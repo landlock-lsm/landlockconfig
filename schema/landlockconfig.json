@@ -1,0 +1,214 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "description": "Landlock security policy configuration schema",
+  "type": "object",
+  "definitions": {
+    "bit": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 63
+    },
+    "uint64": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18446744073709551615
+    },
+    "file": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        }
+      ]
+    },
+    "compatLevel": {
+      "type": "string",
+      "enum": [
+        "best_effort",
+        "soft_requirement",
+        "hard_requirement"
+      ]
+    },
+    "accessFs": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/bit"
+        },
+        {
+          "type": "string",
+          "enum": [
+            "execute",
+            "write_file",
+            "read_file",
+            "read_dir",
+            "remove_dir",
+            "remove_file",
+            "make_char",
+            "make_dir",
+            "make_reg",
+            "make_sock",
+            "make_fifo",
+            "make_block",
+            "make_sym",
+            "refer",
+            "truncate",
+            "ioctl_dev"
+          ]
+        }
+      ]
+    },
+    "accessNet": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/bit"
+        },
+        {
+          "type": "string",
+          "enum": [
+            "bind_tcp",
+            "connect_tcp"
+          ]
+        }
+      ]
+    },
+    "scope": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/bit"
+        },
+        {
+          "type": "string",
+          "enum": [
+            "signal",
+            "abstract_unix_socket"
+          ]
+        }
+      ]
+    }
+  },
+  "properties": {
+    "ruleset": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "oneOf": [
+          {
+            "properties": {
+              "handledAccessFs": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/definitions/accessFs"
+                }
+              },
+              "compatibility": {
+                "$ref": "#/definitions/compatLevel"
+              }
+            },
+            "required": [
+              "handledAccessFs"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "properties": {
+              "handledAccessNet": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/definitions/accessNet"
+                }
+              },
+              "compatibility": {
+                "$ref": "#/definitions/compatLevel"
+              }
+            },
+            "required": [
+              "handledAccessNet"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "properties": {
+              "scope": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/definitions/scope"
+                }
+              },
+              "compatibility": {
+                "$ref": "#/definitions/compatLevel"
+              }
+            },
+            "required": [
+              "scope"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "pathBeneath": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "allowedAccess": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/accessFs"
+            }
+          },
+          "parentFd": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/file"
+            }
+          },
+          "compatibility": {
+            "$ref": "#/definitions/compatLevel"
+          }
+        },
+        "required": [
+          "allowedAccess",
+          "parentFd"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "netPort": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "allowedAccess": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/accessNet"
+            }
+          },
+          "port": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/uint64"
+            }
+          },
+          "compatibility": {
+            "$ref": "#/definitions/compatLevel"
+          }
+        },
+        "required": [
+          "allowedAccess",
+          "port"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "ruleset"
+  ],
+  "additionalProperties": false
+}

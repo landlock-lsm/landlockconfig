@@ -2,6 +2,7 @@
 name = "landlockconfig"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.74"
 description = "Sandboxer library leveraging Landlock with JSON configuration"
 homepage = "https://landlock.io"
 repository = "https://github.com/landlock-lsm/island"

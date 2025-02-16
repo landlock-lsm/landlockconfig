@@ -74,20 +74,6 @@
           ]
         }
       ]
-    },
-    "scope": {
-      "anyOf": [
-        {
-          "$ref": "#/definitions/bit"
-        },
-        {
-          "type": "string",
-          "enum": [
-            "signal",
-            "abstract_unix_socket"
-          ]
-        }
-      ]
     }
   },
   "properties": {
@@ -127,23 +113,6 @@
             },
             "required": [
               "handledAccessNet"
-            ],
-            "additionalProperties": false
-          },
-          {
-            "properties": {
-              "scope": {
-                "type": "array",
-                "items": {
-                  "$ref": "#/definitions/scope"
-                }
-              },
-              "compatibility": {
-                "$ref": "#/definitions/compatLevel"
-              }
-            },
-            "required": [
-              "scope"
             ],
             "additionalProperties": false
           }

@@ -17,7 +17,7 @@ env:
 
 jobs:
   commit_list:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
 
     - uses: actions/checkout@v4
@@ -44,8 +44,8 @@ jobs:
     outputs:
       commits: ${{ toJSON(steps.*.outputs.*) }}
 
-  ubuntu_22_schema:
-    runs-on: ubuntu-22.04
+  ubuntu_24_json:
+    runs-on: ubuntu-24.04
     needs: commit_list
     strategy:
       fail-fast: false
@@ -60,11 +60,14 @@ jobs:
     - name: Install check-jsonschema
       run: pipx install check-jsonschema
 
-    - name: Check JSON schema
+    - name: Check schema format
+      run: diff -u ./schema/landlockconfig.json <(jq < ./schema/landlockconfig.json)
+
+    - name: Check JSON
       run: ./schema/check.sh examples/mini-write-tmp.json
 
-  ubuntu_22_rust_msrv:
-    runs-on: ubuntu-22.04
+  ubuntu_24_rust_msrv:
+    runs-on: ubuntu-24.04
     needs: commit_list
     strategy:
       fail-fast: false
@@ -94,8 +97,8 @@ jobs:
     - name: Run tests
       run: rustup run ${{ env.RUST_TOOLCHAIN }} cargo test --verbose
 
-  ubuntu_22_rust_stable:
-    runs-on: ubuntu-22.04
+  ubuntu_24_rust_stable:
+    runs-on: ubuntu-24.04
     needs: commit_list
     strategy:
       fail-fast: false

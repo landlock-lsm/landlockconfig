@@ -33,6 +33,37 @@ fn test_one_handled_access_fs() {
 }
 
 #[test]
+fn test_all_handled_access_fs() {
+    assert_json(
+        r#"{
+            "ruleset": [
+                {
+                    "handledAccessFs": [
+                        "execute",
+                        "write_file",
+                        "read_file",
+                        "read_dir",
+                        "remove_dir",
+                        "remove_file",
+                        "make_char",
+                        "make_dir",
+                        "make_reg",
+                        "make_sock",
+                        "make_fifo",
+                        "make_block",
+                        "make_sym",
+                        "refer",
+                        "truncate",
+                        "ioctl_dev"
+                        ]
+                }
+            ]
+        }"#,
+        Ok(()),
+    );
+}
+
+#[test]
 fn test_compat_handled_fs_1() {
     assert_json(
         r#"{
@@ -290,6 +321,23 @@ fn test_one_handled_access_net() {
             "ruleset": [
                 {
                     "handledAccessNet": [ "bind_tcp" ]
+                }
+            ]
+        }"#,
+        Ok(()),
+    );
+}
+
+#[test]
+fn test_all_handled_access_net() {
+    assert_json(
+        r#"{
+            "ruleset": [
+                {
+                    "handledAccessNet": [
+                        "bind_tcp",
+                        "connect_tcp"
+                        ]
                 }
             ]
         }"#,

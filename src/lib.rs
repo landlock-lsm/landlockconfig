@@ -1,6 +1,6 @@
 use landlock::{
-    AccessFs, AccessNet, BitFlags, CompatLevel, Compatible, NetPort, PathBeneath,
-    RestrictionStatus, Ruleset, RulesetAttr, RulesetCreated, RulesetCreatedAttr, RulesetError,
+    Access, AccessFs, AccessNet, BitFlags, CompatLevel, Compatible, NetPort, PathBeneath,
+    RestrictionStatus, Ruleset, RulesetAttr, RulesetCreated, RulesetCreatedAttr, RulesetError, ABI,
 };
 use serde::Deserialize;
 use std::collections::BTreeSet;
@@ -74,32 +74,139 @@ enum JsFsAccessItem {
     MakeFifo,
     MakeBlock,
     MakeSym,
+    #[serde(rename = "v1.all")]
+    V1All,
+    #[serde(rename = "v1.read_execute")]
+    V1ReadExecute,
+    #[serde(rename = "v1.read_write")]
+    V1ReadWrite,
     Refer,
+    #[serde(rename = "v2.all")]
+    V2All,
+    #[serde(rename = "v2.read_execute")]
+    V2ReadExecute,
+    #[serde(rename = "v2.read_write")]
+    V2ReadWrite,
     Truncate,
+    #[serde(rename = "v3.all")]
+    V3All,
+    #[serde(rename = "v3.read_execute")]
+    V3ReadExecute,
+    #[serde(rename = "v3.read_write")]
+    V3ReadWrite,
+    #[serde(rename = "v4.all")]
+    V4All,
+    #[serde(rename = "v4.read_execute")]
+    V4ReadExecute,
+    #[serde(rename = "v4.read_write")]
+    V4ReadWrite,
     IoctlDev,
+    #[serde(rename = "v5.all")]
+    V5All,
+    #[serde(rename = "v5.read_execute")]
+    V5ReadExecute,
+    #[serde(rename = "v5.read_write")]
+    V5ReadWrite,
 }
 
-impl From<&JsFsAccessItem> for AccessFs {
+fn get_fs_read_execute(abi: ABI) -> BitFlags<AccessFs> {
+    AccessFs::from_read(abi) | (AccessFs::from_all(abi) & AccessFs::Refer)
+}
+
+fn get_fs_read_write(abi: ABI) -> BitFlags<AccessFs> {
+    // from_all() == from_read() | from_write()
+    AccessFs::from_all(abi) & !AccessFs::Execute
+}
+
+impl From<&JsFsAccessItem> for BitFlags<AccessFs> {
     fn from(js: &JsFsAccessItem) -> Self {
         match js {
-            JsFsAccessItem::Execute => AccessFs::Execute,
-            JsFsAccessItem::WriteFile => AccessFs::WriteFile,
-            JsFsAccessItem::ReadFile => AccessFs::ReadFile,
-            JsFsAccessItem::ReadDir => AccessFs::ReadDir,
-            JsFsAccessItem::RemoveDir => AccessFs::RemoveDir,
-            JsFsAccessItem::RemoveFile => AccessFs::RemoveFile,
-            JsFsAccessItem::MakeChar => AccessFs::MakeChar,
-            JsFsAccessItem::MakeDir => AccessFs::MakeDir,
-            JsFsAccessItem::MakeReg => AccessFs::MakeReg,
-            JsFsAccessItem::MakeSock => AccessFs::MakeSock,
-            JsFsAccessItem::MakeFifo => AccessFs::MakeFifo,
-            JsFsAccessItem::MakeBlock => AccessFs::MakeBlock,
-            JsFsAccessItem::MakeSym => AccessFs::MakeSym,
-            JsFsAccessItem::Refer => AccessFs::Refer,
-            JsFsAccessItem::Truncate => AccessFs::Truncate,
-            JsFsAccessItem::IoctlDev => AccessFs::IoctlDev,
+            JsFsAccessItem::Execute => AccessFs::Execute.into(),
+            JsFsAccessItem::WriteFile => AccessFs::WriteFile.into(),
+            JsFsAccessItem::ReadFile => AccessFs::ReadFile.into(),
+            JsFsAccessItem::ReadDir => AccessFs::ReadDir.into(),
+            JsFsAccessItem::RemoveDir => AccessFs::RemoveDir.into(),
+            JsFsAccessItem::RemoveFile => AccessFs::RemoveFile.into(),
+            JsFsAccessItem::MakeChar => AccessFs::MakeChar.into(),
+            JsFsAccessItem::MakeDir => AccessFs::MakeDir.into(),
+            JsFsAccessItem::MakeReg => AccessFs::MakeReg.into(),
+            JsFsAccessItem::MakeSock => AccessFs::MakeSock.into(),
+            JsFsAccessItem::MakeFifo => AccessFs::MakeFifo.into(),
+            JsFsAccessItem::MakeBlock => AccessFs::MakeBlock.into(),
+            JsFsAccessItem::MakeSym => AccessFs::MakeSym.into(),
+            JsFsAccessItem::V1All => AccessFs::from_all(ABI::V1),
+            JsFsAccessItem::V1ReadExecute => get_fs_read_execute(ABI::V1),
+            JsFsAccessItem::V1ReadWrite => get_fs_read_write(ABI::V1),
+            JsFsAccessItem::Refer => AccessFs::Refer.into(),
+            JsFsAccessItem::V2All => AccessFs::from_all(ABI::V2),
+            JsFsAccessItem::V2ReadExecute => get_fs_read_execute(ABI::V2),
+            JsFsAccessItem::V2ReadWrite => get_fs_read_write(ABI::V2),
+            JsFsAccessItem::Truncate => AccessFs::Truncate.into(),
+            JsFsAccessItem::V3All => AccessFs::from_all(ABI::V3),
+            JsFsAccessItem::V3ReadExecute => get_fs_read_execute(ABI::V3),
+            JsFsAccessItem::V3ReadWrite => get_fs_read_write(ABI::V3),
+            JsFsAccessItem::V4All => AccessFs::from_all(ABI::V4),
+            JsFsAccessItem::V4ReadExecute => get_fs_read_execute(ABI::V4),
+            JsFsAccessItem::V4ReadWrite => get_fs_read_write(ABI::V4),
+            JsFsAccessItem::IoctlDev => AccessFs::IoctlDev.into(),
+            JsFsAccessItem::V5All => AccessFs::from_all(ABI::V5),
+            JsFsAccessItem::V5ReadExecute => get_fs_read_execute(ABI::V5),
+            JsFsAccessItem::V5ReadWrite => get_fs_read_write(ABI::V5),
         }
     }
+}
+
+#[test]
+fn test_v1_read_execute() {
+    let rx: BitFlags<AccessFs> = (&JsFsAccessItem::V1ReadExecute).into();
+    assert_eq!(
+        rx,
+        AccessFs::Execute | AccessFs::ReadFile | AccessFs::ReadDir
+    );
+
+    assert!(rx.contains(AccessFs::Execute));
+
+    // Refer is only available since v2.
+    assert!(!rx.contains(AccessFs::Refer));
+}
+
+#[test]
+fn test_v2_read_execute() {
+    let rx: BitFlags<AccessFs> = (&JsFsAccessItem::V2ReadExecute).into();
+    assert!(rx.contains(AccessFs::Execute));
+    assert!(rx.contains(AccessFs::Refer));
+}
+
+#[test]
+fn test_v1_read_write() {
+    let rw: BitFlags<AccessFs> = (&JsFsAccessItem::V1ReadWrite).into();
+    assert_eq!(
+        rw,
+        AccessFs::WriteFile
+            | AccessFs::ReadFile
+            | AccessFs::ReadDir
+            | AccessFs::RemoveDir
+            | AccessFs::RemoveFile
+            | AccessFs::MakeChar
+            | AccessFs::MakeDir
+            | AccessFs::MakeReg
+            | AccessFs::MakeSock
+            | AccessFs::MakeFifo
+            | AccessFs::MakeBlock
+            | AccessFs::MakeSym
+    );
+
+    assert!(!rw.contains(AccessFs::Execute));
+
+    // Refer is only available since v2.
+    assert!(!rw.contains(AccessFs::Refer));
+}
+
+#[test]
+fn test_v2_read_write() {
+    let rw: BitFlags<AccessFs> = (&JsFsAccessItem::V2ReadWrite).into();
+    assert!(!rw.contains(AccessFs::Execute));
+    assert!(rw.contains(AccessFs::Refer));
 }
 
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
@@ -109,7 +216,7 @@ struct JsFsAccessSet(BTreeSet<JsFsAccessItem>);
 impl From<&JsFsAccessSet> for BitFlags<AccessFs> {
     fn from(set: &JsFsAccessSet) -> Self {
         set.0.iter().fold(BitFlags::EMPTY, |flags, item| {
-            let access: AccessFs = item.into();
+            let access: BitFlags<AccessFs> = item.into();
             flags | access
         })
     }
@@ -120,13 +227,19 @@ impl From<&JsFsAccessSet> for BitFlags<AccessFs> {
 enum JsNetAccessItem {
     BindTcp,
     ConnectTcp,
+    #[serde(rename = "v4.all")]
+    V4All,
+    #[serde(rename = "v5.all")]
+    V5All,
 }
 
-impl From<&JsNetAccessItem> for AccessNet {
+impl From<&JsNetAccessItem> for BitFlags<AccessNet> {
     fn from(js: &JsNetAccessItem) -> Self {
         match js {
-            JsNetAccessItem::BindTcp => AccessNet::BindTcp,
-            JsNetAccessItem::ConnectTcp => AccessNet::ConnectTcp,
+            JsNetAccessItem::BindTcp => AccessNet::BindTcp.into(),
+            JsNetAccessItem::ConnectTcp => AccessNet::ConnectTcp.into(),
+            JsNetAccessItem::V4All => AccessNet::from_all(ABI::V4),
+            JsNetAccessItem::V5All => AccessNet::from_all(ABI::V5),
         }
     }
 }
@@ -138,7 +251,7 @@ struct JsNetAccessSet(BTreeSet<JsNetAccessItem>);
 impl From<&JsNetAccessSet> for BitFlags<AccessNet> {
     fn from(set: &JsNetAccessSet) -> Self {
         set.0.iter().fold(BitFlags::EMPTY, |flags, item| {
-            let access: AccessNet = item.into();
+            let access: BitFlags<AccessNet> = item.into();
             flags | access
         })
     }

@@ -52,9 +52,24 @@ fn test_all_handled_access_fs() {
                         "make_fifo",
                         "make_block",
                         "make_sym",
+                        "v1.all",
+                        "v1.read_execute",
+                        "v1.read_write",
                         "refer",
+                        "v2.all",
+                        "v2.read_execute",
+                        "v2.read_write",
                         "truncate",
-                        "ioctl_dev"
+                        "v3.all",
+                        "v3.read_execute",
+                        "v3.read_write",
+                        "v4.all",
+                        "v4.read_execute",
+                        "v4.read_write",
+                        "ioctl_dev",
+                        "v5.all",
+                        "v5.read_execute",
+                        "v5.read_write"
                         ]
                 }
             ]
@@ -336,7 +351,9 @@ fn test_all_handled_access_net() {
                 {
                     "handledAccessNet": [
                         "bind_tcp",
-                        "connect_tcp"
+                        "connect_tcp",
+                        "v4.all",
+                        "v5.all"
                         ]
                 }
             ]

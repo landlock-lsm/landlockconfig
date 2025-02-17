@@ -66,7 +66,6 @@ https://github.com/opencontainers/runtime-spec/pull/1241#pullrequestreview-25958
 
 The configuration should ease conciseness (e.g., by handling arrays of paths).
 
-**TODO:**
 The configuration should handle groups of access rights per [Landlock ABI
 version](https://landlock.io/rust-landlock/landlock/enum.ABI.html).
 

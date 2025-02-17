@@ -1,116 +1,115 @@
 use landlockconfig::*;
-use std::io::Cursor;
+use serde_json::error::Category;
+
+fn assert_json(data: &str, ret: Result<(), Category>) {
+    let cursor = std::io::Cursor::new(data);
+    let parsing_ret = parse_config(cursor).map(|_| ()).map_err(|e| e.classify());
+    assert_eq!(parsing_ret, ret);
+}
 
 // FIXME: Such an empty ruleset doesn't make sense and should not be allowed.
 #[test]
 fn test_empty_ruleset() {
-    let json = r#"
-        {
+    assert_json(
+        r#"{
             "ruleset": []
-        }
-        "#;
-
-    parse_config(Cursor::new(json)).unwrap();
+        }"#,
+        Ok(()),
+    );
 }
 
 #[test]
 fn test_one_handled_access_fs() {
-    let json = r#"
-        {
+    assert_json(
+        r#"{
             "ruleset": [
                 {
                     "handledAccessFs": [ "execute" ]
                 }
             ]
-        }
-        "#;
-
-    parse_config(Cursor::new(json)).unwrap();
+        }"#,
+        Ok(()),
+    );
 }
 
 #[test]
 fn test_compat_handled_fs_1() {
-    let json = r#"
-        {
+    assert_json(
+        r#"{
             "ruleset": [
                 {
                     "handledAccessFs": [ "execute" ],
                     "compatibility": "best_effort"
                 }
             ]
-        }
-        "#;
-
-    parse_config(Cursor::new(json)).unwrap();
+        }"#,
+        Ok(()),
+    );
 }
 
 #[test]
 fn test_compat_handled_fs_2() {
-    let json = r#"
-        {
+    assert_json(
+        r#"{
             "ruleset": [
                 {
                     "handledAccessFs": [ "execute" ],
                     "compatibility": "soft_requirement"
                 }
             ]
-        }
-        "#;
-
-    parse_config(Cursor::new(json)).unwrap();
+        }"#,
+        Ok(()),
+    );
 }
 
 #[test]
 fn test_compat_handled_fs_3() {
-    let json = r#"
-        {
+    assert_json(
+        r#"{
             "ruleset": [
                 {
                     "handledAccessFs": [ "execute" ],
                     "compatibility": "hard_requirement"
                 }
             ]
-        }
-        "#;
-
-    parse_config(Cursor::new(json)).unwrap();
+        }"#,
+        Ok(()),
+    );
 }
 
 #[test]
 fn test_unknown_ruleset_field() {
-    let json = r#"
-        {
+    assert_json(
+        r#"{
             "ruleset": [
                 {
                     "handledAccessFs": [ "execute" ]
                 }
             ],
             "foo": []
-        }
-        "#;
-
-    assert!(parse_config(Cursor::new(json)).is_err());
+        }"#,
+        Err(Category::Data),
+    );
 }
 
 #[test]
 fn test_dup_handled_access_fs_1() {
-    let json = r#"
-        {
+    assert_json(
+        r#"{
             "ruleset": [
                 {
                     "handledAccessFs": [ "execute", "execute" ]
                 }
             ]
-        }
-        "#;
-
-    parse_config(Cursor::new(json)).unwrap();
+        }"#,
+        Ok(()),
+    );
 }
 
 #[test]
 fn test_dup_handled_access_fs_2() {
-    let json = r#"
-        {
+    assert_json(
+        r#"{
             "ruleset": [
                 {
                     "handledAccessFs": [ "execute" ]
@@ -119,46 +118,43 @@ fn test_dup_handled_access_fs_2() {
                     "handledAccessFs": [ "execute" ]
                 }
             ]
-        }
-        "#;
-
-    parse_config(Cursor::new(json)).unwrap();
+        }"#,
+        Ok(()),
+    );
 }
 
 #[test]
 fn test_unknown_handled_access_fs_1() {
-    let json = r#"
-        {
+    assert_json(
+        r#"{
             "ruleset": [
                 {
                     "handledAccessFs": [ "foo" ]
                 }
             ]
-        }
-        "#;
-
-    assert!(parse_config(Cursor::new(json)).is_err());
+        }"#,
+        Err(Category::Data),
+    );
 }
 
 #[test]
 fn test_unknown_handled_access_fs_2() {
-    let json = r#"
-        {
+    assert_json(
+        r#"{
             "ruleset": [
                 {
                     "handledAccessFs": [ "bind_tcp" ]
                 }
             ]
-        }
-        "#;
-
-    assert!(parse_config(Cursor::new(json)).is_err());
+        }"#,
+        Err(Category::Data),
+    );
 }
 
 #[test]
 fn test_one_path_beneath_str() {
-    let json = r#"
-        {
+    assert_json(
+        r#"{
             "ruleset": [
                 {
                     "handledAccessFs": [ "execute" ]
@@ -170,16 +166,15 @@ fn test_one_path_beneath_str() {
                     "parentFd": [ "." ]
                 }
             ]
-        }
-        "#;
-
-    parse_config(Cursor::new(json)).unwrap();
+        }"#,
+        Ok(()),
+    );
 }
 
 #[test]
 fn test_one_path_beneath_int() {
-    let json = r#"
-        {
+    assert_json(
+        r#"{
             "ruleset": [
                 {
                     "handledAccessFs": [ "execute" ]
@@ -191,16 +186,15 @@ fn test_one_path_beneath_int() {
                     "parentFd": [ 2 ]
                 }
             ]
-        }
-        "#;
-
-    parse_config(Cursor::new(json)).unwrap();
+        }"#,
+        Ok(()),
+    );
 }
 
 #[test]
 fn test_compat_path_beneath() {
-    let json = r#"
-        {
+    assert_json(
+        r#"{
             "ruleset": [
                 {
                     "handledAccessFs": [ "execute" ]
@@ -213,16 +207,15 @@ fn test_compat_path_beneath() {
                     "compatibility": "best_effort"
                 }
             ]
-        }
-        "#;
-
-    parse_config(Cursor::new(json)).unwrap();
+        }"#,
+        Ok(()),
+    );
 }
 
 #[test]
 fn test_dup_path_beneath_1() {
-    let json = r#"
-        {
+    assert_json(
+        r#"{
             "ruleset": [
                 {
                     "handledAccessFs": [ "execute" ]
@@ -234,16 +227,15 @@ fn test_dup_path_beneath_1() {
                     "parentFd": [ ".", "." ]
                 }
             ]
-        }
-        "#;
-
-    parse_config(Cursor::new(json)).unwrap();
+        }"#,
+        Ok(()),
+    );
 }
 
 #[test]
 fn test_dup_path_beneath_2() {
-    let json = r#"
-        {
+    assert_json(
+        r#"{
             "ruleset": [
                 {
                     "handledAccessFs": [ "execute" ]
@@ -259,16 +251,15 @@ fn test_dup_path_beneath_2() {
                     "parentFd": [ "." ]
                 }
             ]
-        }
-        "#;
-
-    parse_config(Cursor::new(json)).unwrap();
+        }"#,
+        Ok(()),
+    );
 }
 
 #[test]
 fn test_overlap_path_beneath() {
-    let json = r#"
-        {
+    assert_json(
+        r#"{
             "ruleset": [
                 {
                     "handledAccessFs": [ "execute" ]
@@ -287,77 +278,72 @@ fn test_overlap_path_beneath() {
                     "parentFd": [ "." ]
                 }
             ]
-        }
-        "#;
-
-    parse_config(Cursor::new(json)).unwrap();
+        }"#,
+        Ok(()),
+    );
 }
 
 #[test]
 fn test_one_handled_access_net() {
-    let json = r#"
-        {
+    assert_json(
+        r#"{
             "ruleset": [
                 {
                     "handledAccessNet": [ "bind_tcp" ]
                 }
             ]
-        }
-        "#;
-
-    parse_config(Cursor::new(json)).unwrap();
+        }"#,
+        Ok(()),
+    );
 }
 
 #[test]
 fn test_compat_handled_access_net() {
-    let json = r#"
-        {
+    assert_json(
+        r#"{
             "ruleset": [
                 {
                     "handledAccessNet": [ "bind_tcp" ],
                     "compatibility": "best_effort"
                 }
             ]
-        }
-        "#;
-
-    parse_config(Cursor::new(json)).unwrap();
+        }"#,
+        Ok(()),
+    );
 }
 
 #[test]
 fn test_unknown_handled_access_net_1() {
-    let json = r#"
-        {
+    assert_json(
+        r#"{
             "ruleset": [
                 {
                     "handledAccessNet": [ "foo" ]
                 }
             ]
-        }
-        "#;
-
-    assert!(parse_config(Cursor::new(json)).is_err());
+        }"#,
+        Err(Category::Data),
+    );
 }
 
 #[test]
 fn test_unknown_handled_access_net_2() {
-    let json = r#"
-        {
+    assert_json(
+        r#"{
             "ruleset": [
                 {
                     "handledAccessNet": [ "execute" ]
                 }
             ]
-        }
-        "#;
-
-    assert!(parse_config(Cursor::new(json)).is_err());
+        }"#,
+        Err(Category::Data),
+    );
 }
 
 #[test]
 fn test_one_net_port() {
-    let json = r#"
-        {
+    assert_json(
+        r#"{
             "ruleset": [
                 {
                     "handledAccessNet": [ "bind_tcp" ]
@@ -369,16 +355,15 @@ fn test_one_net_port() {
                     "port": [ 443 ]
                 }
             ]
-        }
-        "#;
-
-    parse_config(Cursor::new(json)).unwrap();
+        }"#,
+        Ok(()),
+    );
 }
 
 #[test]
 fn test_compat_net_port() {
-    let json = r#"
-        {
+    assert_json(
+        r#"{
             "ruleset": [
                 {
                     "handledAccessNet": [ "bind_tcp" ]
@@ -391,33 +376,31 @@ fn test_compat_net_port() {
                     "compatibility": "best_effort"
                 }
             ]
-        }
-        "#;
-
-    parse_config(Cursor::new(json)).unwrap();
+        }"#,
+        Ok(()),
+    );
 }
 
 #[test]
 fn test_inconsistent_handled_access() {
-    let json = r#"
-        {
+    assert_json(
+        r#"{
             "ruleset": [
                 {
                     "handledAccessFs": [ "execute" ],
                     "handledAccessNet": [ "bind_tcp" ]
                 }
             ]
-        }
-        "#;
-
-    assert!(parse_config(Cursor::new(json)).is_err());
+        }"#,
+        Err(Category::Data),
+    );
 }
 
 // FIXME: This should be forbidden at the parser level.
 #[test]
 fn test_inconsistent_access_net() {
-    let json = r#"
-        {
+    assert_json(
+        r#"{
             "ruleset": [
                 {
                     "handledAccessFs": [ "execute" ]
@@ -429,8 +412,7 @@ fn test_inconsistent_access_net() {
                     "port": [ 443 ]
                 }
             ]
-        }
-        "#;
-
-    parse_config(Cursor::new(json)).unwrap();
+        }"#,
+        Ok(()),
+    );
 }

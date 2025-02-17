@@ -2,32 +2,14 @@
   "ruleset": [
     {
       "handledAccessFs": [
-        "execute",
-        "write_file",
-        "read_file",
-        "read_dir",
-        "remove_dir",
-        "remove_file",
-        "make_char",
-        "make_dir",
-        "make_reg",
-        "make_sock",
-        "make_fifo",
-        "make_block",
-        "make_sym",
-        "refer",
-        "truncate",
-        "ioctl_dev"
+        "v5.all"
       ]
     }
   ],
   "pathBeneath": [
     {
       "allowedAccess": [
-        "execute",
-        "read_file",
-        "read_dir",
-        "refer"
+        "v5.read_execute"
       ],
       "parentFd": [
         ".",
@@ -41,18 +23,7 @@
     },
     {
       "allowedAccess": [
-        "write_file",
-        "read_file",
-        "read_dir",
-        "remove_dir",
-        "remove_file",
-        "make_dir",
-        "make_reg",
-        "make_sock",
-        "make_fifo",
-        "make_sym",
-        "refer",
-        "truncate"
+        "v5.read_write"
       ],
       "parentFd": [
         "/tmp"

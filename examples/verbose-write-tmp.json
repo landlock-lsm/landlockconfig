@@ -1,0 +1,62 @@
+{
+  "ruleset": [
+    {
+      "handledAccessFs": [
+        "execute",
+        "write_file",
+        "read_file",
+        "read_dir",
+        "remove_dir",
+        "remove_file",
+        "make_char",
+        "make_dir",
+        "make_reg",
+        "make_sock",
+        "make_fifo",
+        "make_block",
+        "make_sym",
+        "refer",
+        "truncate",
+        "ioctl_dev"
+      ]
+    }
+  ],
+  "pathBeneath": [
+    {
+      "allowedAccess": [
+        "execute",
+        "read_file",
+        "read_dir",
+        "refer"
+      ],
+      "parentFd": [
+        ".",
+        "/bin",
+        "/lib",
+        "/usr",
+        "/dev",
+        "/etc",
+        "/proc"
+      ]
+    },
+    {
+      "allowedAccess": [
+        "write_file",
+        "read_file",
+        "read_dir",
+        "remove_dir",
+        "remove_file",
+        "make_dir",
+        "make_reg",
+        "make_sock",
+        "make_fifo",
+        "make_sym",
+        "refer",
+        "truncate"
+      ],
+      "parentFd": [
+        "/tmp"
+      ]
+    }
+  ]
+}

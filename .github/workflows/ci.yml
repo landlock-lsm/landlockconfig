@@ -63,8 +63,11 @@ jobs:
     - name: Check schema format
       run: diff -u ./schema/landlockconfig.json <(jq < ./schema/landlockconfig.json)
 
-    - name: Check JSON
+    - name: Check JSON mini
       run: ./schema/check.sh examples/mini-write-tmp.json
+
+    - name: Check JSON verbose
+      run: ./schema/check.sh examples/verbose-write-tmp.json
 
   ubuntu_24_rust_msrv:
     runs-on: ubuntu-24.04

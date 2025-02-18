@@ -7,6 +7,34 @@ fn assert_json(data: &str, ret: Result<(), Category>) {
     assert_eq!(parsing_ret, ret);
 }
 
+const LATEST_VERSION: u32 = 5;
+
+fn assert_versions(name: &str, first_known_version: u32) {
+    let known_versions = first_known_version..=LATEST_VERSION;
+    let next_version = LATEST_VERSION + 1;
+    for version in 0..=next_version {
+        let expected = if known_versions.contains(&version) {
+            Ok(())
+        } else {
+            Err(Category::Data)
+        };
+        println!("Testing version {version} and expecting {:?}", expected);
+        assert_json(
+            format!(
+                r#"{{
+                    "ruleset": [
+                        {{
+                            "{name}": [ "v{version}.all" ]
+                        }}
+                    ]
+                }}"#
+            )
+            .as_ref(),
+            expected,
+        );
+    }
+}
+
 // FIXME: Such an empty ruleset doesn't make sense and should not be allowed.
 #[test]
 fn test_empty_ruleset() {
@@ -76,6 +104,11 @@ fn test_all_handled_access_fs() {
         }"#,
         Ok(()),
     );
+}
+
+#[test]
+fn test_versions_access_fs() {
+    assert_versions("handledAccessFs", 1);
 }
 
 #[test]
@@ -360,6 +393,11 @@ fn test_all_handled_access_net() {
         }"#,
         Ok(()),
     );
+}
+
+#[test]
+fn test_versions_access_net() {
+    assert_versions("handledAccessNet", 4);
 }
 
 #[test]

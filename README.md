@@ -104,11 +104,11 @@ the execution traces are similar.
 
 ## Example
 
-Here are the steps to build and use the sandboxer example locally:
+Here are the steps to build and use the sandboxer example:
 ```bash
 git clone https://github.com/landlock-lsm/landlockconfig
 cd landlockconfig
-cargo run --example sandboxer -- -c examples/mini-write-tmp.json sh
+cargo run --example sandboxer -- --json examples/mini-write-tmp.json sh
 ```
 
 A new dedicated tool will be published soon.

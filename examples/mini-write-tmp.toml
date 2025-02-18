@@ -1,0 +1,12 @@
+[[ruleset]]
+handledAccessFs = ["v5.all"]
+
+# Main system directories can be read.
+[[pathBeneath]]
+allowedAccess = ["v5.read_execute"]
+parentFd = [".", "/bin", "/lib", "/usr", "/dev", "/etc", "/proc"]
+
+# Only allow writing to /tmp.
+[[pathBeneath]]
+allowedAccess = ["v5.read_write"]
+parentFd = ["/tmp"]

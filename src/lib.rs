@@ -328,12 +328,18 @@ pub enum BuildRulesetError {
 // Enforcement should only be configured by the caller (e.g. after execve).
 //
 // TODO: take a Config as optional input to compose configuration snippets.
-pub fn parse_config<R>(reader: R) -> Result<Config, serde_json::Error>
+pub fn parse_json<R>(reader: R) -> Result<Config, serde_json::Error>
 where
     R: std::io::Read,
 {
-    let json = serde_json::from_reader::<R, Config>(reader)?;
-    Ok(json)
+    serde_json::from_reader(reader)
+}
+
+#[cfg(feature = "toml")]
+pub fn parse_toml(data: &str) -> Result<Config, toml::de::Error> {
+    // The TOML parser does not handle Read implementations,
+    // see https://github.com/toml-rs/toml/issues/326
+    toml::from_str(data)
 }
 
 pub fn build_ruleset(
@@ -388,7 +394,7 @@ pub fn build_ruleset(
         // WARNING: Will close the related FD (e.g. stdout)
         for port in &rule.port {
             ruleset_created_ref.add_rule(
-                // TODO: Check integer conversion in parse_config(), which would require changing the type of config and specifying where the error is.
+                // TODO: Check integer conversion in parse_json(), which would require changing the type of config and specifying where the error is.
                 NetPort::new((*port).try_into()?, access_net)
                     .set_compatibility((&rule.compatibility).into()),
             )?;

@@ -3,7 +3,7 @@ use serde_json::error::Category;
 
 fn assert_json(data: &str, ret: Result<(), Category>) {
     let cursor = std::io::Cursor::new(data);
-    let parsing_ret = parse_config(cursor).map(|_| ()).map_err(|e| e.classify());
+    let parsing_ret = parse_json(cursor).map(|_| ()).map_err(|e| e.classify());
     assert_eq!(parsing_ret, ret);
 }
 
@@ -61,7 +61,7 @@ fn test_one_handled_access_fs() {
 }
 
 #[test]
-fn test_all_handled_access_fs() {
+fn test_all_handled_access_fs_json() {
     assert_json(
         r#"{
             "ruleset": [
@@ -104,6 +104,47 @@ fn test_all_handled_access_fs() {
         }"#,
         Ok(()),
     );
+}
+
+#[test]
+fn test_all_handled_access_fs_toml() {
+    let data = r#"
+        [[ruleset]]
+        handledAccessFs = [
+            "execute",
+            "write_file",
+            "read_file",
+            "read_dir",
+            "remove_dir",
+            "remove_file",
+            "make_char",
+            "make_dir",
+            "make_reg",
+            "make_sock",
+            "make_fifo",
+            "make_block",
+            "make_sym",
+            "v1.all",
+            "v1.read_execute",
+            "v1.read_write",
+            "refer",
+            "v2.all",
+            "v2.read_execute",
+            "v2.read_write",
+            "truncate",
+            "v3.all",
+            "v3.read_execute",
+            "v3.read_write",
+            "v4.all",
+            "v4.read_execute",
+            "v4.read_write",
+            "ioctl_dev",
+            "v5.all",
+            "v5.read_execute",
+            "v5.read_write",
+        ]
+    "#;
+    assert_eq!(parse_toml(data).map(|_| ()), Ok(()));
 }
 
 #[test]

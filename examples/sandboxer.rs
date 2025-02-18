@@ -1,7 +1,8 @@
 use anyhow::{bail, Context};
 use clap::Parser;
-use landlockconfig::{build_ruleset, parse_config, restrict_self, RulesetStatus};
+use landlockconfig::{build_ruleset, parse_json, parse_toml, restrict_self, RulesetStatus};
 use std::fs::File;
+use std::io::Read;
 use std::os::unix::process::CommandExt;
 use std::process::Command;
 
@@ -12,19 +13,47 @@ use std::process::Command;
 // rights.  Add an option to disable this warning.
 #[derive(Parser, Debug)]
 struct Args {
-    #[arg(short, long)]
-    config: String,
+    #[arg(short, long, required_unless_present = "toml")]
+    json: Option<String>,
+    #[arg(short, long, required_unless_present = "json")]
+    toml: Option<String>,
     #[arg(required = true)]
     command: Vec<String>,
+}
+
+enum Config {
+    Json(String),
+    Toml(String),
 }
 
 fn main() -> anyhow::Result<()> {
     let mut args = Args::parse();
 
-    let config = if args.config == "-" {
-        parse_config(std::io::stdin())?
+    let config_arg = if let Some(json) = args.json.take() {
+        Config::Json(json)
     } else {
-        parse_config(File::open(args.config).context("Failed to open configuration file")?)?
+        // Clap guarantees that toml is Some().
+        Config::Toml(args.toml.take().unwrap())
+    };
+
+    let config = match config_arg {
+        Config::Json(name) => {
+            if name == "-" {
+                parse_json(std::io::stdin())?
+            } else {
+                parse_json(File::open(name).context("Failed to open JSON file")?)?
+            }
+        }
+        Config::Toml(name) => {
+            let data = if name == "-" {
+                let mut buffer = String::new();
+                std::io::stdin().lock().read_to_string(&mut buffer)?;
+                buffer
+            } else {
+                std::fs::read_to_string(name).context("Failed to open TOML file")?
+            };
+            parse_toml(data.as_str())?
+        }
     };
 
     let ruleset = build_ruleset(&config, None)?;

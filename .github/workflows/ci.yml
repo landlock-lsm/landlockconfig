@@ -103,8 +103,11 @@ jobs:
     - name: Build examples
       run: rustup run ${{ env.RUST_TOOLCHAIN }} cargo build --examples --verbose
 
-    - name: Run the sandboxer example
-      run: rustup run ${{ env.RUST_TOOLCHAIN }} cargo run --example sandboxer -- --config examples/mini-write-tmp.json true
+    - name: Run the sandboxer example with JSON
+      run: rustup run ${{ env.RUST_TOOLCHAIN }} cargo run --example sandboxer -- --json examples/mini-write-tmp.json true
+
+    - name: Run the sandboxer example with TOML
+      run: rustup run ${{ env.RUST_TOOLCHAIN }} cargo run --example sandboxer -- --toml examples/mini-write-tmp.toml true
 
   ubuntu_24_rust_stable:
     runs-on: ubuntu-24.04
@@ -135,8 +138,11 @@ jobs:
     - name: Run tests
       run: rustup run stable cargo test --verbose
 
-    - name: Run the sandboxer example
-      run: rustup run stable cargo run --example sandboxer -- --config examples/mini-write-tmp.json true
+    - name: Run the sandboxer example with JSON
+      run: rustup run stable cargo run --example sandboxer -- --json examples/mini-write-tmp.json true
+
+    - name: Run the sandboxer example with TOML
+      run: rustup run stable cargo run --example sandboxer -- --toml examples/mini-write-tmp.toml true
 
     - name: Check format
       run: rustup run stable cargo fmt --all -- --check

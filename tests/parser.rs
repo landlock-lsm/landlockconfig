@@ -271,6 +271,26 @@ fn test_one_path_beneath_int() {
 }
 
 #[test]
+fn test_mixed_path_beneath() {
+    assert_json(
+        r#"{
+            "ruleset": [
+                {
+                    "handledAccessFs": [ "execute" ]
+                }
+            ],
+            "pathBeneath": [
+                {
+                    "allowedAccess": [ "execute" ],
+                    "parentFd": [ ".", 2 ]
+                }
+            ]
+        }"#,
+        Ok(()),
+    );
+}
+
+#[test]
 fn test_compat_path_beneath() {
     assert_json(
         r#"{

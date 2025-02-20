@@ -100,6 +100,12 @@ jobs:
     - name: Run tests
       run: rustup run ${{ env.RUST_TOOLCHAIN }} cargo test --verbose
 
+    - name: Build examples
+      run: rustup run ${{ env.RUST_TOOLCHAIN }} cargo build --examples --verbose
+
+    - name: Run the sandboxer example
+      run: rustup run ${{ env.RUST_TOOLCHAIN }} cargo run --example sandboxer -- --config examples/mini-write-tmp.json true
+
   ubuntu_24_rust_stable:
     runs-on: ubuntu-24.04
     needs: commit_list
@@ -123,8 +129,14 @@ jobs:
     - name: Build
       run: rustup run stable cargo build --verbose
 
+    - name: Build examples
+      run: rustup run stable cargo build --examples --verbose
+
     - name: Run tests
       run: rustup run stable cargo test --verbose
+
+    - name: Run the sandboxer example
+      run: rustup run stable cargo run --example sandboxer -- --config examples/mini-write-tmp.json true
 
     - name: Check format
       run: rustup run stable cargo fmt --all -- --check
@@ -134,6 +146,9 @@ jobs:
 
     - name: Check tests with Clippy
       run: rustup run stable cargo clippy --tests -- --deny warnings
+
+    - name: Check examples with Clippy
+      run: rustup run stable cargo clippy --examples -- --deny warnings
 
     - name: Check documentation
       run: rustup run stable cargo doc --no-deps

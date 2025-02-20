@@ -269,6 +269,24 @@ struct JsRulesetAccessFs {
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
 #[serde(deny_unknown_fields)]
 #[allow(non_snake_case)]
+struct TomlRulesetAccessFs {
+    handled_access_fs: JsFsAccessSet,
+    #[serde(default)]
+    compatibility: JsCompatLevel,
+}
+
+impl From<TomlRulesetAccessFs> for JsRulesetAccessFs {
+    fn from(toml: TomlRulesetAccessFs) -> Self {
+        Self {
+            handledAccessFs: toml.handled_access_fs,
+            compatibility: toml.compatibility,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
+#[serde(deny_unknown_fields)]
+#[allow(non_snake_case)]
 struct JsRulesetAccessNet {
     handledAccessNet: JsNetAccessSet,
     #[serde(default)]
@@ -276,10 +294,44 @@ struct JsRulesetAccessNet {
 }
 
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
+#[serde(deny_unknown_fields)]
+#[allow(non_snake_case)]
+struct TomlRulesetAccessNet {
+    handled_access_net: JsNetAccessSet,
+    #[serde(default)]
+    compatibility: JsCompatLevel,
+}
+
+impl From<TomlRulesetAccessNet> for JsRulesetAccessNet {
+    fn from(toml: TomlRulesetAccessNet) -> Self {
+        Self {
+            handledAccessNet: toml.handled_access_net,
+            compatibility: toml.compatibility,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
 #[serde(deny_unknown_fields, untagged)]
 enum JsRuleset {
     Fs(JsRulesetAccessFs),
     Net(JsRulesetAccessNet),
+}
+
+#[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
+#[serde(deny_unknown_fields, untagged)]
+enum TomlRuleset {
+    Fs(TomlRulesetAccessFs),
+    Net(TomlRulesetAccessNet),
+}
+
+impl From<TomlRuleset> for JsRuleset {
+    fn from(toml: TomlRuleset) -> Self {
+        match toml {
+            TomlRuleset::Fs(fs) => JsRuleset::Fs(fs.into()),
+            TomlRuleset::Net(net) => JsRuleset::Net(net.into()),
+        }
+    }
 }
 
 // TODO: Make paths canonical (e.g. remove extra slashes and dots) and only open the same paths
@@ -296,12 +348,50 @@ struct JsPathBeneath {
 
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
 #[serde(deny_unknown_fields)]
+struct TomlPathBeneath {
+    allowed_access: JsFsAccessSet,
+    parent_fd: BTreeSet<JsFileDescriptorItem>,
+    #[serde(default)]
+    compatibility: JsCompatLevel,
+}
+
+impl From<TomlPathBeneath> for JsPathBeneath {
+    fn from(toml: TomlPathBeneath) -> Self {
+        Self {
+            allowedAccess: toml.allowed_access,
+            parentFd: toml.parent_fd,
+            compatibility: toml.compatibility,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
+#[serde(deny_unknown_fields)]
 #[allow(non_snake_case)]
 struct JsNetPort {
     allowedAccess: JsNetAccessSet,
     port: BTreeSet<u64>,
     #[serde(default)]
     compatibility: JsCompatLevel,
+}
+
+#[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
+#[serde(deny_unknown_fields)]
+struct TomlNetPort {
+    allowed_access: JsNetAccessSet,
+    port: BTreeSet<u64>,
+    #[serde(default)]
+    compatibility: JsCompatLevel,
+}
+
+impl From<TomlNetPort> for JsNetPort {
+    fn from(toml: TomlNetPort) -> Self {
+        Self {
+            allowedAccess: toml.allowed_access,
+            port: toml.port,
+            compatibility: toml.compatibility,
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -311,6 +401,28 @@ pub struct Config {
     ruleset: BTreeSet<JsRuleset>,
     pathBeneath: Option<BTreeSet<JsPathBeneath>>,
     netPort: Option<BTreeSet<JsNetPort>>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct TomlConfig {
+    ruleset: BTreeSet<TomlRuleset>,
+    path_beneath: Option<BTreeSet<TomlPathBeneath>>,
+    net_port: Option<BTreeSet<TomlNetPort>>,
+}
+
+impl From<TomlConfig> for Config {
+    fn from(toml: TomlConfig) -> Self {
+        Self {
+            ruleset: toml.ruleset.into_iter().map(Into::into).collect(),
+            pathBeneath: toml
+                .path_beneath
+                .map(|set| set.into_iter().map(Into::into).collect()),
+            netPort: toml
+                .net_port
+                .map(|set| set.into_iter().map(Into::into).collect()),
+        }
+    }
 }
 
 #[derive(Debug, Error)]
@@ -339,7 +451,7 @@ where
 pub fn parse_toml(data: &str) -> Result<Config, toml::de::Error> {
     // The TOML parser does not handle Read implementations,
     // see https://github.com/toml-rs/toml/issues/326
-    toml::from_str(data)
+    Ok(toml::from_str::<TomlConfig>(data)?.into())
 }
 
 pub fn build_ruleset(

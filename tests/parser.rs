@@ -110,7 +110,7 @@ fn test_all_handled_access_fs_json() {
 fn test_all_handled_access_fs_toml() {
     let data = r#"
         [[ruleset]]
-        handledAccessFs = [
+        handled_access_fs = [
             "execute",
             "write_file",
             "read_file",

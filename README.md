@@ -1,18 +1,28 @@
 # Landlock Config
 
-> **Work in progress:**  The configuration format is currently unstable.
+> **Work in progress:**  The configuration specification is currently unstable.
 
 See https://landlock.io
 
 ## Goal
 
-The goal of Landlock Config is to provide a simple and flexible configuration
-format for defining security policies using Landlock on any kernel versions.
-This format aims to be user-friendly, allowing for manual creation or generation
-through JSON libraries.  It can be used as an intermediate representation
-leveraged by higher-level configuration formats or languages.  The associated
-library is designed to be embeddable in various programs, facilitating
-sandboxing and providing well-defined security and compatibility guarantees.
+The goal of Landlock Config is to define a simple and flexible configuration
+specification for security policies using Landlock, and to provide a reference
+implementation that can parse both [JSON](https://json.org/) and
+[TOML](https://toml.io) formats.  These formats are designed to be easy to
+write, read, and parse, leveraging libraries available in a wide variety of
+programming languages.
+
+For instance, JSON can serve as an intermediate representation leveraged by
+higher-level configuration languages. In contrast, TOML is more user-friendly,
+making it ideal for end users who need to document their configurations and
+minimize errors due to its less strict format.  Both formats translate to the
+same semantics, ensuring that the security policies defined are consistent
+regardless of the format used.
+
+The associated library is designed to be embeddable in various programs,
+facilitating sandboxing and providing well-defined security and compatibility
+guarantees.
 
 ## Configuration principles
 

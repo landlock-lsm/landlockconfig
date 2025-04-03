@@ -29,7 +29,7 @@
         "read_dir",
         "refer"
       ],
-      "parentFd": [
+      "parent": [
         ".",
         "/bin",
         "/lib",
@@ -54,7 +54,7 @@
         "refer",
         "truncate"
       ],
-      "parentFd": [
+      "parent": [
         "/tmp"
       ]
     }

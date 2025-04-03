@@ -1,43 +1,13 @@
 use landlock::{
-    Access, AccessFs, AccessNet, BitFlags, NetPort, PathBeneath, RestrictionStatus, Ruleset,
-    RulesetAttr, RulesetCreated, RulesetCreatedAttr, RulesetError, ABI,
+    Access, AccessFs, AccessNet, BitFlags, NetPort, PathBeneath, PathFd, PathFdError,
+    RestrictionStatus, Ruleset, RulesetAttr, RulesetCreated, RulesetCreatedAttr, RulesetError, ABI,
 };
 use serde::Deserialize;
 use std::collections::BTreeSet;
-use std::fs::File;
 use std::num::TryFromIntError;
-use std::os::fd::{FromRawFd, OwnedFd};
 use thiserror::Error;
 
 pub use landlock::RulesetStatus;
-
-// https://serde.rs/enum-representations.html
-#[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
-#[serde(deny_unknown_fields, untagged)]
-enum JsFileDescriptorItem {
-    Path(String),
-    Fd(i32),
-}
-
-// TODO: Walk through all path and only open them once, including their common parent directory to
-// get a consistent hierarchy.
-//
-// TODO: Use and extend PathFd instead of File.
-impl TryFrom<&JsFileDescriptorItem> for File {
-    type Error = std::io::Error;
-
-    fn try_from(item: &JsFileDescriptorItem) -> Result<Self, Self::Error> {
-        match item {
-            JsFileDescriptorItem::Path(p) => Ok(File::open(p)?),
-            JsFileDescriptorItem::Fd(fd) => {
-                let f = unsafe { File::from_raw_fd(*fd) };
-                // FIXME: Use fcntl(fd, F_GETFD) to check FD instead of panicking.
-                let _ = f.metadata()?;
-                Ok(f)
-            }
-        }
-    }
-}
 
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
@@ -312,21 +282,21 @@ impl From<TomlRuleset> for JsRuleset {
 #[allow(non_snake_case)]
 struct JsPathBeneath {
     allowedAccess: JsFsAccessSet,
-    parentFd: BTreeSet<JsFileDescriptorItem>,
+    parent: BTreeSet<String>,
 }
 
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
 #[serde(deny_unknown_fields)]
 struct TomlPathBeneath {
     allowed_access: JsFsAccessSet,
-    parent_fd: BTreeSet<JsFileDescriptorItem>,
+    parent: BTreeSet<String>,
 }
 
 impl From<TomlPathBeneath> for JsPathBeneath {
     fn from(toml: TomlPathBeneath) -> Self {
         Self {
             allowedAccess: toml.allowed_access,
-            parentFd: toml.parent_fd,
+            parent: toml.parent,
         }
     }
 }
@@ -390,7 +360,7 @@ impl From<TomlConfig> for Config {
 #[non_exhaustive]
 pub enum BuildRulesetError {
     #[error(transparent)]
-    Io(#[from] std::io::Error),
+    PathFd(#[from] PathFdError),
     #[error(transparent)]
     Integer(#[from] TryFromIntError),
     #[error(transparent)]
@@ -418,7 +388,6 @@ pub fn parse_toml(data: &str) -> Result<Config, toml::de::Error> {
 pub fn build_ruleset(
     // TODO: Handle Vec<Config> and automatically merge them.
     config: &Config,
-    _file_descriptors: Option<BTreeSet<OwnedFd>>,
 ) -> Result<RulesetCreated, BuildRulesetError> {
     let mut ruleset = Ruleset::default();
     let ruleset_ref = &mut ruleset;
@@ -444,11 +413,11 @@ pub fn build_ruleset(
         let access_ref = &rule.allowedAccess;
         let access_fs: BitFlags<AccessFs> = access_ref.into();
 
-        // Find in FDs the referenced name
-        // WARNING: Will close the related FD (e.g. stdout)
-        for fd in &rule.parentFd {
-            let parent_fd: File = fd.try_into()?;
-            ruleset_created_ref.add_rule(PathBeneath::new(parent_fd, access_fs))?;
+        // TODO: Walk through all path and only open them once, including their
+        // common parent directory to get a consistent hierarchy.
+        for path in &rule.parent {
+            let parent = PathFd::new(path)?;
+            ruleset_created_ref.add_rule(PathBeneath::new(parent, access_fs))?;
         }
     }
 

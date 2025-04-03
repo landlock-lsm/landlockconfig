@@ -8,18 +8,6 @@
       "minimum": 0,
       "maximum": 18446744073709551615
     },
-    "file": {
-      "anyOf": [
-        {
-          "type": "string"
-        },
-        {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 2147483647
-        }
-      ]
-    },
     "accessFs": {
       "type": "string",
       "enum": [
@@ -114,16 +102,16 @@
               "$ref": "#/definitions/accessFs"
             }
           },
-          "parentFd": {
+          "parent": {
             "type": "array",
             "items": {
-              "$ref": "#/definitions/file"
+              "type": "string"
             }
           }
         },
         "required": [
           "allowedAccess",
-          "parentFd"
+          "parent"
         ],
         "additionalProperties": false
       }

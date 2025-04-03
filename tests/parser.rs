@@ -238,7 +238,7 @@ fn test_one_path_beneath_str() {
             "pathBeneath": [
                 {
                     "allowedAccess": [ "execute" ],
-                    "parentFd": [ "." ]
+                    "parent": [ "." ]
                 }
             ]
         }"#,
@@ -258,31 +258,11 @@ fn test_one_path_beneath_int() {
             "pathBeneath": [
                 {
                     "allowedAccess": [ "execute" ],
-                    "parentFd": [ 2 ]
+                    "parent": [ 2 ]
                 }
             ]
         }"#,
-        Ok(()),
-    );
-}
-
-#[test]
-fn test_mixed_path_beneath() {
-    assert_json(
-        r#"{
-            "ruleset": [
-                {
-                    "handledAccessFs": [ "execute" ]
-                }
-            ],
-            "pathBeneath": [
-                {
-                    "allowedAccess": [ "execute" ],
-                    "parentFd": [ ".", 2 ]
-                }
-            ]
-        }"#,
-        Ok(()),
+        Err(Category::Data),
     );
 }
 
@@ -298,7 +278,7 @@ fn test_dup_path_beneath_1() {
             "pathBeneath": [
                 {
                     "allowedAccess": [ "execute" ],
-                    "parentFd": [ ".", "." ]
+                    "parent": [ ".", "." ]
                 }
             ]
         }"#,
@@ -318,11 +298,11 @@ fn test_dup_path_beneath_2() {
             "pathBeneath": [
                 {
                     "allowedAccess": [ "execute" ],
-                    "parentFd": [ "." ]
+                    "parent": [ "." ]
                 },
                 {
                     "allowedAccess": [ "execute" ],
-                    "parentFd": [ "." ]
+                    "parent": [ "." ]
                 }
             ]
         }"#,
@@ -345,11 +325,11 @@ fn test_overlap_path_beneath() {
             "pathBeneath": [
                 {
                     "allowedAccess": [ "execute" ],
-                    "parentFd": [ "." ]
+                    "parent": [ "." ]
                 },
                 {
                     "allowedAccess": [ "execute", "read_file" ],
-                    "parentFd": [ "." ]
+                    "parent": [ "." ]
                 }
             ]
         }"#,

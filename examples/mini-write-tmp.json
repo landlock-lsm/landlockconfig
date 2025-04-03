@@ -16,7 +16,7 @@
       "allowedAccess": [
         "v5.read_execute"
       ],
-      "parentFd": [
+      "parent": [
         ".",
         "/bin",
         "/lib",
@@ -30,7 +30,7 @@
       "allowedAccess": [
         "v5.read_write"
       ],
-      "parentFd": [
+      "parent": [
         "/tmp"
       ]
     }

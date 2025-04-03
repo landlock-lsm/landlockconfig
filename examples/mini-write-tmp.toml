@@ -7,12 +7,12 @@ handled_access_net = ["bind_tcp"]
 # Main system directories can be read.
 [[path_beneath]]
 allowed_access = ["v5.read_execute"]
-parent_fd = [".", "/bin", "/lib", "/usr", "/dev", "/etc", "/proc",]
+parent = [".", "/bin", "/lib", "/usr", "/dev", "/etc", "/proc",]
 
 # Only allow writing to /tmp.
 [[path_beneath]]
 allowed_access = ["v5.read_write"]
-parent_fd = ["/tmp"]
+parent = ["/tmp"]
 
 # Only web ports are allowed.
 [[net_port]]

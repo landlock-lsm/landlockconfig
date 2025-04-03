@@ -153,51 +153,6 @@ fn test_versions_access_fs() {
 }
 
 #[test]
-fn test_compat_handled_fs_1() {
-    assert_json(
-        r#"{
-            "ruleset": [
-                {
-                    "handledAccessFs": [ "execute" ],
-                    "compatibility": "best_effort"
-                }
-            ]
-        }"#,
-        Ok(()),
-    );
-}
-
-#[test]
-fn test_compat_handled_fs_2() {
-    assert_json(
-        r#"{
-            "ruleset": [
-                {
-                    "handledAccessFs": [ "execute" ],
-                    "compatibility": "soft_requirement"
-                }
-            ]
-        }"#,
-        Ok(()),
-    );
-}
-
-#[test]
-fn test_compat_handled_fs_3() {
-    assert_json(
-        r#"{
-            "ruleset": [
-                {
-                    "handledAccessFs": [ "execute" ],
-                    "compatibility": "hard_requirement"
-                }
-            ]
-        }"#,
-        Ok(()),
-    );
-}
-
-#[test]
 fn test_unknown_ruleset_field() {
     assert_json(
         r#"{
@@ -332,27 +287,6 @@ fn test_mixed_path_beneath() {
 }
 
 #[test]
-fn test_compat_path_beneath() {
-    assert_json(
-        r#"{
-            "ruleset": [
-                {
-                    "handledAccessFs": [ "execute" ]
-                }
-            ],
-            "pathBeneath": [
-                {
-                    "allowedAccess": [ "execute" ],
-                    "parentFd": [ "." ],
-                    "compatibility": "best_effort"
-                }
-            ]
-        }"#,
-        Ok(()),
-    );
-}
-
-#[test]
 fn test_dup_path_beneath_1() {
     assert_json(
         r#"{
@@ -462,21 +396,6 @@ fn test_versions_access_net() {
 }
 
 #[test]
-fn test_compat_handled_access_net() {
-    assert_json(
-        r#"{
-            "ruleset": [
-                {
-                    "handledAccessNet": [ "bind_tcp" ],
-                    "compatibility": "best_effort"
-                }
-            ]
-        }"#,
-        Ok(()),
-    );
-}
-
-#[test]
 fn test_unknown_handled_access_net_1() {
     assert_json(
         r#"{
@@ -517,27 +436,6 @@ fn test_one_net_port() {
                 {
                     "allowedAccess": [ "bind_tcp" ],
                     "port": [ 443 ]
-                }
-            ]
-        }"#,
-        Ok(()),
-    );
-}
-
-#[test]
-fn test_compat_net_port() {
-    assert_json(
-        r#"{
-            "ruleset": [
-                {
-                    "handledAccessNet": [ "bind_tcp" ]
-                }
-            ],
-            "netPort": [
-                {
-                    "allowedAccess": [ "bind_tcp" ],
-                    "port": [ 443 ],
-                    "compatibility": "best_effort"
                 }
             ]
         }"#,

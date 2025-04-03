@@ -1,6 +1,6 @@
 use landlock::{
-    Access, AccessFs, AccessNet, BitFlags, CompatLevel, Compatible, NetPort, PathBeneath,
-    RestrictionStatus, Ruleset, RulesetAttr, RulesetCreated, RulesetCreatedAttr, RulesetError, ABI,
+    Access, AccessFs, AccessNet, BitFlags, NetPort, PathBeneath, RestrictionStatus, Ruleset,
+    RulesetAttr, RulesetCreated, RulesetCreatedAttr, RulesetError, ABI,
 };
 use serde::Deserialize;
 use std::collections::BTreeSet;
@@ -10,25 +10,6 @@ use std::os::fd::{FromRawFd, OwnedFd};
 use thiserror::Error;
 
 pub use landlock::RulesetStatus;
-
-#[derive(Debug, Default, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
-#[serde(deny_unknown_fields, rename_all = "snake_case")]
-enum JsCompatLevel {
-    #[default]
-    BestEffort,
-    SoftRequirement,
-    HardRequirement,
-}
-
-impl From<&JsCompatLevel> for CompatLevel {
-    fn from(js: &JsCompatLevel) -> Self {
-        match js {
-            JsCompatLevel::BestEffort => CompatLevel::BestEffort,
-            JsCompatLevel::SoftRequirement => CompatLevel::SoftRequirement,
-            JsCompatLevel::HardRequirement => CompatLevel::HardRequirement,
-        }
-    }
-}
 
 // https://serde.rs/enum-representations.html
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
@@ -262,8 +243,6 @@ impl From<&JsNetAccessSet> for BitFlags<AccessNet> {
 #[allow(non_snake_case)]
 struct JsRulesetAccessFs {
     handledAccessFs: JsFsAccessSet,
-    #[serde(default)]
-    compatibility: JsCompatLevel,
 }
 
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
@@ -271,15 +250,12 @@ struct JsRulesetAccessFs {
 #[allow(non_snake_case)]
 struct TomlRulesetAccessFs {
     handled_access_fs: JsFsAccessSet,
-    #[serde(default)]
-    compatibility: JsCompatLevel,
 }
 
 impl From<TomlRulesetAccessFs> for JsRulesetAccessFs {
     fn from(toml: TomlRulesetAccessFs) -> Self {
         Self {
             handledAccessFs: toml.handled_access_fs,
-            compatibility: toml.compatibility,
         }
     }
 }
@@ -289,8 +265,6 @@ impl From<TomlRulesetAccessFs> for JsRulesetAccessFs {
 #[allow(non_snake_case)]
 struct JsRulesetAccessNet {
     handledAccessNet: JsNetAccessSet,
-    #[serde(default)]
-    compatibility: JsCompatLevel,
 }
 
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
@@ -298,15 +272,12 @@ struct JsRulesetAccessNet {
 #[allow(non_snake_case)]
 struct TomlRulesetAccessNet {
     handled_access_net: JsNetAccessSet,
-    #[serde(default)]
-    compatibility: JsCompatLevel,
 }
 
 impl From<TomlRulesetAccessNet> for JsRulesetAccessNet {
     fn from(toml: TomlRulesetAccessNet) -> Self {
         Self {
             handledAccessNet: toml.handled_access_net,
-            compatibility: toml.compatibility,
         }
     }
 }
@@ -342,8 +313,6 @@ impl From<TomlRuleset> for JsRuleset {
 struct JsPathBeneath {
     allowedAccess: JsFsAccessSet,
     parentFd: BTreeSet<JsFileDescriptorItem>,
-    #[serde(default)]
-    compatibility: JsCompatLevel,
 }
 
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
@@ -351,8 +320,6 @@ struct JsPathBeneath {
 struct TomlPathBeneath {
     allowed_access: JsFsAccessSet,
     parent_fd: BTreeSet<JsFileDescriptorItem>,
-    #[serde(default)]
-    compatibility: JsCompatLevel,
 }
 
 impl From<TomlPathBeneath> for JsPathBeneath {
@@ -360,7 +327,6 @@ impl From<TomlPathBeneath> for JsPathBeneath {
         Self {
             allowedAccess: toml.allowed_access,
             parentFd: toml.parent_fd,
-            compatibility: toml.compatibility,
         }
     }
 }
@@ -371,8 +337,6 @@ impl From<TomlPathBeneath> for JsPathBeneath {
 struct JsNetPort {
     allowedAccess: JsNetAccessSet,
     port: BTreeSet<u64>,
-    #[serde(default)]
-    compatibility: JsCompatLevel,
 }
 
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
@@ -380,8 +344,6 @@ struct JsNetPort {
 struct TomlNetPort {
     allowed_access: JsNetAccessSet,
     port: BTreeSet<u64>,
-    #[serde(default)]
-    compatibility: JsCompatLevel,
 }
 
 impl From<TomlNetPort> for JsNetPort {
@@ -389,7 +351,6 @@ impl From<TomlNetPort> for JsNetPort {
         Self {
             allowedAccess: toml.allowed_access,
             port: toml.port,
-            compatibility: toml.compatibility,
         }
     }
 }
@@ -466,19 +427,16 @@ pub fn build_ruleset(
             JsRuleset::Fs(r) => {
                 let access_ref = &r.handledAccessFs;
                 let access_fs: BitFlags<AccessFs> = access_ref.into();
-                ruleset_ref.set_compatibility((&r.compatibility).into());
                 ruleset_ref.handle_access(access_fs)?;
             }
             JsRuleset::Net(r) => {
                 let access_ref = &r.handledAccessNet;
                 let access_net: BitFlags<AccessNet> = access_ref.into();
-                ruleset_ref.set_compatibility((&r.compatibility).into());
                 ruleset_ref.handle_access(access_net)?;
             }
         }
     }
 
-    ruleset_ref.set_compatibility(CompatLevel::default());
     let mut ruleset_created = ruleset.create()?;
     let ruleset_created_ref = &mut ruleset_created;
 
@@ -489,12 +447,8 @@ pub fn build_ruleset(
         // Find in FDs the referenced name
         // WARNING: Will close the related FD (e.g. stdout)
         for fd in &rule.parentFd {
-            // TODO: Handle rule.compatibility for fd.
             let parent_fd: File = fd.try_into()?;
-            ruleset_created_ref.add_rule(
-                PathBeneath::new(parent_fd, access_fs)
-                    .set_compatibility((&rule.compatibility).into()),
-            )?;
+            ruleset_created_ref.add_rule(PathBeneath::new(parent_fd, access_fs))?;
         }
     }
 
@@ -507,8 +461,7 @@ pub fn build_ruleset(
         for port in &rule.port {
             ruleset_created_ref.add_rule(
                 // TODO: Check integer conversion in parse_json(), which would require changing the type of config and specifying where the error is.
-                NetPort::new((*port).try_into()?, access_net)
-                    .set_compatibility((&rule.compatibility).into()),
+                NetPort::new((*port).try_into()?, access_net),
             )?;
         }
     }

@@ -20,14 +20,6 @@
         }
       ]
     },
-    "compatLevel": {
-      "type": "string",
-      "enum": [
-        "best_effort",
-        "soft_requirement",
-        "hard_requirement"
-      ]
-    },
     "accessFs": {
       "type": "string",
       "enum": [
@@ -87,9 +79,6 @@
                 "items": {
                   "$ref": "#/definitions/accessFs"
                 }
-              },
-              "compatibility": {
-                "$ref": "#/definitions/compatLevel"
               }
             },
             "required": [
@@ -104,9 +93,6 @@
                 "items": {
                   "$ref": "#/definitions/accessNet"
                 }
-              },
-              "compatibility": {
-                "$ref": "#/definitions/compatLevel"
               }
             },
             "required": [
@@ -133,9 +119,6 @@
             "items": {
               "$ref": "#/definitions/file"
             }
-          },
-          "compatibility": {
-            "$ref": "#/definitions/compatLevel"
           }
         },
         "required": [
@@ -161,9 +144,6 @@
             "items": {
               "$ref": "#/definitions/uint64"
             }
-          },
-          "compatibility": {
-            "$ref": "#/definitions/compatLevel"
           }
         },
         "required": [

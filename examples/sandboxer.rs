@@ -21,7 +21,7 @@ struct Args {
     command: Vec<String>,
 }
 
-enum Config {
+enum ArgConfig {
     Json(String),
     Toml(String),
 }
@@ -29,22 +29,22 @@ enum Config {
 fn main() -> anyhow::Result<()> {
     let mut args = Args::parse();
 
-    let config_arg = if let Some(json) = args.json.take() {
-        Config::Json(json)
+    let arg_config = if let Some(json) = args.json.take() {
+        ArgConfig::Json(json)
     } else {
         // Clap guarantees that toml is Some().
-        Config::Toml(args.toml.take().unwrap())
+        ArgConfig::Toml(args.toml.take().unwrap())
     };
 
-    let config = match config_arg {
-        Config::Json(name) => {
+    let config = match arg_config {
+        ArgConfig::Json(name) => {
             if name == "-" {
                 parse_json(std::io::stdin())?
             } else {
                 parse_json(File::open(name).context("Failed to open JSON file")?)?
             }
         }
-        Config::Toml(name) => {
+        ArgConfig::Toml(name) => {
             let data = if name == "-" {
                 let mut buffer = String::new();
                 std::io::stdin().lock().read_to_string(&mut buffer)?;

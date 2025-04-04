@@ -11,7 +11,7 @@ pub use landlock::RulesetStatus;
 
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
-enum JsFsAccessItem {
+enum JsonFsAccessItem {
     Execute,
     WriteFile,
     ReadFile,
@@ -69,47 +69,47 @@ fn get_fs_read_write(abi: ABI) -> BitFlags<AccessFs> {
     AccessFs::from_all(abi) & !AccessFs::Execute
 }
 
-impl From<&JsFsAccessItem> for BitFlags<AccessFs> {
-    fn from(js: &JsFsAccessItem) -> Self {
+impl From<&JsonFsAccessItem> for BitFlags<AccessFs> {
+    fn from(js: &JsonFsAccessItem) -> Self {
         match js {
-            JsFsAccessItem::Execute => AccessFs::Execute.into(),
-            JsFsAccessItem::WriteFile => AccessFs::WriteFile.into(),
-            JsFsAccessItem::ReadFile => AccessFs::ReadFile.into(),
-            JsFsAccessItem::ReadDir => AccessFs::ReadDir.into(),
-            JsFsAccessItem::RemoveDir => AccessFs::RemoveDir.into(),
-            JsFsAccessItem::RemoveFile => AccessFs::RemoveFile.into(),
-            JsFsAccessItem::MakeChar => AccessFs::MakeChar.into(),
-            JsFsAccessItem::MakeDir => AccessFs::MakeDir.into(),
-            JsFsAccessItem::MakeReg => AccessFs::MakeReg.into(),
-            JsFsAccessItem::MakeSock => AccessFs::MakeSock.into(),
-            JsFsAccessItem::MakeFifo => AccessFs::MakeFifo.into(),
-            JsFsAccessItem::MakeBlock => AccessFs::MakeBlock.into(),
-            JsFsAccessItem::MakeSym => AccessFs::MakeSym.into(),
-            JsFsAccessItem::V1All => AccessFs::from_all(ABI::V1),
-            JsFsAccessItem::V1ReadExecute => get_fs_read_execute(ABI::V1),
-            JsFsAccessItem::V1ReadWrite => get_fs_read_write(ABI::V1),
-            JsFsAccessItem::Refer => AccessFs::Refer.into(),
-            JsFsAccessItem::V2All => AccessFs::from_all(ABI::V2),
-            JsFsAccessItem::V2ReadExecute => get_fs_read_execute(ABI::V2),
-            JsFsAccessItem::V2ReadWrite => get_fs_read_write(ABI::V2),
-            JsFsAccessItem::Truncate => AccessFs::Truncate.into(),
-            JsFsAccessItem::V3All => AccessFs::from_all(ABI::V3),
-            JsFsAccessItem::V3ReadExecute => get_fs_read_execute(ABI::V3),
-            JsFsAccessItem::V3ReadWrite => get_fs_read_write(ABI::V3),
-            JsFsAccessItem::V4All => AccessFs::from_all(ABI::V4),
-            JsFsAccessItem::V4ReadExecute => get_fs_read_execute(ABI::V4),
-            JsFsAccessItem::V4ReadWrite => get_fs_read_write(ABI::V4),
-            JsFsAccessItem::IoctlDev => AccessFs::IoctlDev.into(),
-            JsFsAccessItem::V5All => AccessFs::from_all(ABI::V5),
-            JsFsAccessItem::V5ReadExecute => get_fs_read_execute(ABI::V5),
-            JsFsAccessItem::V5ReadWrite => get_fs_read_write(ABI::V5),
+            JsonFsAccessItem::Execute => AccessFs::Execute.into(),
+            JsonFsAccessItem::WriteFile => AccessFs::WriteFile.into(),
+            JsonFsAccessItem::ReadFile => AccessFs::ReadFile.into(),
+            JsonFsAccessItem::ReadDir => AccessFs::ReadDir.into(),
+            JsonFsAccessItem::RemoveDir => AccessFs::RemoveDir.into(),
+            JsonFsAccessItem::RemoveFile => AccessFs::RemoveFile.into(),
+            JsonFsAccessItem::MakeChar => AccessFs::MakeChar.into(),
+            JsonFsAccessItem::MakeDir => AccessFs::MakeDir.into(),
+            JsonFsAccessItem::MakeReg => AccessFs::MakeReg.into(),
+            JsonFsAccessItem::MakeSock => AccessFs::MakeSock.into(),
+            JsonFsAccessItem::MakeFifo => AccessFs::MakeFifo.into(),
+            JsonFsAccessItem::MakeBlock => AccessFs::MakeBlock.into(),
+            JsonFsAccessItem::MakeSym => AccessFs::MakeSym.into(),
+            JsonFsAccessItem::V1All => AccessFs::from_all(ABI::V1),
+            JsonFsAccessItem::V1ReadExecute => get_fs_read_execute(ABI::V1),
+            JsonFsAccessItem::V1ReadWrite => get_fs_read_write(ABI::V1),
+            JsonFsAccessItem::Refer => AccessFs::Refer.into(),
+            JsonFsAccessItem::V2All => AccessFs::from_all(ABI::V2),
+            JsonFsAccessItem::V2ReadExecute => get_fs_read_execute(ABI::V2),
+            JsonFsAccessItem::V2ReadWrite => get_fs_read_write(ABI::V2),
+            JsonFsAccessItem::Truncate => AccessFs::Truncate.into(),
+            JsonFsAccessItem::V3All => AccessFs::from_all(ABI::V3),
+            JsonFsAccessItem::V3ReadExecute => get_fs_read_execute(ABI::V3),
+            JsonFsAccessItem::V3ReadWrite => get_fs_read_write(ABI::V3),
+            JsonFsAccessItem::V4All => AccessFs::from_all(ABI::V4),
+            JsonFsAccessItem::V4ReadExecute => get_fs_read_execute(ABI::V4),
+            JsonFsAccessItem::V4ReadWrite => get_fs_read_write(ABI::V4),
+            JsonFsAccessItem::IoctlDev => AccessFs::IoctlDev.into(),
+            JsonFsAccessItem::V5All => AccessFs::from_all(ABI::V5),
+            JsonFsAccessItem::V5ReadExecute => get_fs_read_execute(ABI::V5),
+            JsonFsAccessItem::V5ReadWrite => get_fs_read_write(ABI::V5),
         }
     }
 }
 
 #[test]
 fn test_v1_read_execute() {
-    let rx: BitFlags<AccessFs> = (&JsFsAccessItem::V1ReadExecute).into();
+    let rx: BitFlags<AccessFs> = (&JsonFsAccessItem::V1ReadExecute).into();
     assert_eq!(
         rx,
         AccessFs::Execute | AccessFs::ReadFile | AccessFs::ReadDir
@@ -123,14 +123,14 @@ fn test_v1_read_execute() {
 
 #[test]
 fn test_v2_read_execute() {
-    let rx: BitFlags<AccessFs> = (&JsFsAccessItem::V2ReadExecute).into();
+    let rx: BitFlags<AccessFs> = (&JsonFsAccessItem::V2ReadExecute).into();
     assert!(rx.contains(AccessFs::Execute));
     assert!(rx.contains(AccessFs::Refer));
 }
 
 #[test]
 fn test_v1_read_write() {
-    let rw: BitFlags<AccessFs> = (&JsFsAccessItem::V1ReadWrite).into();
+    let rw: BitFlags<AccessFs> = (&JsonFsAccessItem::V1ReadWrite).into();
     assert_eq!(
         rw,
         AccessFs::WriteFile
@@ -155,17 +155,17 @@ fn test_v1_read_write() {
 
 #[test]
 fn test_v2_read_write() {
-    let rw: BitFlags<AccessFs> = (&JsFsAccessItem::V2ReadWrite).into();
+    let rw: BitFlags<AccessFs> = (&JsonFsAccessItem::V2ReadWrite).into();
     assert!(!rw.contains(AccessFs::Execute));
     assert!(rw.contains(AccessFs::Refer));
 }
 
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
 #[serde(deny_unknown_fields)]
-struct JsFsAccessSet(BTreeSet<JsFsAccessItem>);
+struct JsonFsAccessSet(BTreeSet<JsonFsAccessItem>);
 
-impl From<&JsFsAccessSet> for BitFlags<AccessFs> {
-    fn from(set: &JsFsAccessSet) -> Self {
+impl From<&JsonFsAccessSet> for BitFlags<AccessFs> {
+    fn from(set: &JsonFsAccessSet) -> Self {
         set.0.iter().fold(BitFlags::EMPTY, |flags, item| {
             let access: BitFlags<AccessFs> = item.into();
             flags | access
@@ -175,7 +175,7 @@ impl From<&JsFsAccessSet> for BitFlags<AccessFs> {
 
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
-enum JsNetAccessItem {
+enum JsonNetAccessItem {
     BindTcp,
     ConnectTcp,
     #[serde(rename = "v4.all")]
@@ -184,23 +184,23 @@ enum JsNetAccessItem {
     V5All,
 }
 
-impl From<&JsNetAccessItem> for BitFlags<AccessNet> {
-    fn from(js: &JsNetAccessItem) -> Self {
+impl From<&JsonNetAccessItem> for BitFlags<AccessNet> {
+    fn from(js: &JsonNetAccessItem) -> Self {
         match js {
-            JsNetAccessItem::BindTcp => AccessNet::BindTcp.into(),
-            JsNetAccessItem::ConnectTcp => AccessNet::ConnectTcp.into(),
-            JsNetAccessItem::V4All => AccessNet::from_all(ABI::V4),
-            JsNetAccessItem::V5All => AccessNet::from_all(ABI::V5),
+            JsonNetAccessItem::BindTcp => AccessNet::BindTcp.into(),
+            JsonNetAccessItem::ConnectTcp => AccessNet::ConnectTcp.into(),
+            JsonNetAccessItem::V4All => AccessNet::from_all(ABI::V4),
+            JsonNetAccessItem::V5All => AccessNet::from_all(ABI::V5),
         }
     }
 }
 
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
 #[serde(deny_unknown_fields)]
-struct JsNetAccessSet(BTreeSet<JsNetAccessItem>);
+struct JsonNetAccessSet(BTreeSet<JsonNetAccessItem>);
 
-impl From<&JsNetAccessSet> for BitFlags<AccessNet> {
-    fn from(set: &JsNetAccessSet) -> Self {
+impl From<&JsonNetAccessSet> for BitFlags<AccessNet> {
+    fn from(set: &JsonNetAccessSet) -> Self {
         set.0.iter().fold(BitFlags::EMPTY, |flags, item| {
             let access: BitFlags<AccessNet> = item.into();
             flags | access
@@ -211,18 +211,18 @@ impl From<&JsNetAccessSet> for BitFlags<AccessNet> {
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
 #[serde(deny_unknown_fields)]
 #[allow(non_snake_case)]
-struct JsRulesetAccessFs {
-    handledAccessFs: JsFsAccessSet,
+struct JsonRulesetAccessFs {
+    handledAccessFs: JsonFsAccessSet,
 }
 
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
 #[serde(deny_unknown_fields)]
 #[allow(non_snake_case)]
 struct TomlRulesetAccessFs {
-    handled_access_fs: JsFsAccessSet,
+    handled_access_fs: JsonFsAccessSet,
 }
 
-impl From<TomlRulesetAccessFs> for JsRulesetAccessFs {
+impl From<TomlRulesetAccessFs> for JsonRulesetAccessFs {
     fn from(toml: TomlRulesetAccessFs) -> Self {
         Self {
             handledAccessFs: toml.handled_access_fs,
@@ -233,18 +233,18 @@ impl From<TomlRulesetAccessFs> for JsRulesetAccessFs {
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
 #[serde(deny_unknown_fields)]
 #[allow(non_snake_case)]
-struct JsRulesetAccessNet {
-    handledAccessNet: JsNetAccessSet,
+struct JsonRulesetAccessNet {
+    handledAccessNet: JsonNetAccessSet,
 }
 
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
 #[serde(deny_unknown_fields)]
 #[allow(non_snake_case)]
 struct TomlRulesetAccessNet {
-    handled_access_net: JsNetAccessSet,
+    handled_access_net: JsonNetAccessSet,
 }
 
-impl From<TomlRulesetAccessNet> for JsRulesetAccessNet {
+impl From<TomlRulesetAccessNet> for JsonRulesetAccessNet {
     fn from(toml: TomlRulesetAccessNet) -> Self {
         Self {
             handledAccessNet: toml.handled_access_net,
@@ -254,9 +254,9 @@ impl From<TomlRulesetAccessNet> for JsRulesetAccessNet {
 
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
 #[serde(deny_unknown_fields, untagged)]
-enum JsRuleset {
-    Fs(JsRulesetAccessFs),
-    Net(JsRulesetAccessNet),
+enum JsonRuleset {
+    Fs(JsonRulesetAccessFs),
+    Net(JsonRulesetAccessNet),
 }
 
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
@@ -266,11 +266,11 @@ enum TomlRuleset {
     Net(TomlRulesetAccessNet),
 }
 
-impl From<TomlRuleset> for JsRuleset {
+impl From<TomlRuleset> for JsonRuleset {
     fn from(toml: TomlRuleset) -> Self {
         match toml {
-            TomlRuleset::Fs(fs) => JsRuleset::Fs(fs.into()),
-            TomlRuleset::Net(net) => JsRuleset::Net(net.into()),
+            TomlRuleset::Fs(fs) => JsonRuleset::Fs(fs.into()),
+            TomlRuleset::Net(net) => JsonRuleset::Net(net.into()),
         }
     }
 }
@@ -280,19 +280,19 @@ impl From<TomlRuleset> for JsRuleset {
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
 #[serde(deny_unknown_fields)]
 #[allow(non_snake_case)]
-struct JsPathBeneath {
-    allowedAccess: JsFsAccessSet,
+struct JsonPathBeneath {
+    allowedAccess: JsonFsAccessSet,
     parent: BTreeSet<String>,
 }
 
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
 #[serde(deny_unknown_fields)]
 struct TomlPathBeneath {
-    allowed_access: JsFsAccessSet,
+    allowed_access: JsonFsAccessSet,
     parent: BTreeSet<String>,
 }
 
-impl From<TomlPathBeneath> for JsPathBeneath {
+impl From<TomlPathBeneath> for JsonPathBeneath {
     fn from(toml: TomlPathBeneath) -> Self {
         Self {
             allowedAccess: toml.allowed_access,
@@ -304,19 +304,19 @@ impl From<TomlPathBeneath> for JsPathBeneath {
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
 #[serde(deny_unknown_fields)]
 #[allow(non_snake_case)]
-struct JsNetPort {
-    allowedAccess: JsNetAccessSet,
+struct JsonNetPort {
+    allowedAccess: JsonNetAccessSet,
     port: BTreeSet<u64>,
 }
 
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
 #[serde(deny_unknown_fields)]
 struct TomlNetPort {
-    allowed_access: JsNetAccessSet,
+    allowed_access: JsonNetAccessSet,
     port: BTreeSet<u64>,
 }
 
-impl From<TomlNetPort> for JsNetPort {
+impl From<TomlNetPort> for JsonNetPort {
     fn from(toml: TomlNetPort) -> Self {
         Self {
             allowedAccess: toml.allowed_access,
@@ -329,9 +329,9 @@ impl From<TomlNetPort> for JsNetPort {
 #[serde(deny_unknown_fields)]
 #[allow(non_snake_case)]
 pub struct Config {
-    ruleset: BTreeSet<JsRuleset>,
-    pathBeneath: Option<BTreeSet<JsPathBeneath>>,
-    netPort: Option<BTreeSet<JsNetPort>>,
+    ruleset: BTreeSet<JsonRuleset>,
+    pathBeneath: Option<BTreeSet<JsonPathBeneath>>,
+    netPort: Option<BTreeSet<JsonNetPort>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -393,12 +393,12 @@ pub fn build_ruleset(
     let ruleset_ref = &mut ruleset;
     for a in &config.ruleset {
         match a {
-            JsRuleset::Fs(r) => {
+            JsonRuleset::Fs(r) => {
                 let access_ref = &r.handledAccessFs;
                 let access_fs: BitFlags<AccessFs> = access_ref.into();
                 ruleset_ref.handle_access(access_fs)?;
             }
-            JsRuleset::Net(r) => {
+            JsonRuleset::Net(r) => {
                 let access_ref = &r.handledAccessNet;
                 let access_net: BitFlags<AccessNet> = access_ref.into();
                 ruleset_ref.handle_access(access_net)?;

@@ -1,9 +1,11 @@
-use landlockconfig::*;
+use landlockconfig::Config;
 use serde_json::error::Category;
 
 fn assert_json(data: &str, ret: Result<(), Category>) {
     let cursor = std::io::Cursor::new(data);
-    let parsing_ret = parse_json(cursor).map(|_| ()).map_err(|e| e.classify());
+    let parsing_ret = Config::try_from_json(cursor)
+        .map(|_| ())
+        .map_err(|e| e.classify());
     assert_eq!(parsing_ret, ret);
 }
 
@@ -144,7 +146,7 @@ fn test_all_handled_access_fs_toml() {
             "v5.read_write",
         ]
     "#;
-    assert_eq!(parse_toml(data).map(|_| ()), Ok(()));
+    assert_eq!(Config::try_from_toml(data).map(|_| ()), Ok(()));
 }
 
 #[test]

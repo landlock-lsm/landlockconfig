@@ -1,6 +1,6 @@
 use anyhow::{bail, Context};
 use clap::Parser;
-use landlockconfig::{build_ruleset, parse_json, parse_toml, restrict_self, RulesetStatus};
+use landlockconfig::{Config, RulesetStatus};
 use std::fs::File;
 use std::io::Read;
 use std::os::unix::process::CommandExt;
@@ -39,9 +39,9 @@ fn main() -> anyhow::Result<()> {
     let config = match arg_config {
         ArgConfig::Json(name) => {
             if name == "-" {
-                parse_json(std::io::stdin())?
+                Config::try_from_json(std::io::stdin())?
             } else {
-                parse_json(File::open(name).context("Failed to open JSON file")?)?
+                Config::try_from_json(File::open(name).context("Failed to open JSON file")?)?
             }
         }
         ArgConfig::Toml(name) => {
@@ -52,12 +52,12 @@ fn main() -> anyhow::Result<()> {
             } else {
                 std::fs::read_to_string(name).context("Failed to open TOML file")?
             };
-            parse_toml(data.as_str())?
+            Config::try_from_toml(data.as_str())?
         }
     };
 
-    let ruleset = build_ruleset(&config)?;
-    let status = restrict_self(ruleset, None)?;
+    let ruleset = config.create_ruleset()?;
+    let status = ruleset.restrict_self()?;
     if status.ruleset == RulesetStatus::NotEnforced {
         bail!("Landlock is not supported by the running kernel.");
     }

@@ -1,13 +1,13 @@
 use landlock::{
-    Access, AccessFs, AccessNet, BitFlags, NetPort, PathBeneath, PathFd, PathFdError,
-    RestrictionStatus, Ruleset, RulesetAttr, RulesetCreated, RulesetCreatedAttr, RulesetError, ABI,
+    Access, AccessFs, AccessNet, BitFlags, NetPort, PathBeneath, PathFd, PathFdError, Ruleset,
+    RulesetAttr, RulesetCreated, RulesetCreatedAttr, RulesetError, ABI,
 };
 use serde::Deserialize;
 use std::collections::BTreeSet;
 use std::num::TryFromIntError;
 use thiserror::Error;
 
-pub use landlock::RulesetStatus;
+pub use landlock::{RestrictionStatus, RulesetStatus};
 
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
@@ -328,7 +328,7 @@ impl From<TomlNetPort> for JsonNetPort {
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[allow(non_snake_case)]
-pub struct Config {
+struct JsonConfig {
     ruleset: BTreeSet<JsonRuleset>,
     pathBeneath: Option<BTreeSet<JsonPathBeneath>>,
     netPort: Option<BTreeSet<JsonNetPort>>,
@@ -342,7 +342,7 @@ struct TomlConfig {
     net_port: Option<BTreeSet<TomlNetPort>>,
 }
 
-impl From<TomlConfig> for Config {
+impl From<TomlConfig> for JsonConfig {
     fn from(toml: TomlConfig) -> Self {
         Self {
             ruleset: toml.ruleset.into_iter().map(Into::into).collect(),
@@ -358,7 +358,7 @@ impl From<TomlConfig> for Config {
 
 #[derive(Debug, Error)]
 #[non_exhaustive]
-pub enum BuildRulesetError {
+pub enum CreateRulesetError {
     #[error(transparent)]
     PathFd(#[from] PathFdError),
     #[error(transparent)]
@@ -367,81 +367,79 @@ pub enum BuildRulesetError {
     Ruleset(#[from] RulesetError),
 }
 
-// Logging denials should be configurable by users but also overridable by the caller.
-// Enforcement should only be configured by the caller (e.g. after execve).
-//
-// TODO: take a Config as optional input to compose configuration snippets.
-pub fn parse_json<R>(reader: R) -> Result<Config, serde_json::Error>
-where
-    R: std::io::Read,
-{
-    serde_json::from_reader(reader)
-}
-
-#[cfg(feature = "toml")]
-pub fn parse_toml(data: &str) -> Result<Config, toml::de::Error> {
-    // The TOML parser does not handle Read implementations,
-    // see https://github.com/toml-rs/toml/issues/326
-    Ok(toml::from_str::<TomlConfig>(data)?.into())
-}
-
-pub fn build_ruleset(
-    // TODO: Handle Vec<Config> and automatically merge them.
-    config: &Config,
-) -> Result<RulesetCreated, BuildRulesetError> {
-    let mut ruleset = Ruleset::default();
-    let ruleset_ref = &mut ruleset;
-    for a in &config.ruleset {
-        match a {
-            JsonRuleset::Fs(r) => {
-                let access_ref = &r.handledAccessFs;
-                let access_fs: BitFlags<AccessFs> = access_ref.into();
-                ruleset_ref.handle_access(access_fs)?;
-            }
-            JsonRuleset::Net(r) => {
-                let access_ref = &r.handledAccessNet;
-                let access_net: BitFlags<AccessNet> = access_ref.into();
-                ruleset_ref.handle_access(access_net)?;
+impl JsonConfig {
+    fn create_ruleset(
+        &self, // TODO: Handle Vec<Config> and automatically merge them.
+    ) -> Result<RulesetCreated, CreateRulesetError> {
+        let mut ruleset = Ruleset::default();
+        let ruleset_ref = &mut ruleset;
+        for a in &self.ruleset {
+            match a {
+                JsonRuleset::Fs(r) => {
+                    let access_ref = &r.handledAccessFs;
+                    let access_fs: BitFlags<AccessFs> = access_ref.into();
+                    ruleset_ref.handle_access(access_fs)?;
+                }
+                JsonRuleset::Net(r) => {
+                    let access_ref = &r.handledAccessNet;
+                    let access_net: BitFlags<AccessNet> = access_ref.into();
+                    ruleset_ref.handle_access(access_net)?;
+                }
             }
         }
-    }
 
-    let mut ruleset_created = ruleset.create()?;
-    let ruleset_created_ref = &mut ruleset_created;
+        let mut ruleset_created = ruleset.create()?;
+        let ruleset_created_ref = &mut ruleset_created;
 
-    for rule in config.pathBeneath.iter().flatten() {
-        let access_ref = &rule.allowedAccess;
-        let access_fs: BitFlags<AccessFs> = access_ref.into();
+        for rule in self.pathBeneath.iter().flatten() {
+            let access_ref = &rule.allowedAccess;
+            let access_fs: BitFlags<AccessFs> = access_ref.into();
 
-        // TODO: Walk through all path and only open them once, including their
-        // common parent directory to get a consistent hierarchy.
-        for path in &rule.parent {
-            let parent = PathFd::new(path)?;
-            ruleset_created_ref.add_rule(PathBeneath::new(parent, access_fs))?;
+            // TODO: Walk through all path and only open them once, including their
+            // common parent directory to get a consistent hierarchy.
+            for path in &rule.parent {
+                let parent = PathFd::new(path)?;
+                ruleset_created_ref.add_rule(PathBeneath::new(parent, access_fs))?;
+            }
         }
-    }
 
-    for rule in config.netPort.iter().flatten() {
-        let access_ref = &rule.allowedAccess;
-        let access_net: BitFlags<AccessNet> = access_ref.into();
+        for rule in self.netPort.iter().flatten() {
+            let access_ref = &rule.allowedAccess;
+            let access_net: BitFlags<AccessNet> = access_ref.into();
 
-        // Find in FDs the referenced name
-        // WARNING: Will close the related FD (e.g. stdout)
-        for port in &rule.port {
-            ruleset_created_ref.add_rule(
-                // TODO: Check integer conversion in parse_json(), which would require changing the type of config and specifying where the error is.
-                NetPort::new((*port).try_into()?, access_net),
-            )?;
+            // Find in FDs the referenced name
+            // WARNING: Will close the related FD (e.g. stdout)
+            for port in &rule.port {
+                ruleset_created_ref.add_rule(
+                    // TODO: Check integer conversion in parse_json(), which would require changing the type of config and specifying where the error is.
+                    NetPort::new((*port).try_into()?, access_net),
+                )?;
+            }
         }
-    }
 
-    Ok(ruleset_created)
+        Ok(ruleset_created)
+    }
 }
 
-pub fn restrict_self(
-    ruleset_created: RulesetCreated,
-    _config: Option<&Config>,
-) -> Result<RestrictionStatus, RulesetError> {
-    // With future Landlock features, specified in config, we should be able to change the behavior of restrict_self(): e.g. log flags, context of restriction...
-    ruleset_created.restrict_self()
+pub struct Config(JsonConfig);
+
+// TODO: Add a merge method to compose with another Config.
+impl Config {
+    pub fn try_from_json<R>(reader: R) -> Result<Self, serde_json::Error>
+    where
+        R: std::io::Read,
+    {
+        Ok(Self(serde_json::from_reader::<_, JsonConfig>(reader)?))
+    }
+
+    #[cfg(feature = "toml")]
+    pub fn try_from_toml(data: &str) -> Result<Self, toml::de::Error> {
+        // The TOML parser does not handle Read implementations,
+        // see https://github.com/toml-rs/toml/issues/326
+        Ok(Self(toml::from_str::<TomlConfig>(data)?.into()))
+    }
+
+    pub fn create_ruleset(&self) -> Result<RulesetCreated, CreateRulesetError> {
+        self.0.create_ruleset()
+    }
 }

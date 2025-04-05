@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0 OR MIT
+
 name: CI
 
 permissions: {}
@@ -93,16 +95,19 @@ jobs:
         rustup update ${{ env.RUST_TOOLCHAIN }}
 
     - name: Build
-      run: rustup run ${{ env.RUST_TOOLCHAIN }} cargo build --verbose
+      run: rustup run ${{ env.RUST_TOOLCHAIN }} cargo build --all --verbose
 
     - name: Build tests
-      run: rustup run ${{ env.RUST_TOOLCHAIN }} cargo build --tests --verbose
+      run: rustup run ${{ env.RUST_TOOLCHAIN }} cargo build --all --tests --verbose
 
     - name: Run tests
-      run: rustup run ${{ env.RUST_TOOLCHAIN }} cargo test --verbose
+      run: rustup run ${{ env.RUST_TOOLCHAIN }} cargo test --all --verbose
 
     - name: Build examples
-      run: rustup run ${{ env.RUST_TOOLCHAIN }} cargo build --examples --verbose
+      run: rustup run ${{ env.RUST_TOOLCHAIN }} cargo build --all --examples --verbose
+
+    - name: Check golden file changes by ffi/build.rs
+      run: s="$(set -o pipefail; git status --porcelain=1 | tee >(cat >&2))" && [[ -z "$s" ]]
 
     - name: Run the sandboxer example with JSON
       run: rustup run ${{ env.RUST_TOOLCHAIN }} cargo run --example sandboxer -- --json examples/mini-write-tmp.json true
@@ -132,13 +137,16 @@ jobs:
         ref: ${{ matrix.commit }}
 
     - name: Build
-      run: rustup run stable cargo build --verbose
+      run: rustup run stable cargo build --all --verbose
 
     - name: Build examples
-      run: rustup run stable cargo build --examples --verbose
+      run: rustup run stable cargo build --all --examples --verbose
+
+    - name: Check golden file changes by ffi/build.rs
+      run: s="$(set -o pipefail; git status --porcelain=1 | tee >(cat >&2))" && [[ -z "$s" ]]
 
     - name: Run tests
-      run: rustup run stable cargo test --verbose
+      run: rustup run stable cargo test --all --verbose
 
     - name: Run the sandboxer example with JSON
       run: rustup run stable cargo run --example sandboxer -- --json examples/mini-write-tmp.json true
@@ -150,13 +158,19 @@ jobs:
       run: rustup run stable cargo fmt --all -- --check
 
     - name: Check source with Clippy
-      run: rustup run stable cargo clippy -- --deny warnings
+      run: rustup run stable cargo clippy --all -- --deny warnings
 
     - name: Check tests with Clippy
-      run: rustup run stable cargo clippy --tests -- --deny warnings
+      run: rustup run stable cargo clippy --all --tests -- --deny warnings
 
     - name: Check examples with Clippy
-      run: rustup run stable cargo clippy --examples -- --deny warnings
+      run: rustup run stable cargo clippy --all --examples -- --deny warnings
 
     - name: Check documentation
       run: rustup run stable cargo doc --no-deps
+
+    - name: Build C example
+      run: make -C c/examples
+
+    - name: Run C example
+      run: cd c/examples && LD_LIBRARY_PATH=../../target/release ./sandboxer true

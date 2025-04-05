@@ -1,0 +1,18 @@
+[package]
+name = "landlockconfig_ffi"
+version = "0.0.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "staticlib"]
+name = "landlockconfig"
+
+[dependencies]
+landlock.workspace = true
+landlockconfig = { path = ".." }
+libc = "0.2.171"
+
+[build-dependencies]
+cbindgen = "0.28.0"

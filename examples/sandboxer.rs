@@ -56,7 +56,7 @@ fn main() -> anyhow::Result<()> {
         }
     };
 
-    let ruleset = config.create_ruleset()?;
+    let ruleset = config.build_ruleset()?;
     let status = ruleset.restrict_self()?;
     if status.ruleset == RulesetStatus::NotEnforced {
         bail!("Landlock is not supported by the running kernel.");

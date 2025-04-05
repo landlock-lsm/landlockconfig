@@ -358,7 +358,7 @@ impl From<TomlConfig> for JsonConfig {
 
 #[derive(Debug, Error)]
 #[non_exhaustive]
-pub enum CreateRulesetError {
+pub enum BuildRulesetError {
     #[error(transparent)]
     PathFd(#[from] PathFdError),
     #[error(transparent)]
@@ -368,9 +368,9 @@ pub enum CreateRulesetError {
 }
 
 impl JsonConfig {
-    fn create_ruleset(
+    fn build_ruleset(
         &self, // TODO: Handle Vec<Config> and automatically merge them.
-    ) -> Result<RulesetCreated, CreateRulesetError> {
+    ) -> Result<RulesetCreated, BuildRulesetError> {
         let mut ruleset = Ruleset::default();
         let ruleset_ref = &mut ruleset;
         for a in &self.ruleset {
@@ -439,7 +439,7 @@ impl Config {
         Ok(Self(toml::from_str::<TomlConfig>(data)?.into()))
     }
 
-    pub fn create_ruleset(&self) -> Result<RulesetCreated, CreateRulesetError> {
-        self.0.create_ruleset()
+    pub fn build_ruleset(&self) -> Result<RulesetCreated, BuildRulesetError> {
+        self.0.build_ruleset()
     }
 }

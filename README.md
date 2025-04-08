@@ -34,15 +34,6 @@ related [JSON schema](schema/landlockconfig.json).
 As the Landlock kernel maintainers, we can guarantee that the specification and
 the library will be kept in sync with kernel changes.
 
-### File descriptor handling
-
-Landlock identifies kernel objects (e.g., file hierarchy) with file descriptors.
-This makes it possible to enforce race-condition-free security policies. File
-descriptors are first-class citizens and can be directly specified in a Landlock
-configuration file. However, we also need to be able to identify non-opened
-files with paths. Both file descriptors and file paths are relative to the
-process enforcing a security policy.
-
 ### Backward and forward compatibilities
 
 Because the Linux kernel and user space might be updated independently according

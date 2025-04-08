@@ -2,6 +2,7 @@
 
 #include <fcntl.h>
 #include <stdio.h>
+#include <string.h>
 #include <sys/prctl.h>
 #include <syscall.h>
 #include <unistd.h>
@@ -37,14 +38,16 @@ int main(int argc, char *argv[], char *envp[])
 	config = landlockconfig_parse_toml_file(config_fd, 0);
 	close(config_fd);
 	if ((long)config <= 0) {
-		perror("Failed to parse config");
+		fprintf(stderr, "Failed to parse configuration in '%s': %s\n",
+			config_file, strerror(-(long)config));
 		return 1;
 	}
 
 	ruleset_fd = landlockconfig_build_ruleset(config, 0);
 	landlockconfig_free(config);
 	if (ruleset_fd < 0) {
-		perror("Failed to restrict");
+		fprintf(stderr, "Failed to build ruleset: %s\n",
+			strerror(-ruleset_fd));
 		return 1;
 	}
 

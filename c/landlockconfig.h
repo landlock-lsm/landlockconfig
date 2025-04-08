@@ -17,7 +17,7 @@ extern "C" {
  *
  * * Pointer to a landlockconfig object on success. This object must be freed
  *   with landlockconfig_free().
- * * -1 on error, and errno set to the error code.
+ * * -errno on error.
  */
 struct landlockconfig *landlockconfig_parse_json(int config_fd);
 
@@ -28,7 +28,7 @@ struct landlockconfig *landlockconfig_parse_json(int config_fd);
  *
  * * Pointer to a landlockconfig object on success. This object must be freed
  *   with landlockconfig_free().
- * * -1 on error, and errno set to the error code.
+ * * -errno on error.
  */
 struct landlockconfig *landlockconfig_parse_toml(int config_fd);
 
@@ -53,7 +53,7 @@ void landlockconfig_free(struct landlockconfig *config);
  * # Returns
  *
  * * The ruleset file descriptor on success.
- * * -1 on error, and errno set to the error code.
+ * * -errno on error.
  */
 int landlockconfig_build_ruleset(const struct landlockconfig *config);
 

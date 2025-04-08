@@ -18,10 +18,7 @@ where
         eprintln!("Error: Invalid errno value: {errno}");
         errno = libc::EIO;
     }
-    unsafe {
-        *libc::__errno_location() = errno;
-    }
-    -1
+    -errno
 }
 
 fn parse_file<F>(config_fd: RawFd, flags: u32, parser: F) -> Result<*mut Config, Errno>
@@ -56,7 +53,7 @@ where
 ///
 /// * Pointer to a landlockconfig object on success. This object must be freed
 ///   with landlockconfig_free().
-/// * -1 on error, and errno set to the error code.
+/// * -errno on error.
 #[no_mangle]
 pub extern "C" fn landlockconfig_parse_json_file(config_fd: RawFd, flags: u32) -> *mut Config {
     parse_file(config_fd, flags, |file| {
@@ -78,7 +75,7 @@ pub extern "C" fn landlockconfig_parse_json_file(config_fd: RawFd, flags: u32) -
 ///
 /// * Pointer to a landlockconfig object on success. This object must be freed
 ///   with landlockconfig_free().
-/// * -1 on error, and errno set to the error code.
+/// * -errno on error.
 #[no_mangle]
 pub extern "C" fn landlockconfig_parse_toml_file(config_fd: RawFd, flags: u32) -> *mut Config {
     parse_file(config_fd, flags, |mut file| {
@@ -119,7 +116,7 @@ pub unsafe extern "C" fn landlockconfig_free(config: *mut Config) {
 /// # Returns
 ///
 /// * The ruleset file descriptor on success.
-/// * -1 on error, and errno set to the error code.
+/// * -errno on error.
 #[no_mangle]
 pub unsafe extern "C" fn landlockconfig_build_ruleset(config: *const Config, flags: u32) -> RawFd {
     if flags != 0 {

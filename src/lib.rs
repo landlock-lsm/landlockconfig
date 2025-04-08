@@ -3,8 +3,9 @@ use landlock::{
     RulesetAttr, RulesetCreated, RulesetCreatedAttr, RulesetError, ABI,
 };
 use serde::Deserialize;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::num::TryFromIntError;
+use std::path::PathBuf;
 use thiserror::Error;
 
 pub use landlock::{RestrictionStatus, RulesetStatus};
@@ -367,79 +368,106 @@ pub enum BuildRulesetError {
     Ruleset(#[from] RulesetError),
 }
 
-impl JsonConfig {
-    fn build_ruleset(
-        &self, // TODO: Handle Vec<Config> and automatically merge them.
-    ) -> Result<RulesetCreated, BuildRulesetError> {
-        let mut ruleset = Ruleset::default();
-        let ruleset_ref = &mut ruleset;
-        for a in &self.ruleset {
-            match a {
-                JsonRuleset::Fs(r) => {
-                    let access_ref = &r.handledAccessFs;
-                    let access_fs: BitFlags<AccessFs> = access_ref.into();
-                    ruleset_ref.handle_access(access_fs)?;
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct Config {
+    handled_fs: BitFlags<AccessFs>,
+    handled_net: BitFlags<AccessNet>,
+    // Thanks to the BTreeMap:
+    // * the paths are unique, which guarantee that allowed access are only set once for each path;
+    // * the paths are sorted (the longest path is the last one), which makes configurations deterministic and idempotent.
+    // Thanks to PathBuf, paths are normalized.
+    rules_path_beneath: BTreeMap<PathBuf, BitFlags<AccessFs>>,
+    rules_net_port: BTreeMap<u64, BitFlags<AccessNet>>,
+}
+
+impl From<JsonConfig> for Config {
+    fn from(json: JsonConfig) -> Self {
+        let mut config = Self::default();
+
+        for ruleset in json.ruleset {
+            match ruleset {
+                JsonRuleset::Fs(fs) => {
+                    let access: BitFlags<AccessFs> = (&fs.handledAccessFs).into();
+                    config.handled_fs |= access;
                 }
-                JsonRuleset::Net(r) => {
-                    let access_ref = &r.handledAccessNet;
-                    let access_net: BitFlags<AccessNet> = access_ref.into();
-                    ruleset_ref.handle_access(access_net)?;
+                JsonRuleset::Net(net) => {
+                    let access: BitFlags<AccessNet> = (&net.handledAccessNet).into();
+                    config.handled_net |= access;
                 }
             }
         }
 
-        let mut ruleset_created = ruleset.create()?;
+        if let Some(path_beneaths) = json.pathBeneath {
+            for path_beneath in path_beneaths {
+                let access: BitFlags<AccessFs> = (&path_beneath.allowedAccess).into();
+                for parent in path_beneath.parent {
+                    config
+                        .rules_path_beneath
+                        .entry(PathBuf::from(parent))
+                        .and_modify(|a| *a |= access)
+                        .or_insert(access);
+                }
+            }
+        }
+
+        if let Some(net_ports) = json.netPort {
+            for net_port in net_ports {
+                let access: BitFlags<AccessNet> = (&net_port.allowedAccess).into();
+                for port in net_port.port {
+                    config
+                        .rules_net_port
+                        .entry(port)
+                        .and_modify(|a| *a |= access)
+                        .or_insert(access);
+                }
+            }
+        }
+
+        config
+    }
+}
+
+// TODO: Add a merge method to compose with another Config.
+impl Config {
+    pub fn build_ruleset(&self) -> Result<RulesetCreated, BuildRulesetError> {
+        let mut ruleset_created = Ruleset::default()
+            .handle_access(self.handled_fs)?
+            .handle_access(self.handled_net)?
+            .create()?;
+
         let ruleset_created_ref = &mut ruleset_created;
 
-        for rule in self.pathBeneath.iter().flatten() {
-            let access_ref = &rule.allowedAccess;
-            let access_fs: BitFlags<AccessFs> = access_ref.into();
-
+        for (parent, allowed_access) in &self.rules_path_beneath {
             // TODO: Walk through all path and only open them once, including their
             // common parent directory to get a consistent hierarchy.
-            for path in &rule.parent {
-                let parent = PathFd::new(path)?;
-                ruleset_created_ref.add_rule(PathBeneath::new(parent, access_fs))?;
-            }
+            // TODO: Ignore failure to open path, but record a warning instead.
+            let fd = PathFd::new(parent)?;
+            ruleset_created_ref.add_rule(PathBeneath::new(fd, *allowed_access))?;
         }
 
-        for rule in self.netPort.iter().flatten() {
-            let access_ref = &rule.allowedAccess;
-            let access_net: BitFlags<AccessNet> = access_ref.into();
-
-            // Find in FDs the referenced name
-            // WARNING: Will close the related FD (e.g. stdout)
-            for port in &rule.port {
-                ruleset_created_ref.add_rule(
-                    // TODO: Check integer conversion in parse_json(), which would require changing the type of config and specifying where the error is.
-                    NetPort::new((*port).try_into()?, access_net),
-                )?;
-            }
+        for (port, allowed_access) in &self.rules_net_port {
+            ruleset_created_ref.add_rule(
+                // TODO: Check integer conversion in parse_json(), which would require changing the type of config and specifying where the error is.
+                NetPort::new((*port).try_into()?, *allowed_access),
+            )?;
         }
 
         Ok(ruleset_created)
     }
-}
 
-pub struct Config(JsonConfig);
-
-// TODO: Add a merge method to compose with another Config.
-impl Config {
     pub fn try_from_json<R>(reader: R) -> Result<Self, serde_json::Error>
     where
         R: std::io::Read,
     {
-        Ok(Self(serde_json::from_reader::<_, JsonConfig>(reader)?))
+        let json = serde_json::from_reader::<_, JsonConfig>(reader)?;
+        Ok(json.into())
     }
 
     #[cfg(feature = "toml")]
     pub fn try_from_toml(data: &str) -> Result<Self, toml::de::Error> {
         // The TOML parser does not handle Read implementations,
         // see https://github.com/toml-rs/toml/issues/326
-        Ok(Self(toml::from_str::<TomlConfig>(data)?.into()))
-    }
-
-    pub fn build_ruleset(&self) -> Result<RulesetCreated, BuildRulesetError> {
-        self.0.build_ruleset()
+        let json: JsonConfig = toml::from_str::<TomlConfig>(data)?.into();
+        Ok(json.into())
     }
 }

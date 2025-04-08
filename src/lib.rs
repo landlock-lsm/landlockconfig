@@ -10,6 +10,9 @@ use thiserror::Error;
 
 pub use landlock::{RestrictionStatus, RulesetStatus};
 
+#[cfg(test)]
+mod tests_parser;
+
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 enum JsonFsAccessItem {

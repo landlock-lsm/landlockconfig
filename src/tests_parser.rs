@@ -1,4 +1,4 @@
-use landlockconfig::Config;
+use crate::Config;
 use serde_json::error::Category;
 
 fn assert_json(data: &str, ret: Result<(), Category>) {

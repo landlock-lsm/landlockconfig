@@ -382,6 +382,40 @@ fn test_overlap_path_beneath() {
 }
 
 #[test]
+fn test_normalization_path_beneath() {
+    let json = r#"{
+        "ruleset": [
+            {
+                "handledAccessFs": [ "execute" ]
+            }
+        ],
+        "pathBeneath": [
+            {
+                "allowedAccess": [ "execute" ],
+                "parent": [ ".", "./", ".", "a/./b" ]
+            },
+            {
+                "allowedAccess": [ "execute" ],
+                "parent": [ ".//", "a/////b", "c/../c" ]
+            }
+        ]
+    }"#;
+    assert_eq!(
+        parse_json(json),
+        Ok(Config {
+            handled_fs: AccessFs::Execute.into(),
+            rules_path_beneath: [
+                (PathBuf::from("."), AccessFs::Execute.into()),
+                (PathBuf::from("a/b"), AccessFs::Execute.into()),
+                (PathBuf::from("c/../c"), AccessFs::Execute.into()),
+            ]
+            .into(),
+            ..Default::default()
+        }),
+    );
+}
+
+#[test]
 fn test_one_handled_access_net() {
     let json = r#"{
         "ruleset": [

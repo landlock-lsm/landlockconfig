@@ -12,11 +12,17 @@ categories = ["config", "filesystem", "os::linux-apis", "virtualization"]
 exclude = [".gitignore"]
 readme = "README.md"
 
+[lib]
+# TODO: Create a dedicated workspace for the FFI crate.
+crate-type = ["lib", "cdylib"]
+
 [features]
-default = ["toml"]
+default = ["toml", "ffi"]
+ffi = ["cbindgen", "libc"]
 
 [dependencies]
 landlock = "0.4.1"
+libc = { version = "0.2.171", optional = true }
 serde = { version = "1.0.217", features = ["derive"] }
 serde_json = "1.0.138"
 thiserror = "2.0.11"
@@ -29,3 +35,9 @@ clap = { version = "4.5.28", features = ["derive"] }
 [[example]]
 name = "sandboxer"
 required-features = ["toml"]
+
+[build-dependencies]
+cbindgen = { version = "0.28.0", optional = true }
+
+[patch.crates-io]
+landlock = { git = "https://github.com/landlock-lsm/rust-landlock.git" }

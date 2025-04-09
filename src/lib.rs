@@ -455,7 +455,7 @@ impl Config {
         Ok(ruleset_created)
     }
 
-    pub fn try_from_json<R>(reader: R) -> Result<Self, serde_json::Error>
+    pub fn parse_json<R>(reader: R) -> Result<Self, serde_json::Error>
     where
         R: std::io::Read,
     {
@@ -464,7 +464,7 @@ impl Config {
     }
 
     #[cfg(feature = "toml")]
-    pub fn try_from_toml(data: &str) -> Result<Self, toml::de::Error> {
+    pub fn parse_toml(data: &str) -> Result<Self, toml::de::Error> {
         // The TOML parser does not handle Read implementations,
         // see https://github.com/toml-rs/toml/issues/326
         let json: JsonConfig = toml::from_str::<TomlConfig>(data)?.into();

@@ -39,9 +39,9 @@ fn main() -> anyhow::Result<()> {
     let config = match arg_config {
         ArgConfig::Json(name) => {
             if name == "-" {
-                Config::try_from_json(std::io::stdin())?
+                Config::parse_json(std::io::stdin())?
             } else {
-                Config::try_from_json(File::open(name).context("Failed to open JSON file")?)?
+                Config::parse_json(File::open(name).context("Failed to open JSON file")?)?
             }
         }
         ArgConfig::Toml(name) => {
@@ -52,7 +52,7 @@ fn main() -> anyhow::Result<()> {
             } else {
                 std::fs::read_to_string(name).context("Failed to open TOML file")?
             };
-            Config::try_from_toml(data.as_str())?
+            Config::parse_toml(data.as_str())?
         }
     };
 

@@ -1,14 +1,6 @@
 use crate::*;
 use serde_json::error::Category;
 
-fn assert_json(data: &str, ret: Result<(), Category>) {
-    let cursor = std::io::Cursor::new(data);
-    let parsing_ret = Config::parse_json(cursor)
-        .map(|_| ())
-        .map_err(|e| e.classify());
-    assert_eq!(parsing_ret, ret);
-}
-
 fn parse_json(json: &str) -> Result<Config, Category> {
     let cursor = std::io::Cursor::new(json);
     Config::parse_json(cursor).map_err(|e| e.classify())
@@ -18,29 +10,55 @@ fn parse_toml(toml: &str) -> Result<Config, toml::de::Error> {
     Config::parse_toml(toml)
 }
 
-const LATEST_VERSION: u32 = 5;
+const LATEST_VERSION: i32 = 5;
 
-fn assert_versions(name: &str, first_known_version: u32) {
+enum RulesetHandledType {
+    Fs,
+    Net,
+}
+
+impl AsRef<str> for RulesetHandledType {
+    fn as_ref(&self) -> &str {
+        match self {
+            RulesetHandledType::Fs => "handledAccessFs",
+            RulesetHandledType::Net => "handledAccessNet",
+        }
+    }
+}
+
+fn assert_versions(handled: RulesetHandledType, first_known_version: i32) {
+    let name = handled.as_ref();
     let known_versions = first_known_version..=LATEST_VERSION;
     let next_version = LATEST_VERSION + 1;
     for version in 0..=next_version {
         let expected = if known_versions.contains(&version) {
-            Ok(())
+            Ok(match handled {
+                RulesetHandledType::Fs => Config {
+                    handled_fs: AccessFs::from_all(ABI::from(version)),
+                    ..Default::default()
+                },
+                RulesetHandledType::Net => Config {
+                    handled_net: AccessNet::from_all(ABI::from(version)),
+                    ..Default::default()
+                },
+            })
         } else {
             Err(Category::Data)
         };
-        println!("Testing version {version} and expecting {:?}", expected);
-        assert_json(
-            format!(
-                r#"{{
-                    "ruleset": [
-                        {{
-                            "{name}": [ "v{version}.all" ]
-                        }}
-                    ]
-                }}"#
-            )
-            .as_ref(),
+        println!("Testing version {version} and expecting {expected:?}");
+        assert_eq!(
+            parse_json(
+                format!(
+                    r#"{{
+                        "ruleset": [
+                            {{
+                                "{name}": [ "v{version}.all" ]
+                            }}
+                        ]
+                    }}"#
+                )
+                .as_ref()
+            ),
             expected,
         );
     }
@@ -172,7 +190,7 @@ fn test_all_handled_access_fs_toml() {
 
 #[test]
 fn test_versions_access_fs() {
-    assert_versions("handledAccessFs", 1);
+    assert_versions(RulesetHandledType::Fs, 1);
 }
 
 #[test]
@@ -469,7 +487,7 @@ fn test_all_handled_access_net() {
 
 #[test]
 fn test_versions_access_net() {
-    assert_versions("handledAccessNet", 4);
+    assert_versions(RulesetHandledType::Net, 4);
 }
 
 #[test]

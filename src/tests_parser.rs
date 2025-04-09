@@ -356,7 +356,7 @@ fn test_overlap_path_beneath() {
                 "handledAccessFs": [ "execute" ]
             },
             {
-                "handledAccessFs": [ "read_file" ]
+                "handledAccessFs": [ "read_file", "write_file" ]
             }
         ],
         "pathBeneath": [
@@ -365,7 +365,15 @@ fn test_overlap_path_beneath() {
                 "parent": [ "." ]
             },
             {
+                "allowedAccess": [ "write_file" ],
+                "parent": [ "." ]
+            },
+            {
                 "allowedAccess": [ "execute", "read_file" ],
+                "parent": [ "." ]
+            },
+            {
+                "allowedAccess": [ "execute" ],
                 "parent": [ "." ]
             }
         ]
@@ -373,9 +381,12 @@ fn test_overlap_path_beneath() {
     assert_eq!(
         parse_json(json),
         Ok(Config {
-            handled_fs: AccessFs::Execute | AccessFs::ReadFile,
-            rules_path_beneath: [(PathBuf::from("."), AccessFs::Execute | AccessFs::ReadFile)]
-                .into(),
+            handled_fs: AccessFs::Execute | AccessFs::ReadFile | AccessFs::WriteFile,
+            rules_path_beneath: [(
+                PathBuf::from("."),
+                AccessFs::Execute | AccessFs::ReadFile | AccessFs::WriteFile
+            )]
+            .into(),
             ..Default::default()
         }),
     );
@@ -505,6 +516,39 @@ fn test_one_net_port() {
         Ok(Config {
             handled_net: AccessNet::BindTcp.into(),
             rules_net_port: [(443, AccessNet::BindTcp.into())].into(),
+            ..Default::default()
+        }),
+    );
+}
+
+#[test]
+fn test_overlap_net_port() {
+    let json = r#"{
+        "ruleset": [
+            {
+                "handledAccessNet": [ "bind_tcp", "connect_tcp" ]
+            }
+        ],
+        "netPort": [
+            {
+                "allowedAccess": [ "connect_tcp" ],
+                "port": [ 443 ]
+            },
+            {
+                "allowedAccess": [ "bind_tcp" ],
+                "port": [ 443 ]
+            },
+            {
+                "allowedAccess": [ "connect_tcp" ],
+                "port": [ 443 ]
+            }
+        ]
+    }"#;
+    assert_eq!(
+        parse_json(json),
+        Ok(Config {
+            handled_net: AccessNet::BindTcp | AccessNet::ConnectTcp,
+            rules_net_port: [(443, AccessNet::BindTcp | AccessNet::ConnectTcp)].into(),
             ..Default::default()
         }),
     );

@@ -45,6 +45,44 @@ struct landlockconfig *landlockconfig_parse_json_file(int config_fd, uint32_t fl
 struct landlockconfig *landlockconfig_parse_toml_file(int config_fd, uint32_t flags);
 
 /**
+ * Parses a JSON configuration from a memory buffer
+ *
+ * # Parameters
+ *
+ * * `buffer_ptr`: Pointer to the buffer containing JSON data.
+ * * `buffer_size`: Size of the buffer in bytes, or 0 if `buffer_ptr` is null-terminated.
+ * * `flags`: Must be 0.
+ *
+ * # Return values
+ *
+ * * Pointer to a landlockconfig object on success. This object must be freed
+ *   with landlockconfig_free().
+ * * -errno on error.
+ */
+struct landlockconfig *landlockconfig_parse_json_buffer(const uint8_t *buffer_ptr,
+                                                        uintptr_t buffer_size,
+                                                        uint32_t flags);
+
+/**
+ * Parses a TOML configuration from a memory buffer
+ *
+ * # Parameters
+ *
+ * * `buffer_ptr`: Pointer to the buffer containing TOML data.
+ * * `buffer_size`: Size of the buffer in bytes, or 0 if `buffer_ptr` is null-terminated.
+ * * `flags`: Must be 0.
+ *
+ * # Return values
+ *
+ * * Pointer to a landlockconfig object on success. This object must be freed
+ *   with landlockconfig_free().
+ * * -errno on error.
+ */
+struct landlockconfig *landlockconfig_parse_toml_buffer(const uint8_t *buffer_ptr,
+                                                        uintptr_t buffer_size,
+                                                        uint32_t flags);
+
+/**
  * Frees a landlockconfig object
  *
  * # Safety

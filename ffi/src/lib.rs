@@ -62,8 +62,6 @@ pub extern "C" fn landlockconfig_parse_json_file(config_fd: RawFd, flags: u32) -
     .unwrap_or_else(|e| unwrap_errno(e) as *mut Config)
 }
 
-// TODO: Add landlockconfig_parse_json_buffer()
-
 /// Parses a TOML configuration file
 ///
 /// # Parameters
@@ -82,6 +80,88 @@ pub extern "C" fn landlockconfig_parse_toml_file(config_fd: RawFd, flags: u32) -
         let mut buffer = String::new();
         std::io::Read::read_to_string(&mut file, &mut buffer)?;
         Config::parse_toml(&buffer).map_err(|e| Error::new(ErrorKind::InvalidData, e))
+    })
+    .unwrap_or_else(|e| unwrap_errno(e) as *mut Config)
+}
+
+fn parse_buffer<F>(
+    buffer_ptr: *const u8,
+    buffer_size: usize,
+    flags: u32,
+    parser: F,
+) -> Result<*mut Config, Errno>
+where
+    F: FnOnce(&[u8]) -> Result<Config, Error>,
+{
+    if flags != 0 {
+        return Err(Errno::new(libc::EINVAL));
+    }
+
+    if buffer_ptr.is_null() {
+        return Err(Errno::new(libc::EFAULT));
+    }
+
+    let buffer = if buffer_size == 0 {
+        // Treat 0-sized buffer as null-terminated string.
+        let c_str = unsafe { std::ffi::CStr::from_ptr(buffer_ptr as *const i8) };
+        c_str.to_bytes()
+    } else {
+        unsafe { std::slice::from_raw_parts(buffer_ptr, buffer_size) }
+    };
+
+    let config = parser(buffer).map_err(Errno::from)?;
+    Ok(Box::into_raw(Box::new(config)))
+}
+
+/// Parses a JSON configuration from a memory buffer
+///
+/// # Parameters
+///
+/// * `buffer_ptr`: Pointer to the buffer containing JSON data.
+/// * `buffer_size`: Size of the buffer in bytes, or 0 if `buffer_ptr` is null-terminated.
+/// * `flags`: Must be 0.
+///
+/// # Return values
+///
+/// * Pointer to a landlockconfig object on success. This object must be freed
+///   with landlockconfig_free().
+/// * -errno on error.
+#[no_mangle]
+pub extern "C" fn landlockconfig_parse_json_buffer(
+    buffer_ptr: *const u8,
+    buffer_size: usize,
+    flags: u32,
+) -> *mut Config {
+    parse_buffer(buffer_ptr, buffer_size, flags, |buffer| {
+        Config::parse_json(std::io::Cursor::new(buffer))
+            .map_err(|e| Error::new(ErrorKind::InvalidData, e))
+    })
+    .unwrap_or_else(|e| unwrap_errno(e) as *mut Config)
+}
+
+/// Parses a TOML configuration from a memory buffer
+///
+/// # Parameters
+///
+/// * `buffer_ptr`: Pointer to the buffer containing TOML data.
+/// * `buffer_size`: Size of the buffer in bytes, or 0 if `buffer_ptr` is null-terminated.
+/// * `flags`: Must be 0.
+///
+/// # Return values
+///
+/// * Pointer to a landlockconfig object on success. This object must be freed
+///   with landlockconfig_free().
+/// * -errno on error.
+#[no_mangle]
+pub extern "C" fn landlockconfig_parse_toml_buffer(
+    buffer_ptr: *const u8,
+    buffer_size: usize,
+    flags: u32,
+) -> *mut Config {
+    parse_buffer(buffer_ptr, buffer_size, flags, |buffer| {
+        let data =
+            std::str::from_utf8(buffer).map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
+        Config::parse_toml(data).map_err(|e| Error::new(ErrorKind::InvalidData, e))
     })
     .unwrap_or_else(|e| unwrap_errno(e) as *mut Config)
 }

@@ -1,0 +1,214 @@
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
+use landlock::Errno;
+use landlockconfig::Config;
+use std::ffi::c_int;
+use std::fs::File;
+use std::io::{Error, ErrorKind};
+use std::os::unix::io::{BorrowedFd, IntoRawFd, RawFd};
+
+fn unwrap_errno<T>(err: T) -> c_int
+where
+    T: Into<Errno>,
+{
+    let mut errno = *err.into().as_ref();
+    // TODO: Filter all error codes to document them, see libseccomp's _rc_filter().
+    if errno <= 0 {
+        // This should never happen.
+        eprintln!("Error: Invalid errno value: {errno}");
+        errno = libc::EIO;
+    }
+    -errno
+}
+
+fn parse_file<F>(config_fd: RawFd, flags: u32, parser: F) -> Result<*mut Config, Errno>
+where
+    F: FnOnce(File) -> Result<Config, Error>,
+{
+    if flags != 0 {
+        return Err(Errno::new(libc::EINVAL));
+    }
+
+    let fd = unsafe { BorrowedFd::borrow_raw(config_fd) };
+    // Checks if it is a valid file descriptor.
+    let file = File::from(fd.try_clone_to_owned()?);
+    let config = parser(file).map_err(Errno::from)?;
+    Ok(Box::into_raw(Box::new(config)))
+}
+
+// TODO: Pass a set of buffers for warnings and errors.
+
+// TODO: Return NULL if the ruleset is not supported.
+
+// TODO: Add a flag to accept unknown JSON entries (e.g. for OCI specification).
+
+/// Parses a JSON configuration file
+///
+/// # Parameters
+///
+/// * `config_fd`: A file descriptor referring to a JSON configuration file.
+/// * `flags`: Must be 0.
+///
+/// # Return values
+///
+/// * Pointer to a landlockconfig object on success. This object must be freed
+///   with landlockconfig_free().
+/// * -errno on error.
+#[no_mangle]
+pub extern "C" fn landlockconfig_parse_json_file(config_fd: RawFd, flags: u32) -> *mut Config {
+    parse_file(config_fd, flags, |file| {
+        Config::parse_json(file).map_err(|e| Error::new(ErrorKind::InvalidData, e))
+    })
+    .unwrap_or_else(|e| unwrap_errno(e) as *mut Config)
+}
+
+/// Parses a TOML configuration file
+///
+/// # Parameters
+///
+/// * `config_fd`: A file descriptor referring to a TOML configuration file.
+/// * `flags`: Must be 0.
+///
+/// # Return values
+///
+/// * Pointer to a landlockconfig object on success. This object must be freed
+///   with landlockconfig_free().
+/// * -errno on error.
+#[no_mangle]
+pub extern "C" fn landlockconfig_parse_toml_file(config_fd: RawFd, flags: u32) -> *mut Config {
+    parse_file(config_fd, flags, |mut file| {
+        let mut buffer = String::new();
+        std::io::Read::read_to_string(&mut file, &mut buffer)?;
+        Config::parse_toml(&buffer).map_err(|e| Error::new(ErrorKind::InvalidData, e))
+    })
+    .unwrap_or_else(|e| unwrap_errno(e) as *mut Config)
+}
+
+fn parse_buffer<F>(
+    buffer_ptr: *const u8,
+    buffer_size: usize,
+    flags: u32,
+    parser: F,
+) -> Result<*mut Config, Errno>
+where
+    F: FnOnce(&[u8]) -> Result<Config, Error>,
+{
+    if flags != 0 {
+        return Err(Errno::new(libc::EINVAL));
+    }
+
+    if buffer_ptr.is_null() {
+        return Err(Errno::new(libc::EFAULT));
+    }
+
+    let buffer = if buffer_size == 0 {
+        // Treat 0-sized buffer as null-terminated string.
+        let c_str = unsafe { std::ffi::CStr::from_ptr(buffer_ptr as *const i8) };
+        c_str.to_bytes()
+    } else {
+        unsafe { std::slice::from_raw_parts(buffer_ptr, buffer_size) }
+    };
+
+    let config = parser(buffer).map_err(Errno::from)?;
+    Ok(Box::into_raw(Box::new(config)))
+}
+
+/// Parses a JSON configuration from a memory buffer
+///
+/// # Parameters
+///
+/// * `buffer_ptr`: Pointer to the buffer containing JSON data.
+/// * `buffer_size`: Size of the buffer in bytes, or 0 if `buffer_ptr` is null-terminated.
+/// * `flags`: Must be 0.
+///
+/// # Return values
+///
+/// * Pointer to a landlockconfig object on success. This object must be freed
+///   with landlockconfig_free().
+/// * -errno on error.
+#[no_mangle]
+pub extern "C" fn landlockconfig_parse_json_buffer(
+    buffer_ptr: *const u8,
+    buffer_size: usize,
+    flags: u32,
+) -> *mut Config {
+    parse_buffer(buffer_ptr, buffer_size, flags, |buffer| {
+        Config::parse_json(std::io::Cursor::new(buffer))
+            .map_err(|e| Error::new(ErrorKind::InvalidData, e))
+    })
+    .unwrap_or_else(|e| unwrap_errno(e) as *mut Config)
+}
+
+/// Parses a TOML configuration from a memory buffer
+///
+/// # Parameters
+///
+/// * `buffer_ptr`: Pointer to the buffer containing TOML data.
+/// * `buffer_size`: Size of the buffer in bytes, or 0 if `buffer_ptr` is null-terminated.
+/// * `flags`: Must be 0.
+///
+/// # Return values
+///
+/// * Pointer to a landlockconfig object on success. This object must be freed
+///   with landlockconfig_free().
+/// * -errno on error.
+#[no_mangle]
+pub extern "C" fn landlockconfig_parse_toml_buffer(
+    buffer_ptr: *const u8,
+    buffer_size: usize,
+    flags: u32,
+) -> *mut Config {
+    parse_buffer(buffer_ptr, buffer_size, flags, |buffer| {
+        let data =
+            std::str::from_utf8(buffer).map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
+        Config::parse_toml(data).map_err(|e| Error::new(ErrorKind::InvalidData, e))
+    })
+    .unwrap_or_else(|e| unwrap_errno(e) as *mut Config)
+}
+
+/// Frees a landlockconfig object
+///
+/// # Safety
+///
+/// The pointer must have been returned by landlockconfig_parse_json() or
+/// landlockconfig_parse_toml().
+#[no_mangle]
+pub unsafe extern "C" fn landlockconfig_free(config: *mut Config) {
+    if !config.is_null() {
+        drop(Box::from_raw(config));
+    }
+}
+
+// TODO: Also return RestrictionStatus
+
+/// Creates a ruleset from a landlockconfig object
+///
+/// # Parameters
+///
+/// * `config`: A pointer to a landlockconfig object.
+/// * `flags`: Must be 0.
+///
+/// # Safety
+///
+/// `config` must have been returned by landlockconfig_parse_json() or
+/// landlockconfig_parse_toml().
+///
+/// # Returns
+///
+/// * The ruleset file descriptor on success.
+/// * -errno on error.
+#[no_mangle]
+pub unsafe extern "C" fn landlockconfig_build_ruleset(config: *const Config, flags: u32) -> RawFd {
+    if flags != 0 {
+        return unwrap_errno(Errno::new(libc::EINVAL));
+    }
+
+    if config.is_null() {
+        return unwrap_errno(Errno::new(libc::EFAULT));
+    }
+
+    unsafe { &*config }
+        .build_ruleset()
+        .map(|r| r.into_raw_fd())
+        .unwrap_or_else(unwrap_errno)
+}

@@ -3,6 +3,8 @@ use landlock::{Access, AccessFs, AccessNet, ABI};
 use serde_json::error::Category;
 use std::path::PathBuf;
 
+const LATEST_ABI: ABI = ABI::V5;
+
 fn assert_json(data: &str, ret: Result<(), Category>) {
     let cursor = std::io::Cursor::new(data);
     let parsing_ret = Config::parse_json(cursor)
@@ -20,11 +22,10 @@ fn parse_toml(toml: &str) -> Result<Config, toml::de::Error> {
     Config::parse_toml(toml)
 }
 
-const LATEST_VERSION: u32 = 5;
-
-fn assert_versions(name: &str, first_known_version: u32) {
-    let known_versions = first_known_version..=LATEST_VERSION;
-    let next_version = LATEST_VERSION + 1;
+fn assert_versions(name: &str, first_known_version: ABI) {
+    let latest_version = LATEST_ABI as u32;
+    let known_versions = (first_known_version as u32)..=latest_version;
+    let next_version = latest_version + 1;
     for version in 0..=next_version {
         let expected = if known_versions.contains(&version) {
             Ok(())
@@ -119,7 +120,7 @@ fn test_all_handled_access_fs_json() {
     assert_eq!(
         parse_json(json),
         Ok(Config {
-            handled_fs: AccessFs::from_all(ABI::V5),
+            handled_fs: AccessFs::from_all(LATEST_ABI),
             ..Default::default()
         })
     );
@@ -166,7 +167,7 @@ fn test_all_handled_access_fs_toml() {
     assert_eq!(
         parse_toml(toml),
         Ok(Config {
-            handled_fs: AccessFs::from_all(ABI::V5),
+            handled_fs: AccessFs::from_all(LATEST_ABI),
             ..Default::default()
         })
     );
@@ -174,7 +175,7 @@ fn test_all_handled_access_fs_toml() {
 
 #[test]
 fn test_versions_access_fs() {
-    assert_versions("handledAccessFs", 1);
+    assert_versions("handledAccessFs", ABI::V1);
 }
 
 #[test]
@@ -463,7 +464,7 @@ fn test_all_handled_access_net() {
     assert_eq!(
         parse_json(json),
         Ok(Config {
-            handled_net: AccessNet::from_all(ABI::V5),
+            handled_net: AccessNet::from_all(LATEST_ABI),
             ..Default::default()
         }),
     );
@@ -471,7 +472,7 @@ fn test_all_handled_access_net() {
 
 #[test]
 fn test_versions_access_net() {
-    assert_versions("handledAccessNet", 4);
+    assert_versions("handledAccessNet", ABI::V4);
 }
 
 #[test]

@@ -64,7 +64,7 @@ impl TryFrom<NonEmptyStruct<JsonConfig>> for Config {
             let name = variable.name.parse()?;
             let literal = variable.literal.unwrap_or_default();
             // TODO: Check and warn if users tried to use variable in literal strings?
-            config.variables.insert(name, literal.into_iter().collect());
+            config.variables.extend(name, literal.into_iter().collect());
         }
 
         for ruleset in json.ruleset.unwrap_or_default() {
@@ -144,8 +144,72 @@ pub enum ParseTomlError {
     SerdeToml(#[from] toml::de::Error),
 }
 
-// TODO: Add a merge method to compose with another Config.
 impl Config {
+    /// Composes two configurations by taking the union of `other` with `self`
+    /// in a safe best-effort way.
+    ///
+    /// When composing configurations with different ABI versions (e.g., one
+    /// against ABI::V1 and another against ABI::V2), the composition will
+    /// upgrade the lower ABI configuration to match the higher one, ensuring
+    /// the resulting configuration remains functional.
+    ///
+    /// # Behavior
+    ///
+    /// - Handled access rights are combined using bitwise OR.
+    /// - Existing rules are augmented with additional access rights to maintain
+    ///   compatibility.
+    /// - Paths not handling newer access rights automatically receive them.
+    /// - Variables from both configurations are merged.
+    ///
+    /// # Commutativity
+    ///
+    /// This operation is commutative: `a.compose(&b)` produces the same result
+    /// as `b.compose(&a)`. The order of composition does not affect the final
+    /// configuration, ensuring predictable behavior regardless of the sequence
+    /// in which configurations are combined.
+    pub fn compose(&mut self, other: &Self) {
+        // The full rule access rights for other are the union of the explicit
+        // allowed access rights and the unhandled ones compared to self.
+        let other_implicit_fs = self.handled_fs & !other.handled_fs;
+        let other_implicit_net = self.handled_net & !other.handled_net;
+        let self_implicit_fs = other.handled_fs & !self.handled_fs;
+        let self_implicit_net = other.handled_net & !self.handled_net;
+
+        // First step: upgrade the current access rights according to other's
+        // handled access rights.
+        self.rules_path_beneath
+            .values_mut()
+            .for_each(|access| *access |= self_implicit_fs);
+        self.rules_net_port
+            .values_mut()
+            .for_each(|access| *access |= self_implicit_net);
+
+        // Second step: add the new rules from other, upgraded according to
+        // implicit handled access rights.
+        for (path, access) in &other.rules_path_beneath {
+            self.rules_path_beneath
+                .entry(path.clone())
+                .and_modify(|a| *a |= *access | other_implicit_fs)
+                .or_insert(*access | other_implicit_fs);
+        }
+        for (port, access) in &other.rules_net_port {
+            self.rules_net_port
+                .entry(*port)
+                .and_modify(|a| *a |= *access | other_implicit_net)
+                .or_insert(*access | other_implicit_net);
+        }
+
+        // Third step: merge variables.
+        for (name, value) in other.variables.iter() {
+            self.variables.extend(name.clone(), value.clone());
+        }
+
+        // Fourth step: upgrade the handled access rights.
+        self.handled_fs |= other.handled_fs;
+        self.handled_net |= other.handled_net;
+        self.scoped |= other.scoped;
+    }
+
     pub fn parse_json<R>(reader: R) -> Result<Self, ParseJsonError>
     where
         R: std::io::Read,
@@ -231,5 +295,83 @@ impl TryFrom<Config> for ResolvedConfig {
             rules_path_beneath,
             rules_net_port: config.rules_net_port,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests_compose {
+    use super::*;
+    use landlock::{Access, ABI};
+
+    #[test]
+    fn test_empty_ruleset() {
+        let mut c1 = Config {
+            handled_fs: AccessFs::Execute.into(),
+            ..Default::default()
+        };
+        let c2 = c1.clone();
+        c1.compose(&c2);
+        assert_eq!(c1, c2);
+    }
+
+    #[test]
+    fn test_different_ruleset() {
+        let mut c1 = Config {
+            handled_fs: AccessFs::Execute.into(),
+            ..Default::default()
+        };
+        let c2 = Config {
+            handled_net: AccessNet::BindTcp.into(),
+            ..Default::default()
+        };
+        let expect = Config {
+            handled_fs: AccessFs::Execute.into(),
+            handled_net: AccessNet::BindTcp.into(),
+            ..Default::default()
+        };
+        c1.compose(&c2);
+        assert_eq!(c1, expect);
+    }
+
+    #[test]
+    fn test_compose_v1_v2_without_one_right() {
+        let c1_access = AccessFs::from_all(ABI::V1);
+        let mut c1 = Config {
+            handled_fs: c1_access,
+            rules_path_beneath: [
+                (TemplateString::from_text("/common"), c1_access),
+                (TemplateString::from_text("/c1"), c1_access),
+            ]
+            .into(),
+            ..Default::default()
+        };
+
+        assert!(c1_access.contains(AccessFs::WriteFile));
+        let c2_access = AccessFs::from_all(ABI::V2) & !AccessFs::WriteFile;
+        let c2 = Config {
+            handled_fs: c2_access,
+            rules_path_beneath: [
+                (TemplateString::from_text("/common"), c2_access),
+                (TemplateString::from_text("/c2"), c2_access),
+            ]
+            .into(),
+            ..Default::default()
+        };
+
+        let expect = Config {
+            handled_fs: c1_access | c2_access,
+            rules_path_beneath: [
+                (TemplateString::from_text("/common"), c1_access | c2_access),
+                (TemplateString::from_text("/c1"), c1_access | c2_access),
+                (
+                    TemplateString::from_text("/c2"),
+                    c2_access | AccessFs::WriteFile,
+                ),
+            ]
+            .into(),
+            ..Default::default()
+        };
+        c1.compose(&c2);
+        assert_eq!(c1, expect);
     }
 }

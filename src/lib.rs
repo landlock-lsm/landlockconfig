@@ -8,6 +8,10 @@ mod parser;
 mod variable;
 
 #[cfg(test)]
+#[macro_use]
+extern crate lazy_static;
+
+#[cfg(test)]
 mod tests_helpers;
 
 #[cfg(test)]
@@ -17,5 +21,4 @@ mod tests_parser;
 mod tests_variable;
 
 #[cfg(test)]
-#[macro_use]
-extern crate lazy_static;
+mod tests_compose;

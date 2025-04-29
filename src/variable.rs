@@ -60,8 +60,8 @@ pub enum ResolveError {
 }
 
 impl Variables {
-    pub(crate) fn insert(&mut self, key: Name, values: BTreeSet<String>) {
-        self.0.insert(key, values);
+    pub(crate) fn extend(&mut self, key: Name, values: BTreeSet<String>) {
+        self.0.entry(key).or_default().extend(values);
     }
 
     // TODO: Return references instead of cloning.
@@ -81,6 +81,10 @@ impl Variables {
                     .ok_or_else(|| ResolveError::VariableNotFound(name.clone())),
             })
             .collect()
+    }
+
+    pub(crate) fn iter(&self) -> std::collections::btree_map::Iter<'_, Name, BTreeSet<String>> {
+        self.0.iter()
     }
 
     // Used by tests_parser.rs

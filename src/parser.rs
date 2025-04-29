@@ -18,6 +18,16 @@ pub enum TemplateToken {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct TemplateString(pub Vec<TemplateToken>);
 
+impl TemplateString {
+    #[cfg(test)]
+    pub(crate) fn from_text<T>(text: T) -> Self
+    where
+        T: Into<String>,
+    {
+        Self(vec![TemplateToken::Text(text.into())])
+    }
+}
+
 impl std::fmt::Display for TemplateString {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for token in &self.0 {

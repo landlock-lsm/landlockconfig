@@ -81,10 +81,9 @@ are automatically completed according to all used access rights).
 
 ### Shared Library
 
-**TODO:**
-This repository enables developers the build an ELF shared object library, which
+This repository enables developers to build an ELF shared object library, which
 can then be used by any program and most programming languages via a foreign
-function interface (FFI).
+function interface (FFI) and a [C API](c/landlockconfig.h).
 
 ### Resilient
 

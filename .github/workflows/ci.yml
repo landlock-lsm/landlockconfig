@@ -115,6 +115,9 @@ jobs:
     - name: Run the sandboxer example with TOML
       run: rustup run ${{ env.RUST_TOOLCHAIN }} cargo run --example sandboxer -- --toml examples/mini-write-tmp.toml true
 
+    - name: Run the sandboxer example with FS-only restrictions
+      run: rustup run ${{ env.RUST_TOOLCHAIN }} cargo run --example sandboxer -- --json examples/verbose-write-tmp.json true
+
   ubuntu_24_rust_stable:
     runs-on: ubuntu-24.04
     needs: commit_list

@@ -83,11 +83,15 @@ impl From<JsonConfig> for Config {
 // TODO: Add a merge method to compose with another Config.
 impl Config {
     pub fn build_ruleset(&self) -> Result<RulesetCreated, BuildRulesetError> {
-        let mut ruleset_created = Ruleset::default()
-            .handle_access(self.handled_fs)?
-            .handle_access(self.handled_net)?
-            .create()?;
-
+        let mut ruleset = Ruleset::default();
+        let ruleset_ref = &mut ruleset;
+        if !self.handled_fs.is_empty() {
+            ruleset_ref.handle_access(self.handled_fs)?;
+        }
+        if !self.handled_net.is_empty() {
+            ruleset_ref.handle_access(self.handled_net)?;
+        }
+        let mut ruleset_created = ruleset.create()?;
         let ruleset_created_ref = &mut ruleset_created;
 
         for (parent, allowed_access) in &self.rules_path_beneath {

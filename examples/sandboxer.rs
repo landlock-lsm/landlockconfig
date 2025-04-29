@@ -1,6 +1,7 @@
 use anyhow::{bail, Context};
 use clap::Parser;
-use landlockconfig::{Config, RulesetStatus};
+use landlock::RulesetStatus;
+use landlockconfig::Config;
 use std::fs::File;
 use std::io::Read;
 use std::os::unix::process::CommandExt;

@@ -1,5 +1,7 @@
-use crate::*;
+use crate::Config;
+use landlock::{Access, AccessFs, AccessNet, ABI};
 use serde_json::error::Category;
+use std::path::PathBuf;
 
 fn assert_json(data: &str, ret: Result<(), Category>) {
     let cursor = std::io::Cursor::new(data);

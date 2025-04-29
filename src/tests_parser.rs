@@ -208,14 +208,14 @@ fn test_dup_handled_access_fs_1() {
     let json = r#"{
         "ruleset": [
             {
-                "handledAccessFs": [ "execute", "execute" ]
+                "handledAccessFs": [ "execute", "write_file", "execute" ]
             }
         ]
     }"#;
     assert_eq!(
         parse_json(json),
         Ok(Config {
-            handled_fs: AccessFs::Execute.into(),
+            handled_fs: AccessFs::Execute | AccessFs::WriteFile,
             ..Default::default()
         }),
     );
@@ -226,17 +226,20 @@ fn test_dup_handled_access_fs_2() {
     let json = r#"{
         "ruleset": [
             {
-                "handledAccessFs": [ "execute" ]
+                "handledAccessFs": [ "write_file" ]
             },
             {
                 "handledAccessFs": [ "execute" ]
+            },
+            {
+                "handledAccessFs": [ "write_file" ]
             }
         ]
     }"#;
     assert_eq!(
         parse_json(json),
         Ok(Config {
-            handled_fs: AccessFs::Execute.into(),
+            handled_fs: AccessFs::Execute | AccessFs::WriteFile,
             ..Default::default()
         }),
     );
@@ -487,6 +490,48 @@ fn test_versions_access_net() {
     assert_versions(ABI::V4, |version| {
         vec![format!(r#""handledAccessNet": [ "v{version}.all" ]"#)]
     });
+}
+
+#[test]
+fn test_dup_handled_access_net_1() {
+    let json = r#"{
+        "ruleset": [
+            {
+                "handledAccessNet": [ "bind_tcp", "connect_tcp", "bind_tcp" ]
+            }
+        ]
+    }"#;
+    assert_eq!(
+        parse_json(json),
+        Ok(Config {
+            handled_net: AccessNet::BindTcp | AccessNet::ConnectTcp,
+            ..Default::default()
+        }),
+    );
+}
+
+#[test]
+fn test_dup_handled_access_net_2() {
+    let json = r#"{
+        "ruleset": [
+            {
+                "handledAccessNet": [ "connect_tcp" ]
+            },
+            {
+                "handledAccessNet": [ "bind_tcp" ]
+            },
+            {
+                "handledAccessNet": [ "connect_tcp" ]
+            }
+        ]
+    }"#;
+    assert_eq!(
+        parse_json(json),
+        Ok(Config {
+            handled_net: AccessNet::BindTcp | AccessNet::ConnectTcp,
+            ..Default::default()
+        }),
+    );
 }
 
 #[test]

@@ -22,7 +22,10 @@ fn parse_toml(toml: &str) -> Result<Config, toml::de::Error> {
     Config::parse_toml(toml)
 }
 
-fn assert_versions(name: &str, first_known_version: ABI) {
+fn assert_versions<F>(first_known_version: ABI, ruleset_property: F)
+where
+    F: Fn(u32) -> Vec<String>,
+{
     let latest_version = LATEST_ABI as u32;
     let known_versions = (first_known_version as u32)..=latest_version;
     let next_version = latest_version + 1;
@@ -33,19 +36,22 @@ fn assert_versions(name: &str, first_known_version: ABI) {
             Err(Category::Data)
         };
         println!("Testing version {version} and expecting {:?}", expected);
-        assert_json(
-            format!(
-                r#"{{
-                    "ruleset": [
-                        {{
-                            "{name}": [ "v{version}.all" ]
-                        }}
-                    ]
-                }}"#
-            )
-            .as_ref(),
-            expected,
-        );
+        for property in ruleset_property(version) {
+            println!("  Testing property {property:?}");
+            assert_json(
+                format!(
+                    r#"{{
+                        "ruleset": [
+                            {{
+                                {property}
+                            }}
+                        ]
+                    }}"#
+                )
+                .as_ref(),
+                expected,
+            );
+        }
     }
 }
 
@@ -175,7 +181,13 @@ fn test_all_handled_access_fs_toml() {
 
 #[test]
 fn test_versions_access_fs() {
-    assert_versions("handledAccessFs", ABI::V1);
+    assert_versions(ABI::V1, |version| {
+        vec![
+            format!(r#""handledAccessFs": [ "v{version}.all" ]"#),
+            format!(r#""handledAccessFs": [ "v{version}.read_write" ]"#),
+            format!(r#""handledAccessFs": [ "v{version}.read_execute" ]"#),
+        ]
+    });
 }
 
 #[test]
@@ -472,7 +484,9 @@ fn test_all_handled_access_net() {
 
 #[test]
 fn test_versions_access_net() {
-    assert_versions("handledAccessNet", ABI::V4);
+    assert_versions(ABI::V4, |version| {
+        vec![format!(r#""handledAccessNet": [ "v{version}.all" ]"#)]
+    });
 }
 
 #[test]

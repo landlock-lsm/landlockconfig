@@ -71,6 +71,9 @@ jobs:
     - name: Check JSON verbose
       run: ./schema/check.sh examples/verbose-write-tmp.json
 
+    - name: Check JSON scoped
+      run: ./schema/check.sh examples/mini-scoped.json
+
   ubuntu_24_rust_msrv:
     runs-on: ubuntu-24.04
     needs: commit_list
@@ -117,6 +120,9 @@ jobs:
 
     - name: Run the sandboxer example with FS-only restrictions
       run: rustup run ${{ env.RUST_TOOLCHAIN }} cargo run --example sandboxer -- --json examples/verbose-write-tmp.json true
+
+    - name: Run the sandboxer example with scope restrictions
+      run: rustup run ${{ env.RUST_TOOLCHAIN }} cargo run --example sandboxer -- --json examples/mini-scoped.json true
 
   ubuntu_24_rust_stable:
     runs-on: ubuntu-24.04

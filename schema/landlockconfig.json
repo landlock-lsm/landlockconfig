@@ -41,7 +41,10 @@
         "ioctl_dev",
         "v5.all",
         "v5.read_execute",
-        "v5.read_write"
+        "v5.read_write",
+        "v6.all",
+        "v6.read_execute",
+        "v6.read_write"
       ]
     },
     "accessNet": {
@@ -50,7 +53,16 @@
         "bind_tcp",
         "connect_tcp",
         "v4.all",
-        "v5.all"
+        "v5.all",
+        "v6.all"
+      ]
+    },
+    "scope": {
+      "type": "string",
+      "enum": [
+        "abstract_unix_socket",
+        "signal",
+        "v6.all"
       ]
     }
   },
@@ -85,6 +97,20 @@
             },
             "required": [
               "handledAccessNet"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "properties": {
+              "scoped": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/definitions/scope"
+                }
+              }
+            },
+            "required": [
+              "scoped"
             ],
             "additionalProperties": false
           }

@@ -60,7 +60,7 @@ fn main() -> anyhow::Result<()> {
     let ruleset = config.build_ruleset()?;
     let status = ruleset.restrict_self()?;
     if status.ruleset == RulesetStatus::NotEnforced {
-        bail!("Landlock is not supported by the running kernel.");
+        bail!("None of the restrictions can be enforced with the running kernel.");
     }
 
     // clap guarantees that there is at least one element in command.

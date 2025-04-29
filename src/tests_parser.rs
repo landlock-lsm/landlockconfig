@@ -1,9 +1,9 @@
 use crate::Config;
-use landlock::{Access, AccessFs, AccessNet, ABI};
+use landlock::{Access, AccessFs, AccessNet, Scope, ABI};
 use serde_json::error::Category;
 use std::path::PathBuf;
 
-const LATEST_ABI: ABI = ABI::V5;
+const LATEST_ABI: ABI = ABI::V6;
 
 fn assert_json(data: &str, ret: Result<(), Category>) {
     let cursor = std::io::Cursor::new(data);
@@ -118,7 +118,10 @@ fn test_all_handled_access_fs_json() {
                     "ioctl_dev",
                     "v5.all",
                     "v5.read_execute",
-                    "v5.read_write"
+                    "v5.read_write",
+                    "v6.all",
+                    "v6.read_execute",
+                    "v6.read_write"
                     ]
             }
         ]
@@ -168,6 +171,9 @@ fn test_all_handled_access_fs_toml() {
             "v5.all",
             "v5.read_execute",
             "v5.read_write",
+            "v6.all",
+            "v6.read_execute",
+            "v6.read_write",
         ]
     "#;
     assert_eq!(
@@ -471,7 +477,8 @@ fn test_all_handled_access_net() {
                     "bind_tcp",
                     "connect_tcp",
                     "v4.all",
-                    "v5.all"
+                    "v5.all",
+                    "v6.all"
                     ]
             }
         ]
@@ -653,4 +660,117 @@ fn test_inconsistent_access_net() {
             ..Default::default()
         }),
     );
+}
+
+#[test]
+fn test_one_scoped() {
+    let json = r#"{
+        "ruleset": [
+            {
+                "scoped": [ "abstract_unix_socket" ]
+            }
+        ]
+    }"#;
+    assert_eq!(
+        parse_json(json),
+        Ok(Config {
+            scoped: Scope::AbstractUnixSocket.into(),
+            ..Default::default()
+        }),
+    );
+}
+
+#[test]
+fn test_all_scoped() {
+    let json = r#"{
+        "ruleset": [
+            {
+                "scoped": [
+                    "abstract_unix_socket",
+                    "signal",
+                    "v6.all"
+                    ]
+            }
+        ]
+    }"#;
+    assert_eq!(
+        parse_json(json),
+        Ok(Config {
+            scoped: Scope::from_all(LATEST_ABI),
+            ..Default::default()
+        }),
+    );
+}
+
+#[test]
+fn test_versions_scope() {
+    assert_versions(ABI::V6, |version| {
+        vec![format!(r#""scoped": [ "v{version}.all" ]"#)]
+    });
+}
+
+#[test]
+fn test_dup_scoped_1() {
+    let json = r#"{
+        "ruleset": [
+            {
+                "scoped": [ "abstract_unix_socket", "signal", "abstract_unix_socket" ]
+            }
+        ]
+    }"#;
+    assert_eq!(
+        parse_json(json),
+        Ok(Config {
+            scoped: Scope::Signal | Scope::AbstractUnixSocket,
+            ..Default::default()
+        }),
+    );
+}
+
+#[test]
+fn test_dup_scoped_2() {
+    let json = r#"{
+        "ruleset": [
+            {
+                "scoped": [ "signal" ]
+            },
+            {
+                "scoped": [ "abstract_unix_socket" ]
+            },
+            {
+                "scoped": [ "signal" ]
+            }
+        ]
+    }"#;
+    assert_eq!(
+        parse_json(json),
+        Ok(Config {
+            scoped: Scope::Signal | Scope::AbstractUnixSocket,
+            ..Default::default()
+        }),
+    );
+}
+
+#[test]
+fn test_unknown_scoped_1() {
+    let json = r#"{
+        "ruleset": [
+            {
+                "scoped": [ "foo" ]
+            }
+        ]
+    }"#;
+    assert_eq!(parse_json(json), Err(Category::Data));
+}
+
+#[test]
+fn test_unknown_scoped_2() {
+    let json = r#"{
+        "ruleset": [
+            {
+                "scoped": [ "execute" ]
+            }
+        ]
+    }"#;
+    assert_eq!(parse_json(json), Err(Category::Data));
 }

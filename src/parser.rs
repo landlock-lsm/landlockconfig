@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use landlock::{Access, AccessFs, AccessNet, BitFlags, ABI};
+use landlock::{Access, AccessFs, AccessNet, BitFlags, Scope, ABI};
 use serde::Deserialize;
 use std::collections::BTreeSet;
 
@@ -53,6 +53,12 @@ enum JsonFsAccessItem {
     V5ReadExecute,
     #[serde(rename = "v5.read_write")]
     V5ReadWrite,
+    #[serde(rename = "v6.all")]
+    V6All,
+    #[serde(rename = "v6.read_execute")]
+    V6ReadExecute,
+    #[serde(rename = "v6.read_write")]
+    V6ReadWrite,
 }
 
 fn get_fs_read_execute(abi: ABI) -> BitFlags<AccessFs> {
@@ -98,6 +104,9 @@ impl From<&JsonFsAccessItem> for BitFlags<AccessFs> {
             JsonFsAccessItem::V5All => AccessFs::from_all(ABI::V5),
             JsonFsAccessItem::V5ReadExecute => get_fs_read_execute(ABI::V5),
             JsonFsAccessItem::V5ReadWrite => get_fs_read_write(ABI::V5),
+            JsonFsAccessItem::V6All => AccessFs::from_all(ABI::V6),
+            JsonFsAccessItem::V6ReadExecute => get_fs_read_execute(ABI::V6),
+            JsonFsAccessItem::V6ReadWrite => get_fs_read_write(ABI::V6),
         }
     }
 }
@@ -177,6 +186,8 @@ enum JsonNetAccessItem {
     V4All,
     #[serde(rename = "v5.all")]
     V5All,
+    #[serde(rename = "v6.all")]
+    V6All,
 }
 
 impl From<&JsonNetAccessItem> for BitFlags<AccessNet> {
@@ -186,6 +197,7 @@ impl From<&JsonNetAccessItem> for BitFlags<AccessNet> {
             JsonNetAccessItem::ConnectTcp => AccessNet::ConnectTcp.into(),
             JsonNetAccessItem::V4All => AccessNet::from_all(ABI::V4),
             JsonNetAccessItem::V5All => AccessNet::from_all(ABI::V5),
+            JsonNetAccessItem::V6All => AccessNet::from_all(ABI::V6),
         }
     }
 }
@@ -199,6 +211,38 @@ impl From<&JsonNetAccessSet> for BitFlags<AccessNet> {
         set.0.iter().fold(BitFlags::EMPTY, |flags, item| {
             let access: BitFlags<AccessNet> = item.into();
             flags | access
+        })
+    }
+}
+
+#[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
+#[serde(deny_unknown_fields, rename_all = "snake_case")]
+enum JsonScopeItem {
+    AbstractUnixSocket,
+    Signal,
+    #[serde(rename = "v6.all")]
+    V6All,
+}
+
+impl From<&JsonScopeItem> for BitFlags<Scope> {
+    fn from(js: &JsonScopeItem) -> Self {
+        match js {
+            JsonScopeItem::AbstractUnixSocket => Scope::AbstractUnixSocket.into(),
+            JsonScopeItem::Signal => Scope::Signal.into(),
+            JsonScopeItem::V6All => Scope::from_all(ABI::V6),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct JsonScopeSet(BTreeSet<JsonScopeItem>);
+
+impl From<&JsonScopeSet> for BitFlags<Scope> {
+    fn from(set: &JsonScopeSet) -> Self {
+        set.0.iter().fold(BitFlags::EMPTY, |flags, item| {
+            let scope: BitFlags<Scope> = item.into();
+            flags | scope
         })
     }
 }
@@ -248,10 +292,25 @@ impl From<TomlRulesetAccessNet> for JsonRulesetAccessNet {
 }
 
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
+#[serde(deny_unknown_fields)]
+#[allow(non_snake_case)]
+pub(crate) struct JsonRulesetScope {
+    pub(crate) scoped: JsonScopeSet,
+}
+
+#[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
+#[serde(deny_unknown_fields)]
+#[allow(non_snake_case)]
+struct TomlRulesetScope {
+    scoped: JsonScopeSet,
+}
+
+#[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
 #[serde(deny_unknown_fields, untagged)]
 pub(crate) enum JsonRuleset {
     Fs(JsonRulesetAccessFs),
     Net(JsonRulesetAccessNet),
+    Scope(JsonRulesetScope),
 }
 
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
@@ -259,6 +318,15 @@ pub(crate) enum JsonRuleset {
 enum TomlRuleset {
     Fs(TomlRulesetAccessFs),
     Net(TomlRulesetAccessNet),
+    Scope(TomlRulesetScope),
+}
+
+impl From<TomlRulesetScope> for JsonRulesetScope {
+    fn from(toml: TomlRulesetScope) -> Self {
+        Self {
+            scoped: toml.scoped,
+        }
+    }
 }
 
 impl From<TomlRuleset> for JsonRuleset {
@@ -266,6 +334,7 @@ impl From<TomlRuleset> for JsonRuleset {
         match toml {
             TomlRuleset::Fs(fs) => JsonRuleset::Fs(fs.into()),
             TomlRuleset::Net(net) => JsonRuleset::Net(net.into()),
+            TomlRuleset::Scope(scope) => JsonRuleset::Scope(scope.into()),
         }
     }
 }

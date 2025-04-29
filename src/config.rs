@@ -3,7 +3,7 @@
 use crate::parser::{JsonConfig, JsonRuleset, TomlConfig};
 use landlock::{
     AccessFs, AccessNet, BitFlags, NetPort, PathBeneath, PathFd, PathFdError, Ruleset, RulesetAttr,
-    RulesetCreated, RulesetCreatedAttr, RulesetError,
+    RulesetCreated, RulesetCreatedAttr, RulesetError, Scope,
 };
 use std::collections::BTreeMap;
 use std::num::TryFromIntError;
@@ -25,6 +25,7 @@ pub enum BuildRulesetError {
 pub struct Config {
     pub(crate) handled_fs: BitFlags<AccessFs>,
     pub(crate) handled_net: BitFlags<AccessNet>,
+    pub(crate) scoped: BitFlags<Scope>,
     // Thanks to the BTreeMap:
     // * the paths are unique, which guarantee that allowed access are only set once for each path;
     // * the paths are sorted (the longest path is the last one), which makes configurations deterministic and idempotent.
@@ -46,6 +47,10 @@ impl From<JsonConfig> for Config {
                 JsonRuleset::Net(net) => {
                     let access: BitFlags<AccessNet> = (&net.handledAccessNet).into();
                     config.handled_net |= access;
+                }
+                JsonRuleset::Scope(scope) => {
+                    let scope: BitFlags<Scope> = (&scope.scoped).into();
+                    config.scoped |= scope;
                 }
             }
         }
@@ -90,6 +95,9 @@ impl Config {
         }
         if !self.handled_net.is_empty() {
             ruleset_ref.handle_access(self.handled_net)?;
+        }
+        if !self.scoped.is_empty() {
+            ruleset_ref.scope(self.scoped)?;
         }
         let mut ruleset_created = ruleset.create()?;
         let ruleset_created_ref = &mut ruleset_created;

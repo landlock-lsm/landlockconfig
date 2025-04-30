@@ -55,29 +55,25 @@ impl From<JsonConfig> for Config {
             }
         }
 
-        if let Some(path_beneaths) = json.pathBeneath {
-            for path_beneath in path_beneaths {
-                let access: BitFlags<AccessFs> = (&path_beneath.allowedAccess).into();
-                for parent in path_beneath.parent {
-                    config
-                        .rules_path_beneath
-                        .entry(PathBuf::from(parent))
-                        .and_modify(|a| *a |= access)
-                        .or_insert(access);
-                }
+        for path_beneath in json.pathBeneath.unwrap_or_default() {
+            let access: BitFlags<AccessFs> = (&path_beneath.allowedAccess).into();
+            for parent in path_beneath.parent {
+                config
+                    .rules_path_beneath
+                    .entry(PathBuf::from(parent))
+                    .and_modify(|a| *a |= access)
+                    .or_insert(access);
             }
         }
 
-        if let Some(net_ports) = json.netPort {
-            for net_port in net_ports {
-                let access: BitFlags<AccessNet> = (&net_port.allowedAccess).into();
-                for port in net_port.port {
-                    config
-                        .rules_net_port
-                        .entry(port)
-                        .and_modify(|a| *a |= access)
-                        .or_insert(access);
-                }
+        for net_port in json.netPort.unwrap_or_default() {
+            let access: BitFlags<AccessNet> = (&net_port.allowedAccess).into();
+            for port in net_port.port {
+                config
+                    .rules_net_port
+                    .entry(port)
+                    .and_modify(|a| *a |= access)
+                    .or_insert(access);
             }
         }
 

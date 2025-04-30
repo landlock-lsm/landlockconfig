@@ -679,32 +679,6 @@ fn test_inconsistent_handled_access() {
     assert_eq!(parse_json(json), Err(Category::Data));
 }
 
-// FIXME: This should be forbidden at the parser level.
-#[test]
-fn test_inconsistent_access_net() {
-    let json = r#"{
-        "ruleset": [
-            {
-                "handledAccessFs": [ "execute" ]
-            }
-        ],
-        "netPort": [
-            {
-                "allowedAccess": [ "bind_tcp" ],
-                "port": [ 443 ]
-            }
-        ]
-    }"#;
-    assert_eq!(
-        parse_json(json),
-        Ok(Config {
-            handled_fs: AccessFs::Execute.into(),
-            rules_net_port: [(443, AccessNet::BindTcp.into())].into(),
-            ..Default::default()
-        }),
-    );
-}
-
 #[test]
 fn test_one_scoped() {
     let json = r#"{
@@ -816,4 +790,87 @@ fn test_unknown_scoped_2() {
         ]
     }"#;
     assert_eq!(parse_json(json), Err(Category::Data));
+}
+
+/* Test inference. */
+
+#[test]
+fn test_infer_mixed_handled_and_rule() {
+    let json = r#"{
+        "ruleset": [
+            {
+                "handledAccessFs": [ "execute" ]
+            }
+        ],
+        "netPort": [
+            {
+                "allowedAccess": [ "bind_tcp" ],
+                "port": [ 443 ]
+            }
+        ]
+    }"#;
+    assert_eq!(
+        parse_json(json),
+        Ok(Config {
+            handled_fs: AccessFs::Execute.into(),
+            handled_net: AccessNet::BindTcp.into(),
+            rules_net_port: [(443, AccessNet::BindTcp.into())].into(),
+            ..Default::default()
+        }),
+    );
+}
+
+#[test]
+fn test_infer_handled_access_fs() {
+    let json = r#"{
+        "ruleset": [
+            {
+                "handledAccessFs": [ "execute" ]
+            }
+        ],
+        "pathBeneath": [
+            {
+                "allowedAccess": [ "write_file" ],
+                "parent": [ "." ]
+            },
+            {
+                "allowedAccess": [ "read_file" ],
+                "parent": [ "." ]
+            }
+        ]
+    }"#;
+    assert_eq!(
+        parse_json(json),
+        Ok(Config {
+            handled_fs: AccessFs::Execute | AccessFs::WriteFile | AccessFs::ReadFile,
+            rules_path_beneath: [(PathBuf::from("."), AccessFs::WriteFile | AccessFs::ReadFile)]
+                .into(),
+            ..Default::default()
+        })
+    );
+}
+
+#[test]
+fn test_infer_handled_access_net() {
+    let json = r#"{
+        "ruleset": [
+            {
+                "handledAccessNet": [ "bind_tcp" ]
+            }
+        ],
+        "netPort": [
+            {
+                "allowedAccess": [ "connect_tcp" ],
+                "port": [ 443 ]
+            }
+        ]
+    }"#;
+    assert_eq!(
+        parse_json(json),
+        Ok(Config {
+            handled_net: AccessNet::BindTcp | AccessNet::ConnectTcp,
+            rules_net_port: [(443, AccessNet::ConnectTcp.into())].into(),
+            ..Default::default()
+        })
+    );
 }

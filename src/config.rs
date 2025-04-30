@@ -57,6 +57,10 @@ impl From<JsonConfig> for Config {
 
         for path_beneath in json.pathBeneath.unwrap_or_default() {
             let access: BitFlags<AccessFs> = (&path_beneath.allowedAccess).into();
+
+            /* Automatically augment and keep the ruleset consistent. */
+            config.handled_fs |= access;
+
             for parent in path_beneath.parent {
                 config
                     .rules_path_beneath
@@ -68,6 +72,10 @@ impl From<JsonConfig> for Config {
 
         for net_port in json.netPort.unwrap_or_default() {
             let access: BitFlags<AccessNet> = (&net_port.allowedAccess).into();
+
+            /* Automatically augment and keep the ruleset consistent. */
+            config.handled_net |= access;
+
             for port in net_port.port {
                 config
                     .rules_net_port

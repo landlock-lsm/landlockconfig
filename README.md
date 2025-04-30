@@ -72,7 +72,6 @@ version](https://landlock.io/rust-landlock/landlock/enum.ABI.html).
 
 ### Flexible configuration
 
-**TODO:**
 The parser should limit error cases as much as possible. One way to achieve that
 is to automatically complete the known properties (e.g., handled access rights
 are automatically completed according to all used access rights).

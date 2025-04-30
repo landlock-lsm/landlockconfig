@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 use crate::Config;
 use landlock::{Access, AccessFs, AccessNet, Scope, ABI};
 use serde_json::error::Category;
@@ -6,20 +8,22 @@ use std::path::PathBuf;
 const LATEST_ABI: ABI = ABI::V6;
 
 fn assert_json(data: &str, ret: Result<(), Category>) {
-    let cursor = std::io::Cursor::new(data);
-    let parsing_ret = Config::parse_json(cursor)
-        .map(|_| ())
-        .map_err(|e| e.classify());
-    assert_eq!(parsing_ret, ret);
+    assert_eq!(parse_json(data).map(|_| ()), ret);
 }
 
 fn parse_json(json: &str) -> Result<Config, Category> {
     let cursor = std::io::Cursor::new(json);
-    Config::parse_json(cursor).map_err(|e| e.classify())
+    Config::parse_json(cursor).map_err(|e| {
+        eprintln!("JSON parsing error: {e}");
+        e.classify()
+    })
 }
 
 fn parse_toml(toml: &str) -> Result<Config, toml::de::Error> {
-    Config::parse_toml(toml)
+    Config::parse_toml(toml).map_err(|e| {
+        eprintln!("TOML parsing error: {e}");
+        e
+    })
 }
 
 fn assert_versions<F>(first_known_version: ABI, ruleset_property: F)

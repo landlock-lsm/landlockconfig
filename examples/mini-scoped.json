@@ -3,9 +3,7 @@
     {
       "handledAccessNet": [
         "v6.all"
-      ]
-    },
-    {
+      ],
       "scoped": [
         "v6.all"
       ]

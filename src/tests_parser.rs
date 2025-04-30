@@ -666,8 +666,10 @@ fn test_overlap_net_port() {
     );
 }
 
+/* Test ruleset's properties. */
+
 #[test]
-fn test_inconsistent_handled_access() {
+fn test_mix_handled_access_1() {
     let json = r#"{
         "ruleset": [
             {
@@ -676,8 +678,40 @@ fn test_inconsistent_handled_access() {
             }
         ]
     }"#;
-    assert_eq!(parse_json(json), Err(Category::Data));
+    assert_eq!(
+        parse_json(json),
+        Ok(Config {
+            handled_fs: AccessFs::Execute.into(),
+            handled_net: AccessNet::BindTcp.into(),
+            ..Default::default()
+        })
+    );
 }
+
+#[test]
+fn test_mix_handled_access_2() {
+    let json = r#"{
+        "ruleset": [
+            {
+                "handledAccessFs": [ "execute" ],
+                "handledAccessNet": [ "bind_tcp" ]
+            },
+            {
+                "handledAccessNet": [ "connect_tcp" ]
+            }
+        ]
+    }"#;
+    assert_eq!(
+        parse_json(json),
+        Ok(Config {
+            handled_fs: AccessFs::Execute.into(),
+            handled_net: AccessNet::BindTcp | AccessNet::ConnectTcp,
+            ..Default::default()
+        })
+    );
+}
+
+/* Test ruleset's scoped. */
 
 #[test]
 fn test_one_scoped() {

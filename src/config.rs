@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::parser::{JsonConfig, JsonRuleset, TomlConfig};
+use crate::parser::{JsonConfig, TomlConfig};
 use landlock::{
     AccessFs, AccessNet, BitFlags, NetPort, PathBeneath, PathFd, PathFdError, Ruleset, RulesetAttr,
     RulesetCreated, RulesetCreatedAttr, RulesetError, Scope,
@@ -39,20 +39,21 @@ impl From<JsonConfig> for Config {
         let mut config = Self::default();
 
         for ruleset in json.ruleset {
-            match ruleset {
-                JsonRuleset::Fs(fs) => {
-                    let access: BitFlags<AccessFs> = (&fs.handledAccessFs).into();
-                    config.handled_fs |= access;
-                }
-                JsonRuleset::Net(net) => {
-                    let access: BitFlags<AccessNet> = (&net.handledAccessNet).into();
-                    config.handled_net |= access;
-                }
-                JsonRuleset::Scope(scope) => {
-                    let scope: BitFlags<Scope> = (&scope.scoped).into();
-                    config.scoped |= scope;
-                }
-            }
+            config.handled_fs |= ruleset
+                .handledAccessFs
+                .as_ref()
+                .map(BitFlags::<AccessFs>::from)
+                .unwrap_or_default();
+            config.handled_net |= ruleset
+                .handledAccessNet
+                .as_ref()
+                .map(BitFlags::<AccessNet>::from)
+                .unwrap_or_default();
+            config.scoped |= ruleset
+                .scoped
+                .as_ref()
+                .map(BitFlags::<Scope>::from)
+                .unwrap_or_default();
         }
 
         for path_beneath in json.pathBeneath.unwrap_or_default() {

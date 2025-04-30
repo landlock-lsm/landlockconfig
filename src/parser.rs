@@ -250,91 +250,26 @@ impl From<&JsonScopeSet> for BitFlags<Scope> {
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
 #[serde(deny_unknown_fields)]
 #[allow(non_snake_case)]
-pub(crate) struct JsonRulesetAccessFs {
-    pub(crate) handledAccessFs: JsonFsAccessSet,
+pub(crate) struct JsonRuleset {
+    pub(crate) handledAccessFs: Option<JsonFsAccessSet>,
+    pub(crate) handledAccessNet: Option<JsonNetAccessSet>,
+    pub(crate) scoped: Option<JsonScopeSet>,
 }
 
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
 #[serde(deny_unknown_fields)]
-#[allow(non_snake_case)]
-struct TomlRulesetAccessFs {
-    handled_access_fs: JsonFsAccessSet,
-}
-
-impl From<TomlRulesetAccessFs> for JsonRulesetAccessFs {
-    fn from(toml: TomlRulesetAccessFs) -> Self {
-        Self {
-            handledAccessFs: toml.handled_access_fs,
-        }
-    }
-}
-
-#[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
-#[serde(deny_unknown_fields)]
-#[allow(non_snake_case)]
-pub(crate) struct JsonRulesetAccessNet {
-    pub(crate) handledAccessNet: JsonNetAccessSet,
-}
-
-#[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
-#[serde(deny_unknown_fields)]
-#[allow(non_snake_case)]
-struct TomlRulesetAccessNet {
-    handled_access_net: JsonNetAccessSet,
-}
-
-impl From<TomlRulesetAccessNet> for JsonRulesetAccessNet {
-    fn from(toml: TomlRulesetAccessNet) -> Self {
-        Self {
-            handledAccessNet: toml.handled_access_net,
-        }
-    }
-}
-
-#[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
-#[serde(deny_unknown_fields)]
-#[allow(non_snake_case)]
-pub(crate) struct JsonRulesetScope {
-    pub(crate) scoped: JsonScopeSet,
-}
-
-#[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
-#[serde(deny_unknown_fields)]
-#[allow(non_snake_case)]
-struct TomlRulesetScope {
-    scoped: JsonScopeSet,
-}
-
-#[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
-#[serde(deny_unknown_fields, untagged)]
-pub(crate) enum JsonRuleset {
-    Fs(JsonRulesetAccessFs),
-    Net(JsonRulesetAccessNet),
-    Scope(JsonRulesetScope),
-}
-
-#[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
-#[serde(deny_unknown_fields, untagged)]
-enum TomlRuleset {
-    Fs(TomlRulesetAccessFs),
-    Net(TomlRulesetAccessNet),
-    Scope(TomlRulesetScope),
-}
-
-impl From<TomlRulesetScope> for JsonRulesetScope {
-    fn from(toml: TomlRulesetScope) -> Self {
-        Self {
-            scoped: toml.scoped,
-        }
-    }
+struct TomlRuleset {
+    handled_access_fs: Option<JsonFsAccessSet>,
+    handled_access_net: Option<JsonNetAccessSet>,
+    scoped: Option<JsonScopeSet>,
 }
 
 impl From<TomlRuleset> for JsonRuleset {
     fn from(toml: TomlRuleset) -> Self {
-        match toml {
-            TomlRuleset::Fs(fs) => JsonRuleset::Fs(fs.into()),
-            TomlRuleset::Net(net) => JsonRuleset::Net(net.into()),
-            TomlRuleset::Scope(scope) => JsonRuleset::Scope(scope.into()),
+        Self {
+            handledAccessFs: toml.handled_access_fs,
+            handledAccessNet: toml.handled_access_net,
+            scoped: toml.scoped,
         }
     }
 }

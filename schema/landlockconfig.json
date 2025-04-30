@@ -71,50 +71,27 @@
       "type": "array",
       "items": {
         "type": "object",
-        "oneOf": [
-          {
-            "properties": {
-              "handledAccessFs": {
-                "type": "array",
-                "items": {
-                  "$ref": "#/definitions/accessFs"
-                }
-              }
-            },
-            "required": [
-              "handledAccessFs"
-            ],
-            "additionalProperties": false
+        "properties": {
+          "handledAccessFs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/accessFs"
+            }
           },
-          {
-            "properties": {
-              "handledAccessNet": {
-                "type": "array",
-                "items": {
-                  "$ref": "#/definitions/accessNet"
-                }
-              }
-            },
-            "required": [
-              "handledAccessNet"
-            ],
-            "additionalProperties": false
+          "handledAccessNet": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/accessNet"
+            }
           },
-          {
-            "properties": {
-              "scoped": {
-                "type": "array",
-                "items": {
-                  "$ref": "#/definitions/scope"
-                }
-              }
-            },
-            "required": [
-              "scoped"
-            ],
-            "additionalProperties": false
+          "scoped": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/scope"
+            }
           }
-        ]
+        },
+        "additionalProperties": false
       }
     },
     "pathBeneath": {

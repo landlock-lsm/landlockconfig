@@ -3,9 +3,7 @@
     {
       "handledAccessFs": [
         "v5.all"
-      ]
-    },
-    {
+      ],
       "handledAccessNet": [
         "bind_tcp"
       ]

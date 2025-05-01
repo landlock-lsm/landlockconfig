@@ -42,6 +42,7 @@ impl From<NonEmptyStruct<JsonConfig>> for Config {
         let json = json.into_inner();
 
         for ruleset in json.ruleset.unwrap_or_default() {
+            let ruleset = ruleset.into_inner();
             config.handled_fs |= ruleset
                 .handledAccessFs
                 .as_ref()

@@ -253,6 +253,72 @@ fn test_empty_net_port_number() {
     assert_eq!(parse_json(json), Err(Category::Data));
 }
 
+/* Test "empty ruleset" error. */
+
+#[test]
+fn test_empty_ruleset_json() {
+    let json = r#"{
+        "ruleset": [
+            {}
+        ]
+    }"#;
+    assert_eq!(parse_json(json), Err(Category::Data));
+}
+
+#[test]
+fn test_empty_ruleset_toml() {
+    let toml = r#"
+        [[ruleset]]
+    "#;
+    assert!(parse_toml(toml).is_err());
+}
+
+/* Test full ruleset. */
+
+#[test]
+fn test_full_ruleset_1() {
+    let json = r#"{
+        "ruleset": [
+            {
+                "handledAccessFs": [ "execute" ],
+                "handledAccessNet": [ "bind_tcp" ],
+                "scoped": [ "abstract_unix_socket" ]
+            }
+        ]
+    }"#;
+    assert_eq!(
+        parse_json(json),
+        Ok(Config {
+            handled_fs: AccessFs::Execute.into(),
+            handled_net: AccessNet::BindTcp.into(),
+            scoped: Scope::AbstractUnixSocket.into(),
+            ..Default::default()
+        })
+    );
+}
+
+#[test]
+fn test_full_ruleset_2() {
+    let json = r#"{
+        "ruleset": [
+            {
+                "handledAccessNet": [ "bind_tcp" ],
+                "scoped": [ "abstract_unix_socket" ],
+                "handledAccessFs": [ "execute" ]
+            }
+        ]
+    }"#;
+    assert_eq!(
+        parse_json(json),
+        Ok(Config {
+            handled_fs: AccessFs::Execute.into(),
+            handled_net: AccessNet::BindTcp.into(),
+            scoped: Scope::AbstractUnixSocket.into(),
+            ..Default::default()
+        })
+    );
+}
+
 /* Test ruleset's handledAccessFs. */
 
 #[test]

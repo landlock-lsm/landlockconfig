@@ -64,7 +64,7 @@ pub(crate) trait NonEmptyStructInner {
     fn is_empty(&self) -> bool;
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct NonEmptyStruct<T>(T)
 where
     T: NonEmptyStructInner;

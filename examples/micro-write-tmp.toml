@@ -1,0 +1,17 @@
+# Infered properties:
+# [[ruleset]]
+# handled_access_fs = ["v5.all"]
+# handled_access_net = ["bind_tcp"]
+#
+# We need to be careful to cover all access rights (e.g. v5.read_execute +
+# v5.read_write = v5.all), otherwise the missing accesses would not be denied.
+
+# Main system directories can be red.
+[[path_beneath]]
+allowed_access = ["v5.read_execute"]
+parent = [".", "/bin", "/lib", "/usr", "/dev", "/etc", "/proc",]
+
+# Only allow writing to /tmp.
+[[path_beneath]]
+allowed_access = ["v5.read_write"]
+parent = ["/tmp"]

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::nonempty::NonEmptyStruct;
 use crate::parser::{JsonConfig, TomlConfig};
 use landlock::{
     AccessFs, AccessNet, BitFlags, NetPort, PathBeneath, PathFd, PathFdError, Ruleset, RulesetAttr,
@@ -21,6 +22,7 @@ pub enum BuildRulesetError {
     Ruleset(#[from] RulesetError),
 }
 
+// TODO: Remove the Default implementation to avoid inconsistent configurations wrt. From<NonEmptySet<JsonConfig>>.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct Config {
     pub(crate) handled_fs: BitFlags<AccessFs>,
@@ -34,11 +36,12 @@ pub struct Config {
     pub(crate) rules_net_port: BTreeMap<u64, BitFlags<AccessNet>>,
 }
 
-impl From<JsonConfig> for Config {
-    fn from(json: JsonConfig) -> Self {
+impl From<NonEmptyStruct<JsonConfig>> for Config {
+    fn from(json: NonEmptyStruct<JsonConfig>) -> Self {
         let mut config = Self::default();
+        let json = json.into_inner();
 
-        for ruleset in json.ruleset {
+        for ruleset in json.ruleset.unwrap_or_default() {
             config.handled_fs |= ruleset
                 .handledAccessFs
                 .as_ref()
@@ -129,7 +132,7 @@ impl Config {
     where
         R: std::io::Read,
     {
-        let json = serde_json::from_reader::<_, JsonConfig>(reader)?;
+        let json = serde_json::from_reader::<_, NonEmptyStruct<JsonConfig>>(reader)?;
         Ok(json.into())
     }
 
@@ -137,7 +140,8 @@ impl Config {
     pub fn parse_toml(data: &str) -> Result<Self, toml::de::Error> {
         // The TOML parser does not handle Read implementations,
         // see https://github.com/toml-rs/toml/issues/326
-        let json: JsonConfig = toml::from_str::<TomlConfig>(data)?.into();
+        let json: NonEmptyStruct<JsonConfig> =
+            toml::from_str::<NonEmptyStruct<TomlConfig>>(data)?.convert();
         Ok(json.into())
     }
 }

@@ -118,6 +118,9 @@ jobs:
     - name: Run the sandboxer example with TOML
       run: rustup run ${{ env.RUST_TOOLCHAIN }} cargo run --example sandboxer -- --toml examples/mini-write-tmp.toml true
 
+    - name: Run the sandboxer example with TOML (micro)
+      run: rustup run ${{ env.RUST_TOOLCHAIN }} cargo run --example sandboxer -- --toml examples/micro-write-tmp.toml true
+
     - name: Run the sandboxer example with FS-only restrictions
       run: rustup run ${{ env.RUST_TOOLCHAIN }} cargo run --example sandboxer -- --json examples/verbose-write-tmp.json true
 

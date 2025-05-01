@@ -57,3 +57,47 @@ where
         Self(iter.into_iter().collect())
     }
 }
+
+pub(crate) trait NonEmptyStructInner {
+    const ERROR_MESSAGE: &'static str;
+
+    fn is_empty(&self) -> bool;
+}
+
+#[derive(Debug)]
+pub(crate) struct NonEmptyStruct<T>(T)
+where
+    T: NonEmptyStructInner;
+
+impl<T> NonEmptyStruct<T>
+where
+    T: NonEmptyStructInner,
+{
+    pub(crate) fn into_inner(self) -> T {
+        self.0
+    }
+
+    pub(crate) fn convert<U>(self) -> NonEmptyStruct<U>
+    where
+        U: NonEmptyStructInner + From<T>,
+    {
+        NonEmptyStruct(U::from(self.0))
+    }
+}
+
+impl<'de, T> Deserialize<'de> for NonEmptyStruct<T>
+where
+    T: Deserialize<'de> + NonEmptyStructInner,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let src = T::deserialize(deserializer)?;
+        if src.is_empty() {
+            Err(serde::de::Error::custom(T::ERROR_MESSAGE))
+        } else {
+            Ok(NonEmptyStruct(src))
+        }
+    }
+}

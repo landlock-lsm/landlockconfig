@@ -155,8 +155,22 @@
       }
     }
   },
-  "required": [
-    "ruleset"
+  "anyOf": [
+    {
+      "required": [
+        "ruleset"
+      ]
+    },
+    {
+      "required": [
+        "pathBeneath"
+      ]
+    },
+    {
+      "required": [
+        "netPort"
+      ]
+    }
   ],
   "additionalProperties": false
 }

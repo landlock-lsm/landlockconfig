@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::nonempty::NonEmptySet;
+use crate::nonempty::{NonEmptySet, NonEmptyStructInner};
 use landlock::{Access, AccessFs, AccessNet, BitFlags, Scope, ABI};
 use serde::Deserialize;
 
@@ -239,6 +239,7 @@ impl From<&NonEmptySet<JsonScopeItem>> for BitFlags<Scope> {
 #[serde(deny_unknown_fields)]
 #[allow(non_snake_case)]
 pub(crate) struct JsonRuleset {
+    // TODO: Require at least one field.
     pub(crate) handledAccessFs: Option<NonEmptySet<JsonFsAccessItem>>,
     pub(crate) handledAccessNet: Option<NonEmptySet<JsonNetAccessItem>>,
     pub(crate) scoped: Option<NonEmptySet<JsonScopeItem>>,
@@ -247,6 +248,7 @@ pub(crate) struct JsonRuleset {
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
 #[serde(deny_unknown_fields)]
 struct TomlRuleset {
+    // TODO: Require at least one field.
     handled_access_fs: Option<NonEmptySet<JsonFsAccessItem>>,
     handled_access_net: Option<NonEmptySet<JsonNetAccessItem>>,
     scoped: Option<NonEmptySet<JsonScopeItem>>,
@@ -312,27 +314,54 @@ impl From<TomlNetPort> for JsonNetPort {
     }
 }
 
+// At least one of the fields must be set, which is guaranteed when wrapped with NonEmptyStruct.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[allow(non_snake_case)]
 pub(crate) struct JsonConfig {
-    pub(crate) ruleset: NonEmptySet<JsonRuleset>,
+    pub(crate) ruleset: Option<NonEmptySet<JsonRuleset>>,
     pub(crate) pathBeneath: Option<NonEmptySet<JsonPathBeneath>>,
     pub(crate) netPort: Option<NonEmptySet<JsonNetPort>>,
 }
 
+impl NonEmptyStructInner for JsonConfig {
+    const ERROR_MESSAGE: &'static str = "empty configuration";
+
+    fn is_empty(&self) -> bool {
+        self.ruleset.as_ref().map_or(true, |set| set.is_empty())
+            && self.pathBeneath.as_ref().map_or(true, |set| set.is_empty())
+            && self.netPort.as_ref().map_or(true, |set| set.is_empty())
+    }
+}
+
+// At least one of the fields must be set, which is guaranteed when wrapped with NonEmptyStruct.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct TomlConfig {
-    ruleset: NonEmptySet<TomlRuleset>,
+    ruleset: Option<NonEmptySet<TomlRuleset>>,
     path_beneath: Option<NonEmptySet<TomlPathBeneath>>,
     net_port: Option<NonEmptySet<TomlNetPort>>,
+}
+
+impl NonEmptyStructInner for TomlConfig {
+    const ERROR_MESSAGE: &'static str = "empty configuration";
+
+    fn is_empty(&self) -> bool {
+        self.ruleset.as_ref().map_or(true, |set| set.is_empty())
+            && self
+                .path_beneath
+                .as_ref()
+                .map_or(true, |set| set.is_empty())
+            && self.net_port.as_ref().map_or(true, |set| set.is_empty())
+    }
 }
 
 impl From<TomlConfig> for JsonConfig {
     fn from(toml: TomlConfig) -> Self {
         Self {
-            ruleset: toml.ruleset.into_iter().map(Into::into).collect(),
+            ruleset: toml
+                .ruleset
+                .map(|set| set.into_iter().map(Into::into).collect()),
             pathBeneath: toml
                 .path_beneath
                 .map(|set| set.into_iter().map(Into::into).collect()),

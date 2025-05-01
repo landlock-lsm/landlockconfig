@@ -98,6 +98,29 @@ where
     }
 }
 
+/* Test "empty configuration" error. */
+
+#[test]
+fn test_empty_config_json_1() {
+    let json = r#"{
+    }"#;
+    assert_eq!(parse_json(json), Err(Category::Data));
+}
+
+#[test]
+fn test_empty_config_json_2() {
+    let json = r#"{
+        "ruleset": null
+    }"#;
+    assert_eq!(parse_json(json), Err(Category::Data));
+}
+
+#[test]
+fn test_empty_config_toml() {
+    let toml = "";
+    assert!(parse_toml(toml).is_err());
+}
+
 /* Test "invalid length 0, expected at least one element" error. */
 
 #[test]
@@ -156,6 +179,74 @@ fn test_empty_scoped() {
         "ruleset": [
             {
                 "scoped": [ ]
+            }
+        ]
+    }"#;
+    assert_eq!(parse_json(json), Err(Category::Data));
+}
+
+#[test]
+fn test_empty_path_beneath() {
+    let json = r#"{
+        "pathBeneath": [ ]
+    }"#;
+    assert_eq!(parse_json(json), Err(Category::Data));
+}
+
+#[test]
+fn test_empty_path_beneath_access() {
+    let json = r#"{
+        "pathBeneath": [
+            {
+                "allowedAccess": [ ],
+                "parent": [ "." ]
+            }
+        ]
+    }"#;
+    assert_eq!(parse_json(json), Err(Category::Data));
+}
+
+#[test]
+fn test_empty_path_beneath_parent() {
+    let json = r#"{
+        "pathBeneath": [
+            {
+                "allowedAccess": [ "execute" ],
+                "parent": [ ]
+            }
+        ]
+    }"#;
+    assert_eq!(parse_json(json), Err(Category::Data));
+}
+
+#[test]
+fn test_empty_net_port() {
+    let json = r#"{
+        "netPort": [ ]
+    }"#;
+    assert_eq!(parse_json(json), Err(Category::Data));
+}
+
+#[test]
+fn test_empty_net_port_access() {
+    let json = r#"{
+        "netPort": [
+            {
+                "allowedAccess": [ ],
+                "port": [ 443 ]
+            }
+        ]
+    }"#;
+    assert_eq!(parse_json(json), Err(Category::Data));
+}
+
+#[test]
+fn test_empty_net_port_number() {
+    let json = r#"{
+        "netPort": [
+            {
+                "allowedAccess": [ "bind_tcp" ],
+                "port": [ ]
             }
         ]
     }"#;
@@ -277,11 +368,11 @@ fn test_all_handled_access_fs_toml() {
         ]
     "#;
     assert_eq!(
-        parse_toml(toml),
-        Ok(Config {
+        parse_toml(toml).unwrap(),
+        Config {
             handled_fs: AccessFs::from_all(LATEST_ABI),
             ..Default::default()
-        })
+        }
     );
 }
 
@@ -304,7 +395,7 @@ fn test_unknown_ruleset_field() {
                 "handledAccessFs": [ "execute" ]
             }
         ],
-        "foo": []
+        "foo": [ ]
     }"#;
     assert_eq!(parse_json(json), Err(Category::Data),);
 }
@@ -963,6 +1054,46 @@ fn test_infer_handled_access_net() {
         Ok(Config {
             handled_net: AccessNet::BindTcp | AccessNet::ConnectTcp,
             rules_net_port: [(443, AccessNet::ConnectTcp.into())].into(),
+            ..Default::default()
+        })
+    );
+}
+
+#[test]
+fn test_path_beneath_alone() {
+    let json = r#"{
+        "pathBeneath": [
+            {
+                "allowedAccess": [ "execute" ],
+                "parent": [ "." ]
+            }
+        ]
+    }"#;
+    assert_eq!(
+        parse_json(json),
+        Ok(Config {
+            handled_fs: AccessFs::Execute.into(),
+            rules_path_beneath: [(PathBuf::from("."), AccessFs::Execute.into())].into(),
+            ..Default::default()
+        })
+    );
+}
+
+#[test]
+fn test_net_port_alone() {
+    let json = r#"{
+        "netPort": [
+            {
+                "allowedAccess": [ "bind_tcp" ],
+                "port": [ 443 ]
+            }
+        ]
+    }"#;
+    assert_eq!(
+        parse_json(json),
+        Ok(Config {
+            handled_net: AccessNet::BindTcp.into(),
+            rules_net_port: [(443, AccessNet::BindTcp.into())].into(),
             ..Default::default()
         })
     );

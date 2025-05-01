@@ -69,23 +69,27 @@
   "properties": {
     "ruleset": {
       "type": "array",
+      "minItems": 1,
       "items": {
         "type": "object",
         "properties": {
           "handledAccessFs": {
             "type": "array",
+            "minItems": 1,
             "items": {
               "$ref": "#/definitions/accessFs"
             }
           },
           "handledAccessNet": {
             "type": "array",
+            "minItems": 1,
             "items": {
               "$ref": "#/definitions/accessNet"
             }
           },
           "scoped": {
             "type": "array",
+            "minItems": 1,
             "items": {
               "$ref": "#/definitions/scope"
             }
@@ -96,17 +100,20 @@
     },
     "pathBeneath": {
       "type": "array",
+      "minItems": 1,
       "items": {
         "type": "object",
         "properties": {
           "allowedAccess": {
             "type": "array",
+            "minItems": 1,
             "items": {
               "$ref": "#/definitions/accessFs"
             }
           },
           "parent": {
             "type": "array",
+            "minItems": 1,
             "items": {
               "type": "string"
             }
@@ -121,17 +128,20 @@
     },
     "netPort": {
       "type": "array",
+      "minItems": 1,
       "items": {
         "type": "object",
         "properties": {
           "allowedAccess": {
             "type": "array",
+            "minItems": 1,
             "items": {
               "$ref": "#/definitions/accessNet"
             }
           },
           "port": {
             "type": "array",
+            "minItems": 1,
             "items": {
               "$ref": "#/definitions/uint64"
             }

@@ -98,14 +98,71 @@ where
     }
 }
 
-// FIXME: Such an empty ruleset doesn't make sense and should not be allowed.
+/* Test "invalid length 0, expected at least one element" error. */
+
 #[test]
-fn test_empty_ruleset() {
+fn test_empty_ruleset_array_json() {
     let json = r#"{
-        "ruleset": []
+        "ruleset": [ ]
     }"#;
-    assert_eq!(parse_json(json), Ok(Default::default()),);
+    assert_eq!(parse_json(json), Err(Category::Data));
 }
+
+#[test]
+fn test_empty_handled_access_fs_1() {
+    let json = r#"{
+        "ruleset": [
+            {
+                "handledAccessFs": [ ]
+            }
+        ]
+    }"#;
+    assert_eq!(parse_json(json), Err(Category::Data));
+}
+
+#[test]
+fn test_empty_handled_access_fs_2() {
+    let json = r#"{
+        "ruleset": [
+            {
+                "handledAccessFs": [ ]
+            },
+            {
+                "handledAccessFs": [ "execute" ]
+            },
+            {
+                "handledAccessFs": [ ]
+            }
+        ]
+    }"#;
+    assert_eq!(parse_json(json), Err(Category::Data),);
+}
+
+#[test]
+fn test_empty_handled_access_net() {
+    let json = r#"{
+        "ruleset": [
+            {
+                "handledAccessNet": [ ]
+            }
+        ]
+    }"#;
+    assert_eq!(parse_json(json), Err(Category::Data));
+}
+
+#[test]
+fn test_empty_scoped() {
+    let json = r#"{
+        "ruleset": [
+            {
+                "scoped": [ ]
+            }
+        ]
+    }"#;
+    assert_eq!(parse_json(json), Err(Category::Data));
+}
+
+/* Test ruleset's handledAccessFs. */
 
 #[test]
 fn test_one_handled_access_fs() {
@@ -492,6 +549,8 @@ fn test_normalization_path_beneath() {
         }),
     );
 }
+
+/* Test ruleset's handledAccessNet. */
 
 #[test]
 fn test_one_handled_access_net() {

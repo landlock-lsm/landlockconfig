@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::nonempty::NonEmptySet;
 use landlock::{Access, AccessFs, AccessNet, BitFlags, Scope, ABI};
 use serde::Deserialize;
-use std::collections::BTreeSet;
 
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
-enum JsonFsAccessItem {
+pub(crate) enum JsonFsAccessItem {
     Execute,
     WriteFile,
     ReadFile,
@@ -164,13 +164,9 @@ fn test_v2_read_write() {
     assert!(rw.contains(AccessFs::Refer));
 }
 
-#[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct JsonFsAccessSet(BTreeSet<JsonFsAccessItem>);
-
-impl From<&JsonFsAccessSet> for BitFlags<AccessFs> {
-    fn from(set: &JsonFsAccessSet) -> Self {
-        set.0.iter().fold(BitFlags::EMPTY, |flags, item| {
+impl From<&NonEmptySet<JsonFsAccessItem>> for BitFlags<AccessFs> {
+    fn from(set: &NonEmptySet<JsonFsAccessItem>) -> Self {
+        set.iter().fold(BitFlags::EMPTY, |flags, item| {
             let access: BitFlags<AccessFs> = item.into();
             flags | access
         })
@@ -179,7 +175,7 @@ impl From<&JsonFsAccessSet> for BitFlags<AccessFs> {
 
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
-enum JsonNetAccessItem {
+pub(crate) enum JsonNetAccessItem {
     BindTcp,
     ConnectTcp,
     #[serde(rename = "v4.all")]
@@ -202,13 +198,9 @@ impl From<&JsonNetAccessItem> for BitFlags<AccessNet> {
     }
 }
 
-#[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct JsonNetAccessSet(BTreeSet<JsonNetAccessItem>);
-
-impl From<&JsonNetAccessSet> for BitFlags<AccessNet> {
-    fn from(set: &JsonNetAccessSet) -> Self {
-        set.0.iter().fold(BitFlags::EMPTY, |flags, item| {
+impl From<&NonEmptySet<JsonNetAccessItem>> for BitFlags<AccessNet> {
+    fn from(set: &NonEmptySet<JsonNetAccessItem>) -> Self {
+        set.iter().fold(BitFlags::EMPTY, |flags, item| {
             let access: BitFlags<AccessNet> = item.into();
             flags | access
         })
@@ -217,7 +209,7 @@ impl From<&JsonNetAccessSet> for BitFlags<AccessNet> {
 
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
-enum JsonScopeItem {
+pub(crate) enum JsonScopeItem {
     AbstractUnixSocket,
     Signal,
     #[serde(rename = "v6.all")]
@@ -234,13 +226,9 @@ impl From<&JsonScopeItem> for BitFlags<Scope> {
     }
 }
 
-#[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct JsonScopeSet(BTreeSet<JsonScopeItem>);
-
-impl From<&JsonScopeSet> for BitFlags<Scope> {
-    fn from(set: &JsonScopeSet) -> Self {
-        set.0.iter().fold(BitFlags::EMPTY, |flags, item| {
+impl From<&NonEmptySet<JsonScopeItem>> for BitFlags<Scope> {
+    fn from(set: &NonEmptySet<JsonScopeItem>) -> Self {
+        set.iter().fold(BitFlags::EMPTY, |flags, item| {
             let scope: BitFlags<Scope> = item.into();
             flags | scope
         })
@@ -251,17 +239,17 @@ impl From<&JsonScopeSet> for BitFlags<Scope> {
 #[serde(deny_unknown_fields)]
 #[allow(non_snake_case)]
 pub(crate) struct JsonRuleset {
-    pub(crate) handledAccessFs: Option<JsonFsAccessSet>,
-    pub(crate) handledAccessNet: Option<JsonNetAccessSet>,
-    pub(crate) scoped: Option<JsonScopeSet>,
+    pub(crate) handledAccessFs: Option<NonEmptySet<JsonFsAccessItem>>,
+    pub(crate) handledAccessNet: Option<NonEmptySet<JsonNetAccessItem>>,
+    pub(crate) scoped: Option<NonEmptySet<JsonScopeItem>>,
 }
 
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
 #[serde(deny_unknown_fields)]
 struct TomlRuleset {
-    handled_access_fs: Option<JsonFsAccessSet>,
-    handled_access_net: Option<JsonNetAccessSet>,
-    scoped: Option<JsonScopeSet>,
+    handled_access_fs: Option<NonEmptySet<JsonFsAccessItem>>,
+    handled_access_net: Option<NonEmptySet<JsonNetAccessItem>>,
+    scoped: Option<NonEmptySet<JsonScopeItem>>,
 }
 
 impl From<TomlRuleset> for JsonRuleset {
@@ -280,15 +268,15 @@ impl From<TomlRuleset> for JsonRuleset {
 #[serde(deny_unknown_fields)]
 #[allow(non_snake_case)]
 pub(crate) struct JsonPathBeneath {
-    pub(crate) allowedAccess: JsonFsAccessSet,
-    pub(crate) parent: BTreeSet<String>,
+    pub(crate) allowedAccess: NonEmptySet<JsonFsAccessItem>,
+    pub(crate) parent: NonEmptySet<String>,
 }
 
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
 #[serde(deny_unknown_fields)]
 struct TomlPathBeneath {
-    allowed_access: JsonFsAccessSet,
-    parent: BTreeSet<String>,
+    allowed_access: NonEmptySet<JsonFsAccessItem>,
+    parent: NonEmptySet<String>,
 }
 
 impl From<TomlPathBeneath> for JsonPathBeneath {
@@ -304,15 +292,15 @@ impl From<TomlPathBeneath> for JsonPathBeneath {
 #[serde(deny_unknown_fields)]
 #[allow(non_snake_case)]
 pub(crate) struct JsonNetPort {
-    pub allowedAccess: JsonNetAccessSet,
-    pub port: BTreeSet<u64>,
+    pub(crate) allowedAccess: NonEmptySet<JsonNetAccessItem>,
+    pub(crate) port: NonEmptySet<u64>,
 }
 
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
 #[serde(deny_unknown_fields)]
 struct TomlNetPort {
-    allowed_access: JsonNetAccessSet,
-    port: BTreeSet<u64>,
+    allowed_access: NonEmptySet<JsonNetAccessItem>,
+    port: NonEmptySet<u64>,
 }
 
 impl From<TomlNetPort> for JsonNetPort {
@@ -328,17 +316,17 @@ impl From<TomlNetPort> for JsonNetPort {
 #[serde(deny_unknown_fields)]
 #[allow(non_snake_case)]
 pub(crate) struct JsonConfig {
-    pub(crate) ruleset: BTreeSet<JsonRuleset>,
-    pub(crate) pathBeneath: Option<BTreeSet<JsonPathBeneath>>,
-    pub(crate) netPort: Option<BTreeSet<JsonNetPort>>,
+    pub(crate) ruleset: NonEmptySet<JsonRuleset>,
+    pub(crate) pathBeneath: Option<NonEmptySet<JsonPathBeneath>>,
+    pub(crate) netPort: Option<NonEmptySet<JsonNetPort>>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct TomlConfig {
-    ruleset: BTreeSet<TomlRuleset>,
-    path_beneath: Option<BTreeSet<TomlPathBeneath>>,
-    net_port: Option<BTreeSet<TomlNetPort>>,
+    ruleset: NonEmptySet<TomlRuleset>,
+    path_beneath: Option<NonEmptySet<TomlPathBeneath>>,
+    net_port: Option<NonEmptySet<TomlNetPort>>,
 }
 
 impl From<TomlConfig> for JsonConfig {

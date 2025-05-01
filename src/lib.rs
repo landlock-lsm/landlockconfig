@@ -3,6 +3,7 @@
 pub use config::{BuildRulesetError, Config};
 
 mod config;
+mod nonempty;
 mod parser;
 
 #[cfg(test)]

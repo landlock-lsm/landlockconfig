@@ -352,7 +352,7 @@ pub(crate) struct JsonPathBeneath {
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
 #[serde(deny_unknown_fields)]
 struct TomlPathBeneath {
-    pub allowed_access: JsonFsAccessSet,
+    allowed_access: JsonFsAccessSet,
     parent: BTreeSet<String>,
 }
 

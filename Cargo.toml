@@ -4,7 +4,8 @@ members = ["ffi"]
 
 [workspace.package]
 edition = "2021"
-rust-version = "1.74"
+# rust-version = "1.74" # is enough without test dependencies
+rust-version = "1.81"
 license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
@@ -37,6 +38,8 @@ toml = { version = "0.8.20", optional = true }
 [dev-dependencies]
 anyhow = "1.0.95"
 clap = { version = "4.5.28", features = ["derive"] }
+jsonschema = { version = "0.30.0", default-features = false }
+lazy_static = "1.5.0"
 
 [[example]]
 name = "sandboxer"

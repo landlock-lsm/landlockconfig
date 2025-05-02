@@ -3,9 +3,41 @@
 use crate::Config;
 use landlock::{Access, AccessFs, AccessNet, Scope, ABI};
 use serde_json::error::Category;
+use serde_json::Value;
 use std::path::PathBuf;
+use std::{env, fs};
 
 const LATEST_ABI: ABI = ABI::V6;
+
+lazy_static! {
+    static ref JSON_VALIDATOR: jsonschema::Validator = {
+        let crate_dir = PathBuf::from(
+            env::var("CARGO_MANIFEST_DIR")
+                .expect("The environment variable CARGO_MANIFEST_DIR is not set"),
+        );
+        let schema_path = crate_dir.join("schema/landlockconfig.json");
+        let schema_str =
+            fs::read_to_string(schema_path).expect("Failed to read the JSON schema file");
+        let schema: Value = serde_json::from_str(&schema_str).expect("Invalid JSON");
+        jsonschema::validator_for(&schema).expect("Invalid JSON schema")
+    };
+}
+
+fn validate_json(json: &str) -> Result<(), ()> {
+    let json = serde_json::from_str::<Value>(json).expect("Invalid JSON");
+    JSON_VALIDATOR.validate(&json).map(|_| ()).map_err(|e| {
+        eprintln!("JSON schema validation error: {e}");
+    })
+}
+
+#[test]
+fn test_json_schema() {
+    let test_json = r#"{
+        "ruleset": 0
+    }"#;
+
+    validate_json(test_json).expect_err("JSON schema validator should return a type error")
+}
 
 fn assert_json(data: &str, ret: Result<(), Category>) {
     assert_eq!(parse_json(data).map(|_| ()), ret);
@@ -13,10 +45,17 @@ fn assert_json(data: &str, ret: Result<(), Category>) {
 
 fn parse_json(json: &str) -> Result<Config, Category> {
     let cursor = std::io::Cursor::new(json);
-    Config::parse_json(cursor).map_err(|e| {
+    let parsing = Config::parse_json(cursor).map_err(|e| {
         eprintln!("JSON parsing error: {e}");
         e.classify()
-    })
+    });
+
+    // Ensures the JSON schema is consistent and stays up-to-date with the crate.
+    let valid = validate_json(json);
+    if parsing.is_ok() != valid.is_ok() {
+        panic!("Inconsistent validation: parser and schema validator disagree");
+    }
+    parsing
 }
 
 fn parse_toml(toml: &str) -> Result<Config, toml::de::Error> {

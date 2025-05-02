@@ -7,3 +7,7 @@ mod parser;
 
 #[cfg(test)]
 mod tests_parser;
+
+#[cfg(test)]
+#[macro_use]
+extern crate lazy_static;

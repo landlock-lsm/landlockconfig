@@ -84,6 +84,18 @@ This repository enables developers to build an ELF shared object library, which
 can then be used by any program and most programming languages via a foreign
 function interface (FFI) and a [C API](c/landlockconfig.h).
 
+To install this library, first install
+[cargo-c](https://github.com/lu-zero/cargo-c) using your package manager or with
+`cargo install cargo-c`, and then run these commands:
+
+```sh
+cargo cinstall --package=landlockconfig_ffi --release --prefix=/usr/local --destdir=out
+sudo cp -dr out/usr/local/* /usr/local/
+```
+
+The library is then usable via `pkg-config` as `landlockconfig`. See the [C
+example](c/examples/sandboxer.c) and its [Makefile](c/examples/Makefile).
+
 ### Resilient
 
 The parser should be resilient against any input.
@@ -104,7 +116,7 @@ the execution traces are similar.
 ## Example
 
 Here are the steps to build and use the sandboxer example:
-```bash
+```sh
 git clone https://github.com/landlock-lsm/landlockconfig
 cd landlockconfig
 cargo run --example sandboxer -- --json examples/mini-write-tmp.json sh

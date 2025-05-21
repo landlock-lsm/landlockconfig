@@ -251,12 +251,12 @@ impl NonEmptyStructInner for JsonRuleset {
     fn is_empty(&self) -> bool {
         self.handledAccessFs
             .as_ref()
-            .map_or(true, |set| set.is_empty())
+            .is_none_or(|set| set.is_empty())
             && self
                 .handledAccessNet
                 .as_ref()
-                .map_or(true, |set| set.is_empty())
-            && self.scoped.as_ref().map_or(true, |set| set.is_empty())
+                .is_none_or(|set| set.is_empty())
+            && self.scoped.as_ref().is_none_or(|set| set.is_empty())
     }
 }
 
@@ -275,12 +275,12 @@ impl NonEmptyStructInner for TomlRuleset {
     fn is_empty(&self) -> bool {
         self.handled_access_fs
             .as_ref()
-            .map_or(true, |set| set.is_empty())
+            .is_none_or(|set| set.is_empty())
             && self
                 .handled_access_net
                 .as_ref()
-                .map_or(true, |set| set.is_empty())
-            && self.scoped.as_ref().map_or(true, |set| set.is_empty())
+                .is_none_or(|set| set.is_empty())
+            && self.scoped.as_ref().is_none_or(|set| set.is_empty())
     }
 }
 
@@ -358,9 +358,9 @@ impl NonEmptyStructInner for JsonConfig {
     const ERROR_MESSAGE: &'static str = "empty configuration";
 
     fn is_empty(&self) -> bool {
-        self.ruleset.as_ref().map_or(true, |set| set.is_empty())
-            && self.pathBeneath.as_ref().map_or(true, |set| set.is_empty())
-            && self.netPort.as_ref().map_or(true, |set| set.is_empty())
+        self.ruleset.as_ref().is_none_or(|set| set.is_empty())
+            && self.pathBeneath.as_ref().is_none_or(|set| set.is_empty())
+            && self.netPort.as_ref().is_none_or(|set| set.is_empty())
     }
 }
 
@@ -377,12 +377,9 @@ impl NonEmptyStructInner for TomlConfig {
     const ERROR_MESSAGE: &'static str = "empty configuration";
 
     fn is_empty(&self) -> bool {
-        self.ruleset.as_ref().map_or(true, |set| set.is_empty())
-            && self
-                .path_beneath
-                .as_ref()
-                .map_or(true, |set| set.is_empty())
-            && self.net_port.as_ref().map_or(true, |set| set.is_empty())
+        self.ruleset.as_ref().is_none_or(|set| set.is_empty())
+            && self.path_beneath.as_ref().is_none_or(|set| set.is_empty())
+            && self.net_port.as_ref().is_none_or(|set| set.is_empty())
     }
 }
 

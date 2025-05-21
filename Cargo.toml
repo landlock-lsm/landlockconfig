@@ -4,8 +4,7 @@ members = ["ffi"]
 
 [workspace.package]
 edition = "2021"
-# rust-version = "1.74" # is enough without test dependencies
-rust-version = "1.81"
+rust-version = "1.82"
 license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]

@@ -1,8 +1,9 @@
 [package]
 name = "landlockconfig_ffi"
-version = "0.0.0"
+version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
+description.workspace = true
 license.workspace = true
 
 [lib]
@@ -16,3 +17,10 @@ libc = "0.2.171"
 
 [build-dependencies]
 cbindgen = "0.28.0"
+
+[features]
+capi = []
+
+[package.metadata.capi.header]
+subdirectory = false
+generation = false

@@ -25,6 +25,6 @@ fn main() {
         .expect("Unable to generate bindings")
         .write_to_file(&header_path);
 
-    let target_dir = PathBuf::from(&crate_dir).join("c");
+    let target_dir = PathBuf::from(&crate_dir).join("assets");
     fs::copy(&header_path, target_dir.join(header_file)).expect("Failed to copy header file");
 }

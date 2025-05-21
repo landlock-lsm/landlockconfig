@@ -7,7 +7,7 @@
 #include <syscall.h>
 #include <unistd.h>
 
-#include "../landlockconfig.h"
+#include <landlockconfig.h>
 
 static const char *config_file = "mini-write-tmp.toml";
 

@@ -83,6 +83,9 @@ jobs:
         commit: ${{ fromJSON(needs.commit_list.outputs.commits) }}
     steps:
 
+    - name: Install cargo-c
+      run: sudo apt install cargo-c
+
     - uses: actions/checkout@v4
       with:
         ref: ${{ matrix.commit }}
@@ -109,6 +112,9 @@ jobs:
     - name: Build examples
       run: rustup run ${{ env.RUST_TOOLCHAIN }} cargo build --all --examples --verbose
 
+    - name: Build FFI
+      run: rustup run ${{ env.RUST_TOOLCHAIN }} cargo cinstall --package=landlockconfig_ffi --destdir=out
+
   ubuntu_24_rust_stable:
     runs-on: ubuntu-24.04
     needs: commit_list
@@ -117,6 +123,9 @@ jobs:
       matrix:
         commit: ${{ fromJSON(needs.commit_list.outputs.commits) }}
     steps:
+
+    - name: Install cargo-c
+      run: sudo apt install cargo-c
 
     - name: Install Rust stable
       run: |
@@ -175,5 +184,5 @@ jobs:
     - name: Build C example
       run: make -C c/examples
 
-    - name: Run C example
-      run: cd c/examples && LD_LIBRARY_PATH=../../target/release ./sandboxer true
+    - name: Test C example
+      run: make -C c/examples test

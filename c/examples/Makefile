@@ -1,37 +1,45 @@
+# SPDX-License-Identifier: Apache-2.0 OR MIT
+
 BINARY = sandboxer
 SOURCE = sandboxer.c
 OBJECT = $(SOURCE:.c=.o)
 
-LIB_DIR = ../../target/release
-# Replace with landlockconfig.a for static linking.
-LIB_FILE = $(LIB_DIR)/liblandlockconfig.so
+OUT_DIR = out
+LIB_DIR = $(OUT_DIR)/lib
+
+PKG_NAME = landlockconfig
+PKG_CONFIG_PATH := $(LIB_DIR)/pkgconfig
 
 CC = gcc
-CFLAGS = -Wall -Werror
-LDFLAGS = -L$(LIB_DIR) -llandlockconfig -Wl,--gc-sections
+CFLAGS = $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --cflags $(PKG_NAME)) \
+	-Wall -Werror
+LDFLAGS = $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs $(PKG_NAME)) \
+	-L$(LIB_DIR) -Wl,--gc-sections
 
-.PHONY: all clean mrproper run FFI FORCE
+.PHONY: all clean mrproper run FORCE
 
 all: $(BINARY)
+	mkdir -p $(OUT_DIR)/bin
+	cp $(BINARY) $(OUT_DIR)/bin/
 
 clean:
 	rm $(OBJECT) || :
-
-mrproper: clean
 	rm $(BINARY) || :
 
-run: $(BINARY)
-	LD_LIBRARY_PATH=$(LIB_DIR) ./$(BINARY) bash -i
+mrproper: clean
+	rm -r $(OUT_DIR) || :
 
-FFI: FORCE
-	cargo build --package landlockconfig_ffi --release
+run: all
+	LD_LIBRARY_PATH=$(LIB_DIR) $(OUT_DIR)/bin/$(BINARY) bash -i
 
-${LIB_FILE}: FFI
+test: all
+	LD_LIBRARY_PATH=$(LIB_DIR) $(OUT_DIR)/bin/$(BINARY) true
 
-../landlockconfig.h: FFI
+$(OUT_DIR)/include/landlockconfig.h: FORCE
+	cargo cinstall --package=landlockconfig_ffi --release --prefix=$(OUT_DIR)
 
-%.o: %.c ../landlockconfig.h
+%.o: %.c $(OUT_DIR)/include/landlockconfig.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(BINARY): $(OBJECT) $(LIB_FILE)
+$(BINARY): $(OBJECT)
 	$(CC) -o $@ $< $(LDFLAGS)

@@ -109,24 +109,6 @@ jobs:
     - name: Build examples
       run: rustup run ${{ env.RUST_TOOLCHAIN }} cargo build --all --examples --verbose
 
-    - name: Check golden file changes by ffi/build.rs
-      run: s="$(set -o pipefail; git status --porcelain=1 | tee >(cat >&2))" && [[ -z "$s" ]]
-
-    - name: Run the sandboxer example with JSON
-      run: rustup run ${{ env.RUST_TOOLCHAIN }} cargo run --example sandboxer -- --json examples/mini-write-tmp.json true
-
-    - name: Run the sandboxer example with TOML
-      run: rustup run ${{ env.RUST_TOOLCHAIN }} cargo run --example sandboxer -- --toml examples/mini-write-tmp.toml true
-
-    - name: Run the sandboxer example with TOML (micro)
-      run: rustup run ${{ env.RUST_TOOLCHAIN }} cargo run --example sandboxer -- --toml examples/micro-write-tmp.toml true
-
-    - name: Run the sandboxer example with FS-only restrictions
-      run: rustup run ${{ env.RUST_TOOLCHAIN }} cargo run --example sandboxer -- --json examples/verbose-write-tmp.json true
-
-    - name: Run the sandboxer example with scope restrictions
-      run: rustup run ${{ env.RUST_TOOLCHAIN }} cargo run --example sandboxer -- --json examples/mini-scoped.json true
-
   ubuntu_24_rust_stable:
     runs-on: ubuntu-24.04
     needs: commit_list
@@ -165,6 +147,15 @@ jobs:
 
     - name: Run the sandboxer example with TOML
       run: rustup run stable cargo run --example sandboxer -- --toml examples/mini-write-tmp.toml true
+
+    - name: Run the sandboxer example with TOML (micro)
+      run: rustup run stable cargo run --example sandboxer -- --toml examples/micro-write-tmp.toml true
+
+    - name: Run the sandboxer example with FS-only restrictions
+      run: rustup run stable cargo run --example sandboxer -- --json examples/verbose-write-tmp.json true
+
+    - name: Run the sandboxer example with scope restrictions
+      run: rustup run stable cargo run --example sandboxer -- --json examples/mini-scoped.json true
 
     - name: Check format
       run: rustup run stable cargo fmt --all -- --check

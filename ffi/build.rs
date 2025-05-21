@@ -27,4 +27,7 @@ fn main() {
 
     let target_dir = PathBuf::from(&crate_dir).join("c");
     fs::copy(&header_path, target_dir.join(header_file)).expect("Failed to copy header file");
+
+    let target_dir = PathBuf::from(&crate_dir).join("go");
+    fs::copy(&header_path, target_dir.join(header_file)).expect("Failed to copy header file");
 }

@@ -6,6 +6,7 @@ members = ["ffi"]
 edition = "2021"
 rust-version = "1.82"
 license = "MIT OR Apache-2.0"
+description = "Sandboxer library leveraging Landlock with JSON or TOML configuration"
 
 [workspace.dependencies]
 landlock = "0.4.2"
@@ -15,7 +16,7 @@ name = "landlockconfig"
 version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
-description = "Sandboxer library leveraging Landlock with JSON or TOML configuration"
+description.workspace = true
 homepage = "https://landlock.io"
 repository = "https://github.com/landlock-lsm/island"
 license.workspace = true

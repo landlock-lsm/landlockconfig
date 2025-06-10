@@ -5,6 +5,7 @@ pub use config::{BuildRulesetError, Config, RuleError};
 mod config;
 mod nonempty;
 mod parser;
+mod variable;
 
 #[cfg(test)]
 mod tests_helpers;

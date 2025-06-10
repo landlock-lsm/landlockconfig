@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::{
-    tests_helpers::{assert_json, parse_json, parse_toml, validate_json, LATEST_ABI},
-    Config,
-};
+use crate::tests_helpers::{assert_json, parse_json, parse_toml, validate_json, LATEST_ABI};
+use crate::Config;
 use landlock::{Access, AccessFs, AccessNet, Scope, ABI};
 use serde_json::error::Category;
 use std::path::PathBuf;

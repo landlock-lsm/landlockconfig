@@ -1,8 +1,295 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::nonempty::{NonEmptySet, NonEmptyStruct, NonEmptyStructInner};
+use std::str::FromStr;
+
+use crate::{
+    nonempty::{NonEmptySet, NonEmptyStruct, NonEmptyStructInner},
+    variable::Name,
+};
 use landlock::{Access, AccessFs, AccessNet, BitFlags, Scope, ABI};
-use serde::Deserialize;
+use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum TemplateToken {
+    Text(String),
+    Var(Name),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct TemplateString(pub Vec<TemplateToken>);
+
+impl std::fmt::Display for TemplateString {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for token in &self.0 {
+            match token {
+                TemplateToken::Text(text) => f.write_str(text)?,
+                TemplateToken::Var(var) => write!(f, "${{{}}}", var)?,
+            }
+        }
+        Ok(())
+    }
+}
+
+impl Serialize for TemplateString {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&self.to_string())
+    }
+}
+
+#[derive(Debug, PartialEq)]
+enum TemplateState {
+    Text(usize),
+    FirstDollar(usize),
+    Variable(usize),
+}
+
+struct TemplateStringVisitor;
+
+impl<'de> de::Visitor<'de> for TemplateStringVisitor {
+    type Value = TemplateString;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str("a string with optional variable references like ${var}")
+    }
+
+    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        let mut tokens = Vec::new();
+        let mut state = TemplateState::Text(0);
+
+        let push_text = |tokens: &mut Vec<TemplateToken>, new_text: &str| {
+            if !new_text.is_empty() {
+                if let Some(TemplateToken::Text(ref mut text)) = tokens.last_mut() {
+                    text.push_str(new_text);
+                } else {
+                    tokens.push(TemplateToken::Text(new_text.to_string()));
+                }
+            }
+        };
+
+        for (i, c) in value.char_indices() {
+            state = match state {
+                TemplateState::Text(text_start) => match c {
+                    '$' => TemplateState::FirstDollar(text_start),
+                    _ => TemplateState::Text(text_start),
+                },
+                TemplateState::FirstDollar(text_start) => match c {
+                    '$' => {
+                        // Get text up to the second dollar sign
+                        push_text(&mut tokens, &value[text_start..i]);
+                        TemplateState::Text(i + 1)
+                    }
+                    '{' => {
+                        // Get text up to the beginning of the variable
+                        push_text(&mut tokens, &value[text_start..i - 1]);
+                        TemplateState::Variable(i + 1)
+                    }
+                    _ => {
+                        // Just a regular dollar followed by something else
+                        TemplateState::Text(text_start)
+                    }
+                },
+                TemplateState::Variable(name_start) => match c {
+                    '}' => {
+                        // Get the variable name
+                        let name = Name::from_str(&value[name_start..i]).map_err(|e| {
+                            E::custom(format!(
+                                "invalid variable name at position {}: {}",
+                                name_start - 2,
+                                e
+                            ))
+                        })?;
+                        tokens.push(TemplateToken::Var(name));
+                        TemplateState::Text(i + 1)
+                    }
+                    _ => TemplateState::Variable(name_start),
+                },
+            };
+        }
+
+        match state {
+            TemplateState::Text(text_start) | TemplateState::FirstDollar(text_start) => {
+                // Get text up to the second dollar sign
+                push_text(&mut tokens, &value[text_start..]);
+            }
+            TemplateState::Variable(name_start) => {
+                return Err(E::custom(format!(
+                    "unclosed variable reference starting at position {}",
+                    name_start - 2
+                )));
+            }
+        }
+
+        Ok(TemplateString(tokens))
+    }
+}
+
+#[cfg(test)]
+mod tests_template_string {
+    use super::*;
+    use serde::de::{Error, Visitor};
+
+    #[derive(Debug, PartialEq)]
+    struct TestError(String);
+
+    impl std::fmt::Display for TestError {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "{}", self.0)
+        }
+    }
+
+    impl std::error::Error for TestError {}
+
+    impl Error for TestError {
+        fn custom<T: std::fmt::Display>(msg: T) -> Self {
+            TestError(msg.to_string())
+        }
+    }
+
+    #[test]
+    fn test_visit_str_plain_text() {
+        assert_eq!(
+            TemplateStringVisitor.visit_str::<TestError>("bar").unwrap(),
+            TemplateString(vec![TemplateToken::Text("bar".to_string())])
+        );
+    }
+
+    #[test]
+    fn test_visit_str_empty_string() {
+        assert_eq!(
+            TemplateStringVisitor.visit_str::<TestError>("").unwrap(),
+            TemplateString(vec![])
+        );
+    }
+
+    #[test]
+    fn test_visit_str_single_variable() {
+        assert_eq!(
+            TemplateStringVisitor
+                .visit_str::<TestError>("${foo}")
+                .unwrap(),
+            TemplateString(vec![TemplateToken::Var(Name::from_str("foo").unwrap())])
+        );
+    }
+
+    #[test]
+    fn test_visit_str_text_and_variable() {
+        assert_eq!(
+            TemplateStringVisitor
+                .visit_str::<TestError>("${foo} bar")
+                .unwrap(),
+            TemplateString(vec![
+                TemplateToken::Var(Name::from_str("foo").unwrap()),
+                TemplateToken::Text(" bar".to_string()),
+            ])
+        );
+    }
+
+    #[test]
+    fn test_visit_str_multiple_variables() {
+        assert_eq!(
+            TemplateStringVisitor
+                .visit_str::<TestError>("${foo} bar ${baz}")
+                .unwrap(),
+            TemplateString(vec![
+                TemplateToken::Var(Name::from_str("foo").unwrap()),
+                TemplateToken::Text(" bar ".to_string()),
+                TemplateToken::Var(Name::from_str("baz").unwrap())
+            ])
+        );
+    }
+
+    #[test]
+    fn test_visit_str_escaped_variable() {
+        assert_eq!(
+            TemplateStringVisitor
+                .visit_str::<TestError>("$${escaped}")
+                .unwrap(),
+            TemplateString(vec![TemplateToken::Text("${escaped}".to_string())])
+        );
+    }
+
+    #[test]
+    fn test_visit_str_escaped_non_variable() {
+        assert_eq!(
+            TemplateStringVisitor
+                .visit_str::<TestError>("$$foo")
+                .unwrap(),
+            TemplateString(vec![TemplateToken::Text("$foo".to_string())])
+        );
+    }
+
+    #[test]
+    fn test_visit_str_escaped_variable_with_text() {
+        assert_eq!(
+            TemplateStringVisitor
+                .visit_str::<TestError>("foo $${escaped} baz")
+                .unwrap(),
+            TemplateString(vec![TemplateToken::Text("foo ${escaped} baz".to_string())])
+        );
+    }
+
+    #[test]
+    fn test_visit_str_unclosed_variable() {
+        assert_eq!(
+            TemplateStringVisitor
+                .visit_str::<TestError>("${unclosed")
+                .unwrap_err()
+                .0,
+            "unclosed variable reference starting at position 0"
+        );
+        assert_eq!(
+            TemplateStringVisitor
+                .visit_str::<TestError>(" ${unclosed")
+                .unwrap_err()
+                .0,
+            "unclosed variable reference starting at position 1"
+        );
+    }
+
+    #[test]
+    fn test_visit_str_invalid_variable_first_char() {
+        assert_eq!(TemplateStringVisitor
+            .visit_str::<TestError>(" ${0}")
+            .unwrap_err()
+            .0,
+            "invalid variable name at position 1: invalid first character in name (must be ASCII alphabetic): 0");
+    }
+
+    #[test]
+    fn test_visit_str_invalid_variable_name() {
+        assert_eq!(TemplateStringVisitor
+            .visit_str::<TestError>("${invalid-name}")
+            .unwrap_err()
+            .0,
+            "invalid variable name at position 0: invalid character(s) in name (must be ASCII alphanumeric or '_'): invalid-name");
+    }
+
+    #[test]
+    fn test_visit_str_empty_variable() {
+        assert_eq!(
+            TemplateStringVisitor
+                .visit_str::<TestError>("  ${}")
+                .unwrap_err()
+                .0,
+            "invalid variable name at position 2: name cannot be empty"
+        );
+    }
+}
+
+impl<'de> Deserialize<'de> for TemplateString {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_str(TemplateStringVisitor)
+    }
+}
 
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
@@ -301,14 +588,14 @@ impl From<TomlRuleset> for JsonRuleset {
 #[allow(non_snake_case)]
 pub(crate) struct JsonPathBeneath {
     pub(crate) allowedAccess: NonEmptySet<JsonFsAccessItem>,
-    pub(crate) parent: NonEmptySet<String>,
+    pub(crate) parent: NonEmptySet<TemplateString>,
 }
 
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
 #[serde(deny_unknown_fields)]
 struct TomlPathBeneath {
     allowed_access: NonEmptySet<JsonFsAccessItem>,
-    parent: NonEmptySet<String>,
+    parent: NonEmptySet<TemplateString>,
 }
 
 impl From<TomlPathBeneath> for JsonPathBeneath {

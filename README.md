@@ -113,7 +113,7 @@ can be used to test the library implementation against a set of valid and
 invalid samples. This could also be used to test Landlock libraries to make sure
 the execution traces are similar.
 
-## Example
+## Sandboxer example
 
 Here are the steps to build and use the sandboxer example:
 ```sh
@@ -123,3 +123,38 @@ cargo run --example sandboxer -- --json examples/mini-write-tmp.json sh
 ```
 
 A new dedicated tool will be published soon.
+
+## TOML configuration example
+
+Here is an example of a [TOML configuration](examples/micro-var.toml) that uses
+variables, access right groups, and list of directory hierarchies for
+conciseness.
+
+```toml
+[[variable]]
+name = "tmp"
+literal = ["/tmp", "/var/tmp"]
+
+[[variable]]
+name = "home"
+literal = ["/root", "/home"]
+
+[[variable]]
+name = "config"
+literal = ["/etc"]
+
+# Main system directories can be read, including the current path.
+[[path_beneath]]
+allowed_access = ["v5.read_execute"]
+parent = [".", "/bin", "/lib", "/usr", "/dev", "/proc", "${config}"]
+
+# Only allow writing to /tmp and /var/tmp .
+[[path_beneath]]
+allowed_access = ["v5.read_write"]
+parent = ["${tmp}", "${home}"]
+```
+
+We can get a view of the created Landlock rules:
+```sh
+cargo run --example sandboxer -- --toml examples/micro-var.toml --debug date
+```

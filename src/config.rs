@@ -2,11 +2,12 @@
 
 use crate::nonempty::NonEmptyStruct;
 use crate::parser::{JsonConfig, TomlConfig};
+use crate::variable::{ExtrapolateError, NameError, Variables, VecStringIterator};
 use landlock::{
     AccessFs, AccessNet, BitFlags, NetPort, PathBeneath, PathFd, PathFdError, Ruleset, RulesetAttr,
     RulesetCreated, RulesetCreatedAttr, RulesetError, Scope,
 };
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::num::TryFromIntError;
 use std::path::PathBuf;
 use thiserror::Error;
@@ -25,7 +26,7 @@ pub enum BuildRulesetError {
 // TODO: Remove the Default implementation to avoid inconsistent configurations wrt. From<NonEmptySet<JsonConfig>>.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct Config {
-    pub(crate) variables: BTreeMap<String, BTreeSet<String>>,
+    pub(crate) variables: Variables,
     pub(crate) handled_fs: BitFlags<AccessFs>,
     pub(crate) handled_net: BitFlags<AccessNet>,
     pub(crate) scoped: BitFlags<Scope>,
@@ -37,16 +38,26 @@ pub struct Config {
     pub(crate) rules_net_port: BTreeMap<u64, BitFlags<AccessNet>>,
 }
 
-impl From<NonEmptyStruct<JsonConfig>> for Config {
-    fn from(json: NonEmptyStruct<JsonConfig>) -> Self {
+#[derive(Debug, Error)]
+pub enum ConfigError {
+    #[error(transparent)]
+    Extrapolate(#[from] ExtrapolateError),
+    #[error(transparent)]
+    Name(#[from] NameError),
+}
+
+impl TryFrom<NonEmptyStruct<JsonConfig>> for Config {
+    type Error = ConfigError;
+
+    fn try_from(json: NonEmptyStruct<JsonConfig>) -> Result<Self, Self::Error> {
         let mut config = Self::default();
         let json = json.into_inner();
 
         for variable in json.variable.unwrap_or_default() {
+            let name = variable.name.parse()?;
             let literal = variable.literal.unwrap_or_default();
-            config
-                .variables
-                .insert(variable.name, literal.into_iter().collect());
+            // TODO: Check and warn if users tried to use variable in literal strings?
+            config.variables.insert(name, literal.into_iter().collect());
         }
 
         for ruleset in json.ruleset.unwrap_or_default() {
@@ -75,11 +86,15 @@ impl From<NonEmptyStruct<JsonConfig>> for Config {
             config.handled_fs |= access;
 
             for parent in path_beneath.parent {
-                config
-                    .rules_path_beneath
-                    .entry(PathBuf::from(parent))
-                    .and_modify(|a| *a |= access)
-                    .or_insert(access);
+                // TODO: Defer until the composition of all the configuration files.
+                let set = config.variables.extrapolate(&parent)?;
+                for path in VecStringIterator::new(&set) {
+                    config
+                        .rules_path_beneath
+                        .entry(PathBuf::from(path))
+                        .and_modify(|a| *a |= access)
+                        .or_insert(access);
+                }
             }
         }
 
@@ -98,7 +113,7 @@ impl From<NonEmptyStruct<JsonConfig>> for Config {
             }
         }
 
-        config
+        Ok(config)
     }
 }
 
@@ -107,6 +122,23 @@ impl From<NonEmptyStruct<JsonConfig>> for Config {
 pub enum RuleError {
     #[error(transparent)]
     PathFd(#[from] PathFdError),
+}
+
+#[derive(Debug, Error)]
+pub enum ParseJsonError {
+    #[error(transparent)]
+    Config(#[from] ConfigError),
+    #[error(transparent)]
+    SerdeJson(#[from] serde_json::Error),
+}
+
+#[cfg(feature = "toml")]
+#[derive(Debug, Error)]
+pub enum ParseTomlError {
+    #[error(transparent)]
+    Config(#[from] ConfigError),
+    #[error(transparent)]
+    SerdeToml(#[from] toml::de::Error),
 }
 
 // TODO: Add a merge method to compose with another Config.
@@ -150,20 +182,20 @@ impl Config {
         Ok((ruleset_created, rule_errors))
     }
 
-    pub fn parse_json<R>(reader: R) -> Result<Self, serde_json::Error>
+    pub fn parse_json<R>(reader: R) -> Result<Self, ParseJsonError>
     where
         R: std::io::Read,
     {
         let json = serde_json::from_reader::<_, NonEmptyStruct<JsonConfig>>(reader)?;
-        Ok(json.into())
+        Ok(json.try_into()?)
     }
 
     #[cfg(feature = "toml")]
-    pub fn parse_toml(data: &str) -> Result<Self, toml::de::Error> {
+    pub fn parse_toml(data: &str) -> Result<Self, ParseTomlError> {
         // The TOML parser does not handle Read implementations,
         // see https://github.com/toml-rs/toml/issues/326
         let json: NonEmptyStruct<JsonConfig> =
             toml::from_str::<NonEmptyStruct<TomlConfig>>(data)?.convert();
-        Ok(json.into())
+        Ok(json.try_into()?)
     }
 }

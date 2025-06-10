@@ -1,0 +1,21 @@
+[[variable]]
+name = "tmp"
+literal = ["/tmp", "/var/tmp"]
+
+[[variable]]
+name = "home"
+literal = ["/root", "/home"]
+
+[[variable]]
+name = "config"
+literal = ["/etc"]
+
+# Main system directories can be read, including the current path.
+[[path_beneath]]
+allowed_access = ["v5.read_execute"]
+parent = [".", "/bin", "/lib", "/usr", "/dev", "/proc", "${config}"]
+
+# Only allow writing to /tmp and /var/tmp .
+[[path_beneath]]
+allowed_access = ["v5.read_write"]
+parent = ["${tmp}", "${home}"]

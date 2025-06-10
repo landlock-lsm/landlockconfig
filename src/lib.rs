@@ -13,5 +13,8 @@ mod tests_helpers;
 mod tests_parser;
 
 #[cfg(test)]
+mod tests_variable;
+
+#[cfg(test)]
 #[macro_use]
 extern crate lazy_static;

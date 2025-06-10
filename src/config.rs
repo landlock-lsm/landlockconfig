@@ -6,7 +6,7 @@ use landlock::{
     AccessFs, AccessNet, BitFlags, NetPort, PathBeneath, PathFd, PathFdError, Ruleset, RulesetAttr,
     RulesetCreated, RulesetCreatedAttr, RulesetError, Scope,
 };
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::num::TryFromIntError;
 use std::path::PathBuf;
 use thiserror::Error;
@@ -25,6 +25,7 @@ pub enum BuildRulesetError {
 // TODO: Remove the Default implementation to avoid inconsistent configurations wrt. From<NonEmptySet<JsonConfig>>.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct Config {
+    pub(crate) variables: BTreeMap<String, BTreeSet<String>>,
     pub(crate) handled_fs: BitFlags<AccessFs>,
     pub(crate) handled_net: BitFlags<AccessNet>,
     pub(crate) scoped: BitFlags<Scope>,
@@ -40,6 +41,13 @@ impl From<NonEmptyStruct<JsonConfig>> for Config {
     fn from(json: NonEmptyStruct<JsonConfig>) -> Self {
         let mut config = Self::default();
         let json = json.into_inner();
+
+        for variable in json.variable.unwrap_or_default() {
+            let literal = variable.literal.unwrap_or_default();
+            config
+                .variables
+                .insert(variable.name, literal.into_iter().collect());
+        }
 
         for ruleset in json.ruleset.unwrap_or_default() {
             let ruleset = ruleset.into_inner();

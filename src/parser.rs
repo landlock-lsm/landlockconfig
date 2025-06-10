@@ -344,11 +344,22 @@ impl From<TomlNetPort> for JsonNetPort {
     }
 }
 
+#[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
+#[serde(deny_unknown_fields)]
+#[allow(non_snake_case)]
+pub(crate) struct JsonVariable {
+    pub(crate) name: String,
+    pub(crate) literal: Option<NonEmptySet<String>>,
+}
+
+type TomlVariable = JsonVariable;
+
 // At least one of the fields must be set, which is guaranteed when wrapped with NonEmptyStruct.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[allow(non_snake_case)]
 pub(crate) struct JsonConfig {
+    pub(crate) variable: Option<NonEmptySet<JsonVariable>>,
     pub(crate) ruleset: Option<NonEmptySet<NonEmptyStruct<JsonRuleset>>>,
     pub(crate) pathBeneath: Option<NonEmptySet<JsonPathBeneath>>,
     pub(crate) netPort: Option<NonEmptySet<JsonNetPort>>,
@@ -358,7 +369,8 @@ impl NonEmptyStructInner for JsonConfig {
     const ERROR_MESSAGE: &'static str = "empty configuration";
 
     fn is_empty(&self) -> bool {
-        self.ruleset.as_ref().is_none_or(|set| set.is_empty())
+        self.variable.as_ref().is_none_or(|set| set.is_empty())
+            && self.ruleset.as_ref().is_none_or(|set| set.is_empty())
             && self.pathBeneath.as_ref().is_none_or(|set| set.is_empty())
             && self.netPort.as_ref().is_none_or(|set| set.is_empty())
     }
@@ -368,6 +380,7 @@ impl NonEmptyStructInner for JsonConfig {
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct TomlConfig {
+    variable: Option<NonEmptySet<TomlVariable>>,
     ruleset: Option<NonEmptySet<NonEmptyStruct<TomlRuleset>>>,
     path_beneath: Option<NonEmptySet<TomlPathBeneath>>,
     net_port: Option<NonEmptySet<TomlNetPort>>,
@@ -377,7 +390,8 @@ impl NonEmptyStructInner for TomlConfig {
     const ERROR_MESSAGE: &'static str = "empty configuration";
 
     fn is_empty(&self) -> bool {
-        self.ruleset.as_ref().is_none_or(|set| set.is_empty())
+        self.variable.as_ref().is_none_or(|set| set.is_empty())
+            && self.ruleset.as_ref().is_none_or(|set| set.is_empty())
             && self.path_beneath.as_ref().is_none_or(|set| set.is_empty())
             && self.net_port.as_ref().is_none_or(|set| set.is_empty())
     }
@@ -386,6 +400,7 @@ impl NonEmptyStructInner for TomlConfig {
 impl From<TomlConfig> for JsonConfig {
     fn from(toml: TomlConfig) -> Self {
         Self {
+            variable: toml.variable,
             ruleset: toml
                 .ruleset
                 .map(|set| set.into_iter().map(|r| r.convert()).collect()),

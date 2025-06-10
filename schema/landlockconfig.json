@@ -67,6 +67,29 @@
     }
   },
   "properties": {
+    "variable": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "literal": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      }
+    },
     "ruleset": {
       "type": "array",
       "minItems": 1,
@@ -157,6 +180,11 @@
     }
   },
   "anyOf": [
+    {
+      "required": [
+        "variable"
+      ]
+    },
     {
       "required": [
         "ruleset"

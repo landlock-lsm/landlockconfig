@@ -18,6 +18,8 @@ struct Args {
     json: Option<String>,
     #[arg(short, long, required_unless_present = "json")]
     toml: Option<String>,
+    #[arg(short, long)]
+    debug: bool,
     #[arg(required = true)]
     command: Vec<String>,
 }
@@ -56,6 +58,10 @@ fn main() -> anyhow::Result<()> {
             Config::parse_toml(data.as_str())?
         }
     };
+
+    if args.debug {
+        eprintln!("{:#?}", config);
+    }
 
     let ruleset = config.build_ruleset()?;
     let status = ruleset.restrict_self()?;

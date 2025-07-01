@@ -94,9 +94,16 @@ impl From<NonEmptyStruct<JsonConfig>> for Config {
     }
 }
 
+#[derive(Debug, Error)]
+#[non_exhaustive]
+pub enum RuleError {
+    #[error(transparent)]
+    PathFd(#[from] PathFdError),
+}
+
 // TODO: Add a merge method to compose with another Config.
 impl Config {
-    pub fn build_ruleset(&self) -> Result<RulesetCreated, BuildRulesetError> {
+    pub fn build_ruleset(&self) -> Result<(RulesetCreated, Vec<RuleError>), BuildRulesetError> {
         let mut ruleset = Ruleset::default();
         let ruleset_ref = &mut ruleset;
         if !self.handled_fs.is_empty() {
@@ -110,12 +117,18 @@ impl Config {
         }
         let mut ruleset_created = ruleset.create()?;
         let ruleset_created_ref = &mut ruleset_created;
+        let mut rule_errors = Vec::new();
 
         for (parent, allowed_access) in &self.rules_path_beneath {
             // TODO: Walk through all path and only open them once, including their
             // common parent directory to get a consistent hierarchy.
-            // TODO: Ignore failure to open path, but record a warning instead.
-            let fd = PathFd::new(parent)?;
+            let fd = match PathFd::new(parent) {
+                Ok(fd) => fd,
+                Err(e) => {
+                    rule_errors.push(RuleError::PathFd(e));
+                    continue;
+                }
+            };
             ruleset_created_ref.add_rule(PathBeneath::new(fd, *allowed_access))?;
         }
 
@@ -126,7 +139,7 @@ impl Config {
             )?;
         }
 
-        Ok(ruleset_created)
+        Ok((ruleset_created, rule_errors))
     }
 
     pub fn parse_json<R>(reader: R) -> Result<Self, serde_json::Error>

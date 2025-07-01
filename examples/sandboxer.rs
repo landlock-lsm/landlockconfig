@@ -63,7 +63,11 @@ fn main() -> anyhow::Result<()> {
         eprintln!("{:#?}", config);
     }
 
-    let ruleset = config.build_ruleset()?;
+    let (ruleset, rule_errors) = config.build_ruleset()?;
+    if args.debug {
+        eprintln!("Ignored rule errors: {:#?}", rule_errors);
+    }
+
     let status = ruleset.restrict_self()?;
     if status.ruleset == RulesetStatus::NotEnforced {
         bail!("None of the restrictions can be enforced with the running kernel.");

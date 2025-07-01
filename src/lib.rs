@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-pub use config::{BuildRulesetError, Config};
+pub use config::{BuildRulesetError, Config, RuleError};
 
 mod config;
 mod nonempty;

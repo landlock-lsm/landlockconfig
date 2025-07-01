@@ -209,7 +209,7 @@ pub unsafe extern "C" fn landlockconfig_build_ruleset(config: *const Config, fla
 
     unsafe { &*config }
         .build_ruleset()
-        .map(|r| {
+        .map(|(r, _)| {
             let fd: Option<OwnedFd> = r.into();
             fd.map(|fd| fd.into_raw_fd()).unwrap_or(-1)
         })

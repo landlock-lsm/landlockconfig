@@ -145,20 +145,20 @@ pub enum ParseTomlError {
 }
 
 impl Config {
-    /// Composes two configurations by taking the union of `other` with `self`
-    /// in a safe best-effort way.
+    /// Composes two configurations by merging `other` with `self` in a safe
+    /// best-effort way, which means the common handled access rights with all
+    /// rules.
     ///
     /// When composing configurations with different ABI versions (e.g., one
     /// against ABI::V1 and another against ABI::V2), the composition will
-    /// upgrade the lower ABI configuration to match the higher one, ensuring
-    /// the resulting configuration remains functional.
+    /// downgrade to the intersection of handled access rights, ensuring the
+    /// resulting configuration remains functional across both contexts.
     ///
     /// # Behavior
     ///
-    /// - Handled access rights are combined using bitwise OR.
-    /// - Existing rules are augmented with additional access rights to maintain
-    ///   compatibility.
-    /// - Paths not handling newer access rights automatically receive them.
+    /// - Handled access rights are combined using bitwise AND (intersection).
+    /// - Rules are merged with access rights limited to commonly handled ones.
+    /// - Paths with empty access rights after intersection are removed.
     /// - Variables from both configurations are merged.
     ///
     /// # Commutativity
@@ -168,35 +168,39 @@ impl Config {
     /// configuration, ensuring predictable behavior regardless of the sequence
     /// in which configurations are combined.
     pub fn compose(&mut self, other: &Self) {
-        // The full rule access rights for other are the union of the explicit
-        // allowed access rights and the unhandled ones compared to self.
-        let other_implicit_fs = self.handled_fs & !other.handled_fs;
-        let other_implicit_net = self.handled_net & !other.handled_net;
-        let self_implicit_fs = other.handled_fs & !self.handled_fs;
-        let self_implicit_net = other.handled_net & !self.handled_net;
+        let common_handled_fs = self.handled_fs & other.handled_fs;
+        let common_handled_net = self.handled_net & other.handled_net;
 
-        // First step: upgrade the current access rights according to other's
-        // handled access rights.
-        self.rules_path_beneath
-            .values_mut()
-            .for_each(|access| *access |= self_implicit_fs);
-        self.rules_net_port
-            .values_mut()
-            .for_each(|access| *access |= self_implicit_net);
+        // First step: downgrade the current access rights according to other's
+        // handled access rights, and remove entries with empty accesses.
+        self.rules_path_beneath.retain(|_, access| {
+            *access &= common_handled_fs;
+            !access.is_empty()
+        });
+        self.rules_net_port.retain(|_, access| {
+            *access &= common_handled_net;
+            !access.is_empty()
+        });
 
-        // Second step: add the new rules from other, upgraded according to
-        // implicit handled access rights.
+        // Second step: add the new rules from other, downgrade according to
+        // common handled access rights, if they are not empty.
         for (path, access) in &other.rules_path_beneath {
-            self.rules_path_beneath
-                .entry(path.clone())
-                .and_modify(|a| *a |= *access | other_implicit_fs)
-                .or_insert(*access | other_implicit_fs);
+            let downgraded_access = *access & common_handled_fs;
+            if !downgraded_access.is_empty() {
+                self.rules_path_beneath
+                    .entry(path.clone())
+                    .and_modify(|a| *a |= downgraded_access)
+                    .or_insert(downgraded_access);
+            }
         }
         for (port, access) in &other.rules_net_port {
-            self.rules_net_port
-                .entry(*port)
-                .and_modify(|a| *a |= *access | other_implicit_net)
-                .or_insert(*access | other_implicit_net);
+            let downgraded_access = *access & common_handled_net;
+            if !downgraded_access.is_empty() {
+                self.rules_net_port
+                    .entry(*port)
+                    .and_modify(|a| *a |= downgraded_access)
+                    .or_insert(downgraded_access);
+            }
         }
 
         // Third step: merge variables.
@@ -204,10 +208,10 @@ impl Config {
             self.variables.extend(name.clone(), value.clone());
         }
 
-        // Fourth step: upgrade the handled access rights.
-        self.handled_fs |= other.handled_fs;
-        self.handled_net |= other.handled_net;
-        self.scoped |= other.scoped;
+        // Fourth step: downgrade the handled access rights.
+        self.handled_fs &= other.handled_fs;
+        self.handled_net &= other.handled_net;
+        self.scoped &= other.scoped;
     }
 
     pub fn parse_json<R>(reader: R) -> Result<Self, ParseJsonError>
@@ -325,8 +329,6 @@ mod tests_compose {
             ..Default::default()
         };
         let expect = Config {
-            handled_fs: AccessFs::Execute.into(),
-            handled_net: AccessNet::BindTcp.into(),
             ..Default::default()
         };
         c1.compose(&c2);
@@ -358,20 +360,19 @@ mod tests_compose {
             ..Default::default()
         };
 
-        let expect = Config {
-            handled_fs: c1_access | c2_access,
-            rules_path_beneath: [
-                (TemplateString::from_text("/common"), c1_access | c2_access),
-                (TemplateString::from_text("/c1"), c1_access | c2_access),
-                (
-                    TemplateString::from_text("/c2"),
-                    c2_access | AccessFs::WriteFile,
-                ),
-            ]
-            .into(),
-            ..Default::default()
-        };
         c1.compose(&c2);
-        assert_eq!(c1, expect);
+        assert_eq!(
+            c1,
+            Config {
+                handled_fs: c1_access & c2_access,
+                rules_path_beneath: [
+                    (TemplateString::from_text("/common"), c1_access & c2_access),
+                    (TemplateString::from_text("/c1"), c1_access & c2_access),
+                    (TemplateString::from_text("/c2"), c1_access & c2_access),
+                ]
+                .into(),
+                ..Default::default()
+            }
+        );
     }
 }

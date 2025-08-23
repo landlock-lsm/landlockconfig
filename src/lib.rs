@@ -7,6 +7,9 @@ mod nonempty;
 mod parser;
 
 #[cfg(test)]
+mod tests_helpers;
+
+#[cfg(test)]
 mod tests_parser;
 
 #[cfg(test)]

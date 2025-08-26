@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::config::ResolvedConfig;
 use crate::tests_helpers::{assert_json, parse_json, parse_toml, validate_json, LATEST_ABI};
 use crate::Config;
 use landlock::{Access, AccessFs, AccessNet, Scope, ABI};
@@ -498,8 +499,8 @@ fn test_one_path_beneath_str() {
         ]
     }"#;
     assert_eq!(
-        parse_json(json),
-        Ok(Config {
+        parse_json(json).unwrap().resolve(),
+        Ok(ResolvedConfig {
             handled_fs: AccessFs::Execute.into(),
             rules_path_beneath: [(PathBuf::from("."), AccessFs::Execute.into())].into(),
             ..Default::default()
@@ -541,8 +542,8 @@ fn test_dup_path_beneath_1() {
         ]
     }"#;
     assert_eq!(
-        parse_json(json),
-        Ok(Config {
+        parse_json(json).unwrap().resolve(),
+        Ok(ResolvedConfig {
             handled_fs: AccessFs::Execute.into(),
             rules_path_beneath: [(PathBuf::from("."), AccessFs::Execute.into())].into(),
             ..Default::default()
@@ -570,8 +571,8 @@ fn test_dup_path_beneath_2() {
         ]
     }"#;
     assert_eq!(
-        parse_json(json),
-        Ok(Config {
+        parse_json(json).unwrap().resolve(),
+        Ok(ResolvedConfig {
             handled_fs: AccessFs::Execute.into(),
             rules_path_beneath: [(PathBuf::from("."), AccessFs::Execute.into())].into(),
             ..Default::default()
@@ -610,8 +611,8 @@ fn test_overlap_path_beneath() {
         ]
     }"#;
     assert_eq!(
-        parse_json(json),
-        Ok(Config {
+        parse_json(json).unwrap().resolve(),
+        Ok(ResolvedConfig {
             handled_fs: AccessFs::Execute | AccessFs::ReadFile | AccessFs::WriteFile,
             rules_path_beneath: [(
                 PathBuf::from("."),
@@ -643,8 +644,8 @@ fn test_normalization_path_beneath() {
         ]
     }"#;
     assert_eq!(
-        parse_json(json),
-        Ok(Config {
+        parse_json(json).unwrap().resolve(),
+        Ok(ResolvedConfig {
             handled_fs: AccessFs::Execute.into(),
             rules_path_beneath: [
                 (PathBuf::from("."), AccessFs::Execute.into()),
@@ -1040,8 +1041,8 @@ fn test_infer_handled_access_fs() {
         ]
     }"#;
     assert_eq!(
-        parse_json(json),
-        Ok(Config {
+        parse_json(json).unwrap().resolve(),
+        Ok(ResolvedConfig {
             handled_fs: AccessFs::Execute | AccessFs::WriteFile | AccessFs::ReadFile,
             rules_path_beneath: [(PathBuf::from("."), AccessFs::WriteFile | AccessFs::ReadFile)]
                 .into(),
@@ -1086,8 +1087,8 @@ fn test_path_beneath_alone() {
         ]
     }"#;
     assert_eq!(
-        parse_json(json),
-        Ok(Config {
+        parse_json(json).unwrap().resolve(),
+        Ok(ResolvedConfig {
             handled_fs: AccessFs::Execute.into(),
             rules_path_beneath: [(PathBuf::from("."), AccessFs::Execute.into())].into(),
             ..Default::default()

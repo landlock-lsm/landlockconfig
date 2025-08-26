@@ -207,7 +207,12 @@ pub unsafe extern "C" fn landlockconfig_build_ruleset(config: *const Config, fla
         return unwrap_errno(Errno::new(libc::EFAULT));
     }
 
-    unsafe { &*config }
+    // TODO: Avoid cloning the config.
+    let resolved = match unsafe { &*config }.clone().resolve() {
+        Ok(resolved) => resolved,
+        Err(e) => return unwrap_errno(e),
+    };
+    resolved
         .build_ruleset()
         .map(|(r, _)| {
             let fd: Option<OwnedFd> = r.into();

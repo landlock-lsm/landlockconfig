@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use crate::nonempty::NonEmptyStruct;
-use crate::parser::{JsonConfig, TomlConfig};
-use crate::variable::{ExtrapolateError, NameError, Variables, VecStringIterator};
+use crate::parser::{JsonConfig, TemplateString, TomlConfig};
+use crate::variable::{NameError, ResolveError, Variables, VecStringIterator};
 use landlock::{
     AccessFs, AccessNet, BitFlags, NetPort, PathBeneath, PathFd, PathFdError, Ruleset, RulesetAttr,
     RulesetCreated, RulesetCreatedAttr, RulesetError, Scope,
@@ -24,9 +24,18 @@ pub enum BuildRulesetError {
 }
 
 // TODO: Remove the Default implementation to avoid inconsistent configurations wrt. From<NonEmptySet<JsonConfig>>.
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Config {
     pub(crate) variables: Variables,
+    pub(crate) handled_fs: BitFlags<AccessFs>,
+    pub(crate) handled_net: BitFlags<AccessNet>,
+    pub(crate) scoped: BitFlags<Scope>,
+    pub(crate) rules_path_beneath: BTreeMap<TemplateString, BitFlags<AccessFs>>,
+    pub(crate) rules_net_port: BTreeMap<u64, BitFlags<AccessNet>>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct ResolvedConfig {
     pub(crate) handled_fs: BitFlags<AccessFs>,
     pub(crate) handled_net: BitFlags<AccessNet>,
     pub(crate) scoped: BitFlags<Scope>,
@@ -40,8 +49,6 @@ pub struct Config {
 
 #[derive(Debug, Error)]
 pub enum ConfigError {
-    #[error(transparent)]
-    Extrapolate(#[from] ExtrapolateError),
     #[error(transparent)]
     Name(#[from] NameError),
 }
@@ -86,15 +93,11 @@ impl TryFrom<NonEmptyStruct<JsonConfig>> for Config {
             config.handled_fs |= access;
 
             for parent in path_beneath.parent {
-                // TODO: Defer until the composition of all the configuration files.
-                let set = config.variables.extrapolate(&parent)?;
-                for path in VecStringIterator::new(&set) {
-                    config
-                        .rules_path_beneath
-                        .entry(PathBuf::from(path))
-                        .and_modify(|a| *a |= access)
-                        .or_insert(access);
-                }
+                config
+                    .rules_path_beneath
+                    .entry(parent)
+                    .and_modify(|a| *a |= access)
+                    .or_insert(access);
             }
         }
 
@@ -143,6 +146,29 @@ pub enum ParseTomlError {
 
 // TODO: Add a merge method to compose with another Config.
 impl Config {
+    pub fn parse_json<R>(reader: R) -> Result<Self, ParseJsonError>
+    where
+        R: std::io::Read,
+    {
+        let json = serde_json::from_reader::<_, NonEmptyStruct<JsonConfig>>(reader)?;
+        Ok(json.try_into()?)
+    }
+
+    #[cfg(feature = "toml")]
+    pub fn parse_toml(data: &str) -> Result<Self, ParseTomlError> {
+        // The TOML parser does not handle Read implementations,
+        // see https://github.com/toml-rs/toml/issues/326
+        let json: NonEmptyStruct<JsonConfig> =
+            toml::from_str::<NonEmptyStruct<TomlConfig>>(data)?.convert();
+        Ok(json.try_into()?)
+    }
+
+    pub fn resolve(self) -> Result<ResolvedConfig, ResolveError> {
+        self.try_into()
+    }
+}
+
+impl ResolvedConfig {
     pub fn build_ruleset(&self) -> Result<(RulesetCreated, Vec<RuleError>), BuildRulesetError> {
         let mut ruleset = Ruleset::default();
         let ruleset_ref = &mut ruleset;
@@ -181,21 +207,29 @@ impl Config {
 
         Ok((ruleset_created, rule_errors))
     }
+}
 
-    pub fn parse_json<R>(reader: R) -> Result<Self, ParseJsonError>
-    where
-        R: std::io::Read,
-    {
-        let json = serde_json::from_reader::<_, NonEmptyStruct<JsonConfig>>(reader)?;
-        Ok(json.try_into()?)
-    }
+impl TryFrom<Config> for ResolvedConfig {
+    type Error = ResolveError;
 
-    #[cfg(feature = "toml")]
-    pub fn parse_toml(data: &str) -> Result<Self, ParseTomlError> {
-        // The TOML parser does not handle Read implementations,
-        // see https://github.com/toml-rs/toml/issues/326
-        let json: NonEmptyStruct<JsonConfig> =
-            toml::from_str::<NonEmptyStruct<TomlConfig>>(data)?.convert();
-        Ok(json.try_into()?)
+    fn try_from(config: Config) -> Result<Self, Self::Error> {
+        let mut rules_path_beneath: BTreeMap<PathBuf, BitFlags<AccessFs>> = Default::default();
+        for (path_beneath, access) in config.rules_path_beneath {
+            let set = config.variables.resolve(&path_beneath)?;
+            for path in VecStringIterator::new(&set) {
+                rules_path_beneath
+                    .entry(PathBuf::from(path))
+                    .and_modify(|a| *a |= access)
+                    .or_insert(access);
+            }
+        }
+
+        Ok(Self {
+            handled_fs: config.handled_fs,
+            handled_net: config.handled_net,
+            scoped: config.scoped,
+            rules_path_beneath,
+            rules_net_port: config.rules_net_port,
+        })
     }
 }

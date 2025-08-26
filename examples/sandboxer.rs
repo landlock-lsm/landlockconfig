@@ -63,7 +63,7 @@ fn main() -> anyhow::Result<()> {
         eprintln!("{:#?}", config);
     }
 
-    let (ruleset, rule_errors) = config.build_ruleset()?;
+    let (ruleset, rule_errors) = config.resolve()?.build_ruleset()?;
     if args.debug {
         eprintln!("Ignored rule errors: {:#?}", rule_errors);
     }

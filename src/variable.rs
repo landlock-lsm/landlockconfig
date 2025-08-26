@@ -38,7 +38,7 @@ impl FromStr for Name {
     }
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, PartialEq, Eq)]
 pub enum NameError {
     #[error("name cannot be empty")]
     Empty,
@@ -48,11 +48,11 @@ pub enum NameError {
     InvalidCharacter(String),
 }
 
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct Variables(BTreeMap<Name, BTreeSet<String>>);
 
-#[derive(Debug, Error)]
-pub enum ExtrapolateError {
+#[derive(Debug, Error, PartialEq, Eq)]
+pub enum ResolveError {
     #[error("variable '{0}' not found")]
     VariableNotFound(Name),
     #[error(transparent)]
@@ -65,10 +65,10 @@ impl Variables {
     }
 
     // TODO: Return references instead of cloning.
-    pub(crate) fn extrapolate(
+    pub(crate) fn resolve(
         &self,
         template: &TemplateString,
-    ) -> Result<Vec<BTreeSet<String>>, ExtrapolateError> {
+    ) -> Result<Vec<BTreeSet<String>>, ResolveError> {
         template
             .0
             .iter()
@@ -78,7 +78,7 @@ impl Variables {
                     .0
                     .get(name)
                     .cloned()
-                    .ok_or_else(|| ExtrapolateError::VariableNotFound(name.clone())),
+                    .ok_or_else(|| ResolveError::VariableNotFound(name.clone())),
             })
             .collect()
     }

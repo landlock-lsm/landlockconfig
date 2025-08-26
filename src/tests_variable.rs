@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use crate::{
+    config::ResolvedConfig,
+    parser::{TemplateString, TemplateToken},
     tests_helpers::{parse_json, parse_json_schema, parse_toml},
-    variable::Variables,
+    variable::{Name, ResolveError, Variables},
     Config,
 };
 use landlock::AccessFs;
 use serde_json::error::Category;
-use std::path::PathBuf;
+use std::{path::PathBuf, str::FromStr};
 
 #[test]
 fn test_empty_variable() {
@@ -272,7 +274,12 @@ fn test_one_variable_template_missing() {
             }
         ]
     }"#;
-    assert_eq!(parse_json_schema(json, false), Err(Category::Data),);
+    assert_eq!(
+        parse_json(json).unwrap().resolve(),
+        Err(ResolveError::VariableNotFound(
+            Name::from_str("bar").unwrap()
+        )),
+    );
 }
 
 #[test]
@@ -337,8 +344,17 @@ fn test_one_variable_json_toml_template() {
         ]
     "#;
 
-    let ret = Config {
+    let config = Config {
         variables: Variables::try_from([("foo", vec!["a", "b"])]).unwrap(),
+        handled_fs: AccessFs::Execute.into(),
+        rules_path_beneath: [(
+            TemplateString(vec![TemplateToken::Var(Name::from_str("foo").unwrap())]),
+            AccessFs::Execute.into(),
+        )]
+        .into(),
+        ..Default::default()
+    };
+    let resolved = ResolvedConfig {
         handled_fs: AccessFs::Execute.into(),
         rules_path_beneath: [
             (PathBuf::from("a"), AccessFs::Execute.into()),
@@ -347,10 +363,22 @@ fn test_one_variable_json_toml_template() {
         .into(),
         ..Default::default()
     };
-    assert_eq!(parse_json(json).unwrap(), ret);
-    assert_eq!(parse_json(json_reverse).unwrap(), ret);
-    assert_eq!(parse_toml(toml).unwrap(), ret);
-    assert_eq!(parse_toml(toml_reverse).unwrap(), ret);
+
+    let out_json = parse_json(json).unwrap();
+    assert_eq!(out_json, config);
+    assert_eq!(out_json.resolve().unwrap(), resolved);
+
+    let out_json_reverse = parse_json(json_reverse).unwrap();
+    assert_eq!(out_json_reverse, config);
+    assert_eq!(out_json_reverse.resolve().unwrap(), resolved);
+
+    let out_toml = parse_toml(toml).unwrap();
+    assert_eq!(out_toml, config);
+    assert_eq!(out_toml.resolve().unwrap(), resolved);
+
+    let out_toml_reverse = parse_toml(toml_reverse).unwrap();
+    assert_eq!(out_toml_reverse, config);
+    assert_eq!(out_toml_reverse.resolve().unwrap(), resolved);
 }
 
 #[test]
@@ -373,11 +401,30 @@ fn test_two_variable_template() {
             }
         ]
     }"#;
+    let config = parse_json(json).unwrap();
     assert_eq!(
-        parse_json(json),
-        Ok(Config {
+        config,
+        Config {
             variables: Variables::try_from([("foo", vec!["a", "b"]), ("bar", vec!["X", "Y", "Z"])])
                 .unwrap(),
+            handled_fs: AccessFs::Execute.into(),
+            rules_path_beneath: [(
+                TemplateString(vec![
+                    TemplateToken::Text("before/".into()),
+                    TemplateToken::Var(Name::from_str("foo").unwrap()),
+                    TemplateToken::Text("/".into()),
+                    TemplateToken::Var(Name::from_str("bar").unwrap()),
+                    TemplateToken::Text("/after".into())
+                ]),
+                AccessFs::Execute.into()
+            )]
+            .into(),
+            ..Default::default()
+        }
+    );
+    assert_eq!(
+        config.resolve(),
+        Ok(ResolvedConfig {
             handled_fs: AccessFs::Execute.into(),
             rules_path_beneath: [
                 (PathBuf::from("before/a/X/after"), AccessFs::Execute.into()),
@@ -415,9 +462,8 @@ fn test_special_characters() {
         ]
     }"#;
     assert_eq!(
-        parse_json(json),
-        Ok(Config {
-            variables: Variables::try_from([("foo", ["bar"])]).unwrap(),
+        parse_json(json).unwrap().resolve(),
+        Ok(ResolvedConfig {
             handled_fs: AccessFs::Execute.into(),
             rules_path_beneath: [
                 (PathBuf::from("$"), AccessFs::Execute.into()),

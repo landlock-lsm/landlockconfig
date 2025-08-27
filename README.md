@@ -143,10 +143,10 @@ literal = ["/root", "/home"]
 name = "config"
 literal = ["/etc"]
 
-# Main system file hierarchies can be read and executed, including the current path (for test only).
+# Main system file hierarchies can be read and executed.
 [[path_beneath]]
 allowed_access = ["v5.read_execute"]
-parent = [".", "/bin", "/lib", "/usr", "/dev", "/proc", "${config}"]
+parent = ["/bin", "/lib", "/usr", "/dev", "/proc", "${config}"]
 
 # Only allow writing to temporary and home directories.
 [[path_beneath]]

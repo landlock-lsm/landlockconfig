@@ -122,6 +122,9 @@ cd landlockconfig
 cargo run --example sandboxer -- --json examples/mini-write-tmp.json sh
 ```
 
+We can compose configurations by specifying `--json` or `--toml` (and related
+file paths) several times.
+
 A new dedicated tool will be published soon.
 
 ## TOML configuration example

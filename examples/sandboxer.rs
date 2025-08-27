@@ -15,55 +15,62 @@ use std::process::Command;
 #[derive(Parser, Debug)]
 struct Args {
     #[arg(short, long, required_unless_present = "toml")]
-    json: Option<String>,
+    json: Vec<String>,
     #[arg(short, long, required_unless_present = "json")]
-    toml: Option<String>,
+    toml: Vec<String>,
     #[arg(short, long)]
     debug: bool,
     #[arg(required = true)]
     command: Vec<String>,
 }
 
-enum ArgConfig {
-    Json(String),
-    Toml(String),
-}
-
 fn main() -> anyhow::Result<()> {
     let mut args = Args::parse();
 
-    let arg_config = if let Some(json) = args.json.take() {
-        ArgConfig::Json(json)
-    } else {
-        // Clap guarantees that toml is Some().
-        ArgConfig::Toml(args.toml.take().unwrap())
-    };
-
-    let config = match arg_config {
-        ArgConfig::Json(name) => {
-            if name == "-" {
-                Config::parse_json(std::io::stdin())?
-            } else {
-                Config::parse_json(File::open(name).context("Failed to open JSON file")?)?
-            }
-        }
-        ArgConfig::Toml(name) => {
-            let data = if name == "-" {
-                let mut buffer = String::new();
-                std::io::stdin().lock().read_to_string(&mut buffer)?;
-                buffer
-            } else {
-                std::fs::read_to_string(name).context("Failed to open TOML file")?
-            };
-            Config::parse_toml(data.as_str())?
-        }
-    };
-
-    if args.debug {
-        eprintln!("{:#?}", config);
+    let stdin_count = args.json.iter().filter(|&path| path == "-").count()
+        + args.toml.iter().filter(|&path| path == "-").count();
+    if stdin_count > 1 {
+        bail!("Stdin can only be used as configuration once");
     }
 
-    let (ruleset, rule_errors) = config.resolve()?.build_ruleset()?;
+    // TODO: Avoid storing all configurations in memory but compose them on the fly instead.
+    let mut configs = Vec::new();
+
+    for json_path in args.json {
+        let config = if json_path == "-" {
+            Config::parse_json(std::io::stdin())?
+        } else {
+            Config::parse_json(File::open(&json_path).context("Failed to open JSON file")?)?
+        };
+        configs.push(config);
+    }
+
+    for toml_path in args.toml {
+        let config = if toml_path == "-" {
+            let mut buffer = String::new();
+            std::io::stdin().lock().read_to_string(&mut buffer)?;
+            Config::parse_toml(buffer.as_str())?
+        } else {
+            let data = std::fs::read_to_string(&toml_path).context("Failed to open TOML file")?;
+            Config::parse_toml(data.as_str())?
+        };
+        configs.push(config);
+    }
+
+    let config = configs
+        .into_iter()
+        .reduce(|mut acc, config| {
+            acc.compose(&config);
+            acc
+        })
+        .context("No configuration files provided")?;
+
+    let resolved = config.resolve()?;
+    if args.debug {
+        eprintln!("{:#?}", resolved);
+    }
+
+    let (ruleset, rule_errors) = resolved.build_ruleset()?;
     if args.debug {
         eprintln!("Ignored rule errors: {:#?}", rule_errors);
     }

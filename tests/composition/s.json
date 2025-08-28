@@ -1,0 +1,36 @@
+{
+  "variable": [
+    {
+      "name": "rw",
+      "literal": [
+        "/tmp",
+        "/var/tmp",
+        "/home/user/tmp"
+      ]
+    }
+  ],
+  "pathBeneath": [
+    {
+      "allowedAccess": [
+        "v4.read_execute"
+      ],
+      "parent": [
+        "/bin",
+        "/lib",
+        "/usr",
+        "/dev",
+        "/proc",
+        "/etc",
+        "/home/user/bin"
+      ]
+    },
+    {
+      "allowedAccess": [
+        "v4.read_write"
+      ],
+      "parent": [
+        "${rw}"
+      ]
+    }
+  ]
+}

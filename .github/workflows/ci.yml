@@ -74,6 +74,9 @@ jobs:
     - name: Check JSON scoped
       run: ./schema/check.sh examples/mini-scoped.json
 
+    - name: Check JSON compose
+      run: ./schema/check.sh tests/composition/s.json
+
   ubuntu_24_rust_msrv:
     runs-on: ubuntu-24.04
     needs: commit_list
@@ -187,6 +190,15 @@ jobs:
 
     - name: Run the sandboxer example with scope restrictions
       run: rustup run stable cargo run --example sandboxer -- --json examples/mini-scoped.json true
+
+    - name: Run the sandboxer example with composed configurations, and compare to golden file
+      run: |
+        diff -u "tests/composition/golden-debug.txt" \
+          <(rustup run stable cargo run --quiet --example sandboxer -- --toml tests/composition/source/s1.toml --toml tests/composition/source/s2.toml --debug true 2>&1)
+        diff -u "tests/composition/golden-debug.txt" \
+          <(rustup run stable cargo run --quiet --example sandboxer -- --toml tests/composition/s.toml --debug true 2>&1)
+        diff -u "tests/composition/golden-debug.txt" \
+          <(rustup run stable cargo run --quiet --example sandboxer -- --json tests/composition/s.json --debug true 2>&1)
 
     - name: Check format
       run: rustup run stable cargo fmt --all -- --check

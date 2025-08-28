@@ -1,0 +1,13 @@
+[[variable]]
+name = "rw"
+literal = ["/tmp", "/var/tmp"]
+
+# Main system file hierarchies can be read and executed.
+[[path_beneath]]
+allowed_access = ["v5.read_execute"]
+parent = ["/bin", "/lib", "/usr", "/dev", "/proc", "/etc"]
+
+# Only allow writing to temporary and home directories.
+[[path_beneath]]
+allowed_access = ["v5.read_write"]
+parent = ["${rw}"]

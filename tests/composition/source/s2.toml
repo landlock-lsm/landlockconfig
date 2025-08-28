@@ -1,0 +1,11 @@
+[[variable]]
+name = "rw"
+literal = ["/home/user/tmp"]
+
+[[ruleset]]
+handled_access_fs = ["v4.all"]
+
+# Custom apps.
+[[path_beneath]]
+allowed_access = ["v4.read_execute"]
+parent = ["/home/user/bin"]

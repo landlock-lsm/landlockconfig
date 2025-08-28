@@ -1,0 +1,78 @@
+ResolvedConfig {
+    handled_fs: BitFlags<AccessFs> {
+        bits: 0b111111111111111,
+        flags: Execute | WriteFile | ReadFile | ReadDir | RemoveDir | RemoveFile | MakeChar | MakeDir | MakeReg | MakeSock | MakeFifo | MakeBlock | MakeSym | Refer | Truncate,
+    },
+    handled_net: BitFlags<AccessNet> {
+        bits: 0b0,
+    },
+    scoped: BitFlags<Scope> {
+        bits: 0b0,
+    },
+    rules_path_beneath: {
+        "/bin": BitFlags<AccessFs> {
+            bits: 0b10000000001101,
+            flags: Execute | ReadFile | ReadDir | Refer,
+        },
+        "/dev": BitFlags<AccessFs> {
+            bits: 0b10000000001101,
+            flags: Execute | ReadFile | ReadDir | Refer,
+        },
+        "/etc": BitFlags<AccessFs> {
+            bits: 0b10000000001101,
+            flags: Execute | ReadFile | ReadDir | Refer,
+        },
+        "/home/user/bin": BitFlags<AccessFs> {
+            bits: 0b10000000001101,
+            flags: Execute | ReadFile | ReadDir | Refer,
+        },
+        "/home/user/tmp": BitFlags<AccessFs> {
+            bits: 0b111111111111110,
+            flags: WriteFile | ReadFile | ReadDir | RemoveDir | RemoveFile | MakeChar | MakeDir | MakeReg | MakeSock | MakeFifo | MakeBlock | MakeSym | Refer | Truncate,
+        },
+        "/lib": BitFlags<AccessFs> {
+            bits: 0b10000000001101,
+            flags: Execute | ReadFile | ReadDir | Refer,
+        },
+        "/proc": BitFlags<AccessFs> {
+            bits: 0b10000000001101,
+            flags: Execute | ReadFile | ReadDir | Refer,
+        },
+        "/tmp": BitFlags<AccessFs> {
+            bits: 0b111111111111110,
+            flags: WriteFile | ReadFile | ReadDir | RemoveDir | RemoveFile | MakeChar | MakeDir | MakeReg | MakeSock | MakeFifo | MakeBlock | MakeSym | Refer | Truncate,
+        },
+        "/usr": BitFlags<AccessFs> {
+            bits: 0b10000000001101,
+            flags: Execute | ReadFile | ReadDir | Refer,
+        },
+        "/var/tmp": BitFlags<AccessFs> {
+            bits: 0b111111111111110,
+            flags: WriteFile | ReadFile | ReadDir | RemoveDir | RemoveFile | MakeChar | MakeDir | MakeReg | MakeSock | MakeFifo | MakeBlock | MakeSym | Refer | Truncate,
+        },
+    },
+    rules_net_port: {},
+}
+Ignored rule errors: [
+    PathFd(
+        OpenCall {
+            source: Os {
+                code: 2,
+                kind: NotFound,
+                message: "No such file or directory",
+            },
+            path: "/home/user/bin",
+        },
+    ),
+    PathFd(
+        OpenCall {
+            source: Os {
+                code: 2,
+                kind: NotFound,
+                message: "No such file or directory",
+            },
+            path: "/home/user/tmp",
+        },
+    ),
+]
+Executing true in a sandbox...

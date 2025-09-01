@@ -1,7 +1,9 @@
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 use anyhow::{bail, Context};
 use clap::Parser;
 use landlock::RulesetStatus;
-use landlockconfig::Config;
+use landlockconfig::{Config, OptionalConfig};
 use std::fs::File;
 use std::io::Read;
 use std::os::unix::process::CommandExt;
@@ -33,8 +35,7 @@ fn main() -> anyhow::Result<()> {
         bail!("Stdin can only be used as configuration once");
     }
 
-    // TODO: Avoid storing all configurations in memory but compose them on the fly instead.
-    let mut configs = Vec::new();
+    let mut full_config = None;
 
     for json_path in args.json {
         let config = if json_path == "-" {
@@ -42,7 +43,7 @@ fn main() -> anyhow::Result<()> {
         } else {
             Config::parse_json(File::open(&json_path).context("Failed to open JSON file")?)?
         };
-        configs.push(config);
+        full_config.compose(&config);
     }
 
     for toml_path in args.toml {
@@ -54,18 +55,12 @@ fn main() -> anyhow::Result<()> {
             let data = std::fs::read_to_string(&toml_path).context("Failed to open TOML file")?;
             Config::parse_toml(data.as_str())?
         };
-        configs.push(config);
+        full_config.compose(&config);
     }
 
-    let config = configs
-        .into_iter()
-        .reduce(|mut acc, config| {
-            acc.compose(&config);
-            acc
-        })
-        .context("No configuration files provided")?;
-
-    let resolved = config.resolve()?;
+    let resolved = full_config
+        .context("No configuration file provided")?
+        .resolve()?;
     if args.debug {
         eprintln!("{:#?}", resolved);
     }

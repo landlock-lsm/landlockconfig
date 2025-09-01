@@ -236,6 +236,19 @@ impl Config {
     }
 }
 
+pub trait OptionalConfig {
+    fn compose(&mut self, other: &Config);
+}
+
+impl OptionalConfig for Option<Config> {
+    fn compose(&mut self, other: &Config) {
+        match self {
+            Some(config) => config.compose(other),
+            None => *self = Some(other.clone()),
+        }
+    }
+}
+
 impl ResolvedConfig {
     pub fn build_ruleset(&self) -> Result<(RulesetCreated, Vec<RuleError>), BuildRulesetError> {
         let mut ruleset = Ruleset::default();

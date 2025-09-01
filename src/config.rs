@@ -8,8 +8,9 @@ use landlock::{
     RulesetCreated, RulesetCreatedAttr, RulesetError, Scope,
 };
 use std::collections::BTreeMap;
+use std::fs::{self, File};
 use std::num::TryFromIntError;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -145,6 +146,52 @@ pub enum ParseTomlError {
     SerdeToml(#[from] toml::de::Error),
 }
 
+#[derive(Debug, Error)]
+pub enum ParseFileError {
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+    #[error(transparent)]
+    ParseJson(#[from] ParseJsonError),
+    #[cfg(feature = "toml")]
+    #[error(transparent)]
+    ParseToml(#[from] ParseTomlError),
+}
+
+fn format_parse_files_error(errors: &BTreeMap<PathBuf, ParseFileError>) -> String {
+    errors
+        .iter()
+        .map(|(path, error)| format!("{}: {}", path.display(), error))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+#[derive(Debug, Error)]
+pub enum ParseDirectoryError {
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+    // Use BTreeMap for deterministic errors.
+    #[error("failed to parse configuration file(s):\n\n{}", format_parse_files_error(.0))]
+    ParseFiles(BTreeMap<PathBuf, ParseFileError>),
+    #[error("no configuration file found")]
+    NoConfigFile,
+}
+
+pub enum ConfigFormat {
+    Json,
+    #[cfg(feature = "toml")]
+    Toml,
+}
+
+impl ConfigFormat {
+    fn extension(&self) -> &'static str {
+        match self {
+            ConfigFormat::Json => "json",
+            #[cfg(feature = "toml")]
+            ConfigFormat::Toml => "toml",
+        }
+    }
+}
+
 impl Config {
     // Do not implement Default for Config because it would not be useful but
     // misleading.  Indeed, the default configuration would allow everything and
@@ -244,6 +291,83 @@ impl Config {
         let json: NonEmptyStruct<JsonConfig> =
             toml::from_str::<NonEmptyStruct<TomlConfig>>(data)?.convert();
         Ok(json.try_into()?)
+    }
+
+    /// Parse all configuration files in a directory with the specified format.
+    ///
+    /// This method reads all files in the given directory that match the specified
+    /// format's file extension and are regular files (not directories or hidden files
+    /// starting with '.'). Each valid configuration file is parsed and composed into
+    /// a single configuration using the [`compose`](Config::compose) method.
+    ///
+    /// # Returns
+    ///
+    /// Returns a composed `Config` from all valid configuration files found in the
+    /// directory, or ParseDirectoryError otherwise.
+    pub fn parse_directory<T>(path: T, format: ConfigFormat) -> Result<Self, ParseDirectoryError>
+    where
+        T: AsRef<Path>,
+    {
+        let mut full_config = None;
+        let mut errors = BTreeMap::new();
+
+        for entry in fs::read_dir(path)? {
+            let path = entry?.path();
+            if path.extension() != Some(format.extension().as_ref()) {
+                continue;
+            }
+
+            if path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(|name| name.starts_with('.'))
+            {
+                continue;
+            }
+
+            if !path.is_file() {
+                continue;
+            }
+
+            match format {
+                ConfigFormat::Json => match File::open(&path) {
+                    Ok(file) => match Self::parse_json(file) {
+                        Ok(config) => full_config.compose(&config),
+                        Err(e) => {
+                            // Duplicated file names should be very rare when
+                            // listing the content of a directory, and ignoring
+                            // errors for now-removed files is OK.
+                            errors.insert(path.clone(), e.into());
+                        }
+                    },
+                    Err(e) => {
+                        // Ignore race conditions when files are removed.
+                        if e.kind() != std::io::ErrorKind::NotFound {
+                            errors.insert(path.clone(), e.into());
+                        }
+                    }
+                },
+                #[cfg(feature = "toml")]
+                ConfigFormat::Toml => match std::fs::read_to_string(&path) {
+                    Ok(data) => match Self::parse_toml(data.as_str()) {
+                        Ok(config) => full_config.compose(&config),
+                        Err(e) => {
+                            errors.insert(path.clone(), e.into());
+                        }
+                    },
+                    Err(e) => {
+                        if e.kind() != std::io::ErrorKind::NotFound {
+                            errors.insert(path.clone(), e.into());
+                        }
+                    }
+                },
+            }
+        }
+
+        if !errors.is_empty() {
+            return Err(ParseDirectoryError::ParseFiles(errors));
+        }
+        full_config.ok_or(ParseDirectoryError::NoConfigFile)
     }
 
     pub fn resolve(self) -> Result<ResolvedConfig, ResolveError> {

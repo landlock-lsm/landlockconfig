@@ -3,10 +3,11 @@
 use anyhow::{bail, Context};
 use clap::Parser;
 use landlock::RulesetStatus;
-use landlockconfig::{Config, OptionalConfig};
+use landlockconfig::{Config, ConfigFormat, OptionalConfig};
 use std::fs::File;
 use std::io::Read;
 use std::os::unix::process::CommandExt;
+use std::path::Path;
 use std::process::Command;
 
 // TODO: Add option to only validate JSON and/or actual syscalls
@@ -41,7 +42,12 @@ fn main() -> anyhow::Result<()> {
         let config = if json_path == "-" {
             Config::parse_json(std::io::stdin())?
         } else {
-            Config::parse_json(File::open(&json_path).context("Failed to open JSON file")?)?
+            let json_path = Path::new(&json_path);
+            if json_path.is_dir() {
+                Config::parse_directory(json_path, ConfigFormat::Json)?
+            } else {
+                Config::parse_json(File::open(json_path).context("Failed to open JSON file")?)?
+            }
         };
         full_config.compose(&config);
     }
@@ -52,8 +58,14 @@ fn main() -> anyhow::Result<()> {
             std::io::stdin().lock().read_to_string(&mut buffer)?;
             Config::parse_toml(buffer.as_str())?
         } else {
-            let data = std::fs::read_to_string(&toml_path).context("Failed to open TOML file")?;
-            Config::parse_toml(data.as_str())?
+            let json_path = Path::new(&toml_path);
+            if json_path.is_dir() {
+                Config::parse_directory(&toml_path, ConfigFormat::Toml)?
+            } else {
+                let data =
+                    std::fs::read_to_string(&toml_path).context("Failed to open TOML file")?;
+                Config::parse_toml(data.as_str())?
+            }
         };
         full_config.compose(&config);
     }

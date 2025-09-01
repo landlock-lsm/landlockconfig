@@ -199,6 +199,8 @@ jobs:
           <(rustup run stable cargo run --quiet --example sandboxer -- --toml tests/composition/s.toml --debug true 2>&1)
         diff -u "tests/composition/golden-debug.txt" \
           <(rustup run stable cargo run --quiet --example sandboxer -- --json tests/composition/s.json --debug true 2>&1)
+        diff -u "tests/composition/golden-debug.txt" \
+          <(rustup run stable cargo run --quiet --example sandboxer -- --toml tests/composition/source/ --debug true 2>&1)
 
     - name: Check format
       run: rustup run stable cargo fmt --all -- --check

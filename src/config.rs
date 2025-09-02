@@ -23,8 +23,8 @@ pub enum BuildRulesetError {
     Ruleset(#[from] RulesetError),
 }
 
-// TODO: Remove the Default implementation to avoid inconsistent configurations wrt. From<NonEmptySet<JsonConfig>>.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(test, derive(Default))]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Config {
     pub(crate) variables: Variables,
     pub(crate) handled_fs: BitFlags<AccessFs>,
@@ -34,7 +34,8 @@ pub struct Config {
     pub(crate) rules_net_port: BTreeMap<u64, BitFlags<AccessNet>>,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(test, derive(Default))]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ResolvedConfig {
     pub(crate) handled_fs: BitFlags<AccessFs>,
     pub(crate) handled_net: BitFlags<AccessNet>,
@@ -57,7 +58,7 @@ impl TryFrom<NonEmptyStruct<JsonConfig>> for Config {
     type Error = ConfigError;
 
     fn try_from(json: NonEmptyStruct<JsonConfig>) -> Result<Self, Self::Error> {
-        let mut config = Self::default();
+        let mut config = Self::empty();
         let json = json.into_inner();
 
         for variable in json.variable.unwrap_or_default() {
@@ -145,6 +146,20 @@ pub enum ParseTomlError {
 }
 
 impl Config {
+    // Do not implement Default for Config because it would not be useful but
+    // misleading.  Indeed, the default configuration would allow everything and
+    // could not be updated with public methods (e.g. compose).
+    fn empty() -> Self {
+        Self {
+            variables: Default::default(),
+            handled_fs: Default::default(),
+            handled_net: Default::default(),
+            scoped: Default::default(),
+            rules_path_beneath: Default::default(),
+            rules_net_port: Default::default(),
+        }
+    }
+
     /// Composes two configurations by merging `other` with `self` in a safe
     /// best-effort way, which means the common handled access rights with all
     /// rules.
@@ -234,6 +249,16 @@ impl Config {
     pub fn resolve(self) -> Result<ResolvedConfig, ResolveError> {
         self.try_into()
     }
+}
+
+#[test]
+fn test_config_default_empty() {
+    let config = Config::default();
+    assert_eq!(config.handled_fs, BitFlags::EMPTY);
+    assert_eq!(config.handled_net, BitFlags::EMPTY);
+    assert_eq!(config.scoped, BitFlags::EMPTY);
+
+    assert_eq!(config, Config::empty());
 }
 
 pub trait OptionalConfig {

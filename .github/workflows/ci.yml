@@ -90,6 +90,17 @@ jobs:
       with:
         ref: ${{ matrix.commit }}
 
+    - name: Cache MSRV build
+      uses: actions/cache@v4
+      with:
+        path: |
+          target
+          ~/.cargo
+          ~/.rustup
+        key: build-msrv-${{ github.sha }}
+        restore-keys: |
+          build-msrv-
+
     - name: Get MSRV
       run: sed -n 's/^rust-version = "\([0-9.]\+\)"$/RUST_TOOLCHAIN=\1/p' Cargo.toml >> $GITHUB_ENV
 
@@ -127,6 +138,21 @@ jobs:
     - name: Install cargo-c
       run: sudo apt install cargo-c
 
+    - uses: actions/checkout@v4
+      with:
+        ref: ${{ matrix.commit }}
+
+    - name: Cache stable build
+      uses: actions/cache@v4
+      with:
+        path: |
+          target
+          ~/.cargo
+          ~/.rustup
+        key: build-stable-${{ github.sha }}
+        restore-keys: |
+          build-stable-
+
     - name: Install Rust stable
       run: |
         rm ~/.cargo/bin/{cargo-fmt,rustfmt} || :
@@ -134,10 +160,6 @@ jobs:
         rustup default stable
         rustup component add rustfmt clippy
         rustup update
-
-    - uses: actions/checkout@v4
-      with:
-        ref: ${{ matrix.commit }}
 
     - name: Build
       run: rustup run stable cargo build --all --verbose

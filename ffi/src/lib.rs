@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use landlock::Errno;
-use landlockconfig::Config;
-use std::ffi::c_int;
+use landlockconfig::{Config, ConfigFormat};
+use libc::c_char;
+use std::ffi::{c_int, CStr};
 use std::fs::File;
 use std::io::{Error, ErrorKind};
 use std::os::unix::io::{BorrowedFd, IntoRawFd, OwnedFd, RawFd};
@@ -166,12 +167,74 @@ pub extern "C" fn landlockconfig_parse_toml_buffer(
     .unwrap_or_else(|e| unwrap_errno(e) as *mut Config)
 }
 
+fn parse_directory(
+    dir_path: *const c_char,
+    flags: u32,
+    format: ConfigFormat,
+) -> Result<*mut Config, Errno> {
+    if flags != 0 {
+        return Err(Errno::new(libc::EINVAL));
+    }
+
+    if dir_path.is_null() {
+        return Err(Errno::new(libc::EFAULT));
+    }
+
+    let path = unsafe { CStr::from_ptr(dir_path) }
+        .to_str()
+        .map_err(|_| Errno::new(libc::EINVAL))?;
+    let config =
+        Config::parse_directory(path, format).map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
+    Ok(Box::into_raw(Box::new(config)))
+}
+
+/// Parses all JSON configuration files in a directory
+///
+/// # Parameters
+///
+/// * `dir_path`: A pointer to a null-terminated string containing the directory path.
+/// * `flags`: Must be 0.
+///
+/// # Return values
+///
+/// * Pointer to a landlockconfig object on success. This object must be freed
+///   with landlockconfig_free().
+/// * -errno on error.
+#[no_mangle]
+pub extern "C" fn landlockconfig_parse_json_directory(
+    dir_path: *const c_char,
+    flags: u32,
+) -> *mut Config {
+    parse_directory(dir_path, flags, ConfigFormat::Json)
+        .unwrap_or_else(|e| unwrap_errno(e) as *mut Config)
+}
+
+/// Parses all TOML configuration files in a directory
+///
+/// # Parameters
+///
+/// * `dir_path`: A pointer to a null-terminated string containing the directory path.
+/// * `flags`: Must be 0.
+///
+/// # Return values
+///
+/// * Pointer to a landlockconfig object on success. This object must be freed
+///   with landlockconfig_free().
+/// * -errno on error.
+#[no_mangle]
+pub extern "C" fn landlockconfig_parse_toml_directory(
+    dir_path: *const c_char,
+    flags: u32,
+) -> *mut Config {
+    parse_directory(dir_path, flags, ConfigFormat::Toml)
+        .unwrap_or_else(|e| unwrap_errno(e) as *mut Config)
+}
+
 /// Frees a landlockconfig object
 ///
 /// # Safety
 ///
-/// The pointer must have been returned by landlockconfig_parse_json() or
-/// landlockconfig_parse_toml().
+/// The pointer must have been returned by landlockconfig_parse_*().
 #[no_mangle]
 pub unsafe extern "C" fn landlockconfig_free(config: *mut Config) {
     if !config.is_null() {

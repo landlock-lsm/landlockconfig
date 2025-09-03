@@ -84,12 +84,43 @@ struct landlockconfig *landlockconfig_parse_toml_buffer(const uint8_t *buffer_pt
                                                         uint32_t flags);
 
 /**
+ * Parses all JSON configuration files in a directory
+ *
+ * # Parameters
+ *
+ * * `dir_path`: A pointer to a null-terminated string containing the directory path.
+ * * `flags`: Must be 0.
+ *
+ * # Return values
+ *
+ * * Pointer to a landlockconfig object on success. This object must be freed
+ *   with landlockconfig_free().
+ * * -errno on error.
+ */
+struct landlockconfig *landlockconfig_parse_json_directory(const char *dir_path, uint32_t flags);
+
+/**
+ * Parses all TOML configuration files in a directory
+ *
+ * # Parameters
+ *
+ * * `dir_path`: A pointer to a null-terminated string containing the directory path.
+ * * `flags`: Must be 0.
+ *
+ * # Return values
+ *
+ * * Pointer to a landlockconfig object on success. This object must be freed
+ *   with landlockconfig_free().
+ * * -errno on error.
+ */
+struct landlockconfig *landlockconfig_parse_toml_directory(const char *dir_path, uint32_t flags);
+
+/**
  * Frees a landlockconfig object
  *
  * # Safety
  *
- * The pointer must have been returned by landlockconfig_parse_json() or
- * landlockconfig_parse_toml().
+ * The pointer must have been returned by landlockconfig_parse_*().
  */
 void landlockconfig_free(struct landlockconfig *config);
 

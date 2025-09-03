@@ -4,14 +4,31 @@ use crate::{config::ResolvedConfig, tests_helpers::parse_json, Config};
 use landlock::{Access, AccessFs, AccessNet, Scope, ABI};
 use std::path::PathBuf;
 
-fn get_compositions(json1: &str, json2: &str) -> (Config, Config) {
-    let mut c1 = parse_json(json1).unwrap();
-    c1.compose(&parse_json(json2).unwrap());
+fn test_idempotence(config: &Config) {
+    let mut bkp = config.clone();
+    bkp.compose(config);
+    assert_eq!(bkp, *config);
+}
 
-    let mut c2 = parse_json(json2).unwrap();
-    c2.compose(&parse_json(json1).unwrap());
+fn get_composition(json1: &str, json2: &str) -> ResolvedConfig {
+    let j1 = parse_json(json1).unwrap();
+    test_idempotence(&j1);
 
-    (c1, c2)
+    let j2 = parse_json(json2).unwrap();
+    test_idempotence(&j2);
+
+    let mut c1 = j1.clone();
+    c1.compose(&j2);
+    test_idempotence(&c1);
+
+    let mut c2 = j2.clone();
+    c2.compose(&j1);
+    test_idempotence(&c2);
+
+    // Test commutativity
+    assert_eq!(c1, c2);
+
+    c1.resolve().unwrap()
 }
 
 #[test]
@@ -40,10 +57,8 @@ fn test_compose_most_fs_net() {
         ]
     }"#;
 
-    let (c1, c2) = get_compositions(json1, json2);
-    assert_eq!(c1, c2);
     assert_eq!(
-        c1.resolve().unwrap(),
+        get_composition(json1, json2),
         ResolvedConfig {
             handled_fs: AccessFs::from_all(ABI::V4),
             handled_net: AccessNet::from_all(ABI::V4),
@@ -71,10 +86,8 @@ fn test_compose_scope() {
         ]
     }"#;
 
-    let (c1, c2) = get_compositions(json1, json2);
-    assert_eq!(c1, c2);
     assert_eq!(
-        c1.resolve().unwrap(),
+        get_composition(json1, json2),
         ResolvedConfig {
             scoped: Scope::AbstractUnixSocket.into(),
             ..Default::default()
@@ -105,11 +118,8 @@ fn test_compose_exclusive() {
         ]
     }"#;
 
-    let (c1, c2) = get_compositions(json1, json2);
-    // Test commutativity
-    assert_eq!(c1, c2);
     assert_eq!(
-        c1.resolve().unwrap(),
+        get_composition(json1, json2),
         // No remaining access rights.
         ResolvedConfig {
             ..Default::default()
@@ -145,10 +155,8 @@ fn test_compose_complement1() {
         ]
     }"#;
 
-    let (c1, c2) = get_compositions(json1, json2);
-    assert_eq!(c1, c2);
     assert_eq!(
-        c1.resolve().unwrap(),
+        get_composition(json1, json2),
         ResolvedConfig {
             handled_fs: AccessFs::ReadFile.into(),
             rules_path_beneath: [
@@ -189,10 +197,8 @@ fn test_compose_complement2() {
         ]
     }"#;
 
-    let (c1, c2) = get_compositions(json1, json2);
-    assert_eq!(c1, c2);
     assert_eq!(
-        c1.resolve().unwrap(),
+        get_composition(json1, json2),
         ResolvedConfig {
             handled_fs: AccessFs::Execute.into(),
             rules_path_beneath: [(PathBuf::from("a"), AccessFs::Execute.into()),].into(),
@@ -235,10 +241,8 @@ fn test_compose_standalone_variable() {
         ]
     }"#;
 
-    let (c1, c2) = get_compositions(json1, json2);
-    assert_eq!(c1, c2);
     assert_eq!(
-        c1.resolve().unwrap(),
+        get_composition(json1, json2),
         ResolvedConfig {
             handled_fs: AccessFs::Execute.into(),
             rules_path_beneath: [
@@ -295,10 +299,8 @@ fn test_compose_shared_variable() {
         ]
     }"#;
 
-    let (c1, c2) = get_compositions(json1, json2);
-    assert_eq!(c1, c2);
     assert_eq!(
-        c1.resolve().unwrap(),
+        get_composition(json1, json2),
         ResolvedConfig {
             handled_fs: AccessFs::Execute | AccessFs::ReadFile,
             rules_path_beneath: [
@@ -354,10 +356,8 @@ fn test_compose_same_resolved_path() {
         ]
     }"#;
 
-    let (c1, c2) = get_compositions(json1, json2);
-    assert_eq!(c1, c2);
     assert_eq!(
-        c1.resolve().unwrap(),
+        get_composition(json1, json2),
         ResolvedConfig {
             handled_fs: AccessFs::Execute | AccessFs::ReadFile,
             rules_path_beneath: [(PathBuf::from("a"), AccessFs::Execute | AccessFs::ReadFile)]

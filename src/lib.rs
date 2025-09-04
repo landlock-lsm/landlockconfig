@@ -22,3 +22,6 @@ mod tests_variable;
 
 #[cfg(test)]
 mod tests_compose;
+
+#[cfg(test)]
+mod tests_abi;

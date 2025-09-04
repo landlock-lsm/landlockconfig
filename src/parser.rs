@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use std::str::FromStr;
-
 use crate::{
     nonempty::{NonEmptySet, NonEmptyStruct, NonEmptyStructInner},
-    variable::Name,
+    variable::{Name, ResolveError},
 };
 use landlock::{Access, AccessFs, AccessNet, BitFlags, Scope, ABI};
+use serde::de::{Unexpected, Visitor};
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
+use std::str::FromStr;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum TemplateToken {
@@ -304,6 +304,12 @@ impl<'de> Deserialize<'de> for TemplateString {
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub(crate) enum JsonFsAccessItem {
+    #[serde(rename = "abi.all")]
+    AbiAll,
+    #[serde(rename = "abi.read_execute")]
+    AbiReadExecute,
+    #[serde(rename = "abi.read_write")]
+    AbiReadWrite,
     Execute,
     WriteFile,
     ReadFile,
@@ -358,18 +364,91 @@ pub(crate) enum JsonFsAccessItem {
     V6ReadWrite,
 }
 
-fn get_fs_read_execute(abi: ABI) -> BitFlags<AccessFs> {
-    AccessFs::from_read(abi) | (AccessFs::from_all(abi) & AccessFs::Refer)
+trait AbiGroup<A>
+where
+    A: Access,
+{
+    fn resolve_bitflags(&self, abi: ABI) -> BitFlags<A>;
 }
 
-fn get_fs_read_write(abi: ABI) -> BitFlags<AccessFs> {
-    // from_all() == from_read() | from_write()
-    AccessFs::from_all(abi) & !AccessFs::Execute
+enum AbiGroupFs {
+    All,
+    ReadExecute,
+    ReadWrite,
 }
 
-impl From<&JsonFsAccessItem> for BitFlags<AccessFs> {
+impl AbiGroup<AccessFs> for AbiGroupFs {
+    fn resolve_bitflags(&self, abi: ABI) -> BitFlags<AccessFs> {
+        match self {
+            Self::All => AccessFs::from_all(abi),
+            Self::ReadExecute => {
+                AccessFs::from_read(abi) | (AccessFs::from_all(abi) & AccessFs::Refer)
+            }
+            // from_all() == from_read() | from_write()
+            Self::ReadWrite => AccessFs::from_all(abi) & !AccessFs::Execute,
+        }
+    }
+}
+
+type ValueAccessFs = ValueAccess<AccessFs, AbiGroupFs>;
+
+enum ValueAccess<A, G>
+where
+    A: Access,
+    G: AbiGroup<A>,
+{
+    // TODO: Replace with Value(A) when removing old vN groups.
+    Value(BitFlags<A>),
+    Group(G),
+}
+
+impl<A, G> ValueAccess<A, G>
+where
+    A: Access,
+    G: AbiGroup<A>,
+{
+    fn resolve_bitflags<V>(access: V, abi: Option<ABI>) -> Result<BitFlags<A>, ResolveError>
+    where
+        V: Into<Self>,
+    {
+        match access.into() {
+            Self::Value(a) => Ok(a),
+            Self::Group(g) => {
+                // Simulate a missing variable
+                Ok(g.resolve_bitflags(
+                    abi.ok_or(ResolveError::VariableNotFound(Name::from_str("abi")?))?,
+                ))
+            }
+        }
+    }
+}
+
+impl<A, G> From<A> for ValueAccess<A, G>
+where
+    A: Access,
+    G: AbiGroup<A>,
+{
+    fn from(access: A) -> Self {
+        Self::Value(access.into())
+    }
+}
+
+impl<A, G> From<BitFlags<A>> for ValueAccess<A, G>
+where
+    A: Access,
+    G: AbiGroup<A>,
+{
+    fn from(a: BitFlags<A>) -> Self {
+        Self::Value(a)
+    }
+}
+
+impl From<&JsonFsAccessItem> for ValueAccessFs {
     fn from(js: &JsonFsAccessItem) -> Self {
         match js {
+            JsonFsAccessItem::AbiAll => Self::Group(AbiGroupFs::All),
+            JsonFsAccessItem::AbiReadExecute => Self::Group(AbiGroupFs::ReadExecute),
+            JsonFsAccessItem::AbiReadWrite => Self::Group(AbiGroupFs::ReadWrite),
             JsonFsAccessItem::Execute => AccessFs::Execute.into(),
             JsonFsAccessItem::WriteFile => AccessFs::WriteFile.into(),
             JsonFsAccessItem::ReadFile => AccessFs::ReadFile.into(),
@@ -383,34 +462,46 @@ impl From<&JsonFsAccessItem> for BitFlags<AccessFs> {
             JsonFsAccessItem::MakeFifo => AccessFs::MakeFifo.into(),
             JsonFsAccessItem::MakeBlock => AccessFs::MakeBlock.into(),
             JsonFsAccessItem::MakeSym => AccessFs::MakeSym.into(),
-            JsonFsAccessItem::V1All => AccessFs::from_all(ABI::V1),
-            JsonFsAccessItem::V1ReadExecute => get_fs_read_execute(ABI::V1),
-            JsonFsAccessItem::V1ReadWrite => get_fs_read_write(ABI::V1),
+            JsonFsAccessItem::V1All => AbiGroupFs::All.resolve_bitflags(ABI::V1).into(),
+            JsonFsAccessItem::V1ReadExecute => {
+                AbiGroupFs::ReadExecute.resolve_bitflags(ABI::V1).into()
+            }
+            JsonFsAccessItem::V1ReadWrite => AbiGroupFs::ReadWrite.resolve_bitflags(ABI::V1).into(),
             JsonFsAccessItem::Refer => AccessFs::Refer.into(),
-            JsonFsAccessItem::V2All => AccessFs::from_all(ABI::V2),
-            JsonFsAccessItem::V2ReadExecute => get_fs_read_execute(ABI::V2),
-            JsonFsAccessItem::V2ReadWrite => get_fs_read_write(ABI::V2),
+            JsonFsAccessItem::V2All => AbiGroupFs::All.resolve_bitflags(ABI::V2).into(),
+            JsonFsAccessItem::V2ReadExecute => {
+                AbiGroupFs::ReadExecute.resolve_bitflags(ABI::V2).into()
+            }
+            JsonFsAccessItem::V2ReadWrite => AbiGroupFs::ReadWrite.resolve_bitflags(ABI::V2).into(),
             JsonFsAccessItem::Truncate => AccessFs::Truncate.into(),
-            JsonFsAccessItem::V3All => AccessFs::from_all(ABI::V3),
-            JsonFsAccessItem::V3ReadExecute => get_fs_read_execute(ABI::V3),
-            JsonFsAccessItem::V3ReadWrite => get_fs_read_write(ABI::V3),
-            JsonFsAccessItem::V4All => AccessFs::from_all(ABI::V4),
-            JsonFsAccessItem::V4ReadExecute => get_fs_read_execute(ABI::V4),
-            JsonFsAccessItem::V4ReadWrite => get_fs_read_write(ABI::V4),
+            JsonFsAccessItem::V3All => AbiGroupFs::All.resolve_bitflags(ABI::V3).into(),
+            JsonFsAccessItem::V3ReadExecute => {
+                AbiGroupFs::ReadExecute.resolve_bitflags(ABI::V3).into()
+            }
+            JsonFsAccessItem::V3ReadWrite => AbiGroupFs::ReadWrite.resolve_bitflags(ABI::V3).into(),
+            JsonFsAccessItem::V4All => AbiGroupFs::All.resolve_bitflags(ABI::V4).into(),
+            JsonFsAccessItem::V4ReadExecute => {
+                AbiGroupFs::ReadExecute.resolve_bitflags(ABI::V4).into()
+            }
+            JsonFsAccessItem::V4ReadWrite => AbiGroupFs::ReadWrite.resolve_bitflags(ABI::V4).into(),
             JsonFsAccessItem::IoctlDev => AccessFs::IoctlDev.into(),
-            JsonFsAccessItem::V5All => AccessFs::from_all(ABI::V5),
-            JsonFsAccessItem::V5ReadExecute => get_fs_read_execute(ABI::V5),
-            JsonFsAccessItem::V5ReadWrite => get_fs_read_write(ABI::V5),
-            JsonFsAccessItem::V6All => AccessFs::from_all(ABI::V6),
-            JsonFsAccessItem::V6ReadExecute => get_fs_read_execute(ABI::V6),
-            JsonFsAccessItem::V6ReadWrite => get_fs_read_write(ABI::V6),
+            JsonFsAccessItem::V5All => AbiGroupFs::All.resolve_bitflags(ABI::V5).into(),
+            JsonFsAccessItem::V5ReadExecute => {
+                AbiGroupFs::ReadExecute.resolve_bitflags(ABI::V5).into()
+            }
+            JsonFsAccessItem::V5ReadWrite => AbiGroupFs::ReadWrite.resolve_bitflags(ABI::V5).into(),
+            JsonFsAccessItem::V6All => AbiGroupFs::All.resolve_bitflags(ABI::V6).into(),
+            JsonFsAccessItem::V6ReadExecute => {
+                AbiGroupFs::ReadExecute.resolve_bitflags(ABI::V6).into()
+            }
+            JsonFsAccessItem::V6ReadWrite => AbiGroupFs::ReadWrite.resolve_bitflags(ABI::V6).into(),
         }
     }
 }
 
 #[test]
 fn test_v1_read_execute() {
-    let rx: BitFlags<AccessFs> = (&JsonFsAccessItem::V1ReadExecute).into();
+    let rx = ValueAccessFs::resolve_bitflags(&JsonFsAccessItem::V1ReadExecute, None).unwrap();
     assert_eq!(
         rx,
         AccessFs::Execute | AccessFs::ReadFile | AccessFs::ReadDir
@@ -424,14 +515,14 @@ fn test_v1_read_execute() {
 
 #[test]
 fn test_v2_read_execute() {
-    let rx: BitFlags<AccessFs> = (&JsonFsAccessItem::V2ReadExecute).into();
+    let rx = ValueAccessFs::resolve_bitflags(&JsonFsAccessItem::V2ReadExecute, None).unwrap();
     assert!(rx.contains(AccessFs::Execute));
     assert!(rx.contains(AccessFs::Refer));
 }
 
 #[test]
 fn test_v1_read_write() {
-    let rw: BitFlags<AccessFs> = (&JsonFsAccessItem::V1ReadWrite).into();
+    let rw = ValueAccessFs::resolve_bitflags(&JsonFsAccessItem::V1ReadWrite, None).unwrap();
     assert_eq!(
         rw,
         AccessFs::WriteFile
@@ -456,16 +547,16 @@ fn test_v1_read_write() {
 
 #[test]
 fn test_v2_read_write() {
-    let rw: BitFlags<AccessFs> = (&JsonFsAccessItem::V2ReadWrite).into();
+    let rw = ValueAccessFs::resolve_bitflags(&JsonFsAccessItem::V2ReadWrite, None).unwrap();
     assert!(!rw.contains(AccessFs::Execute));
     assert!(rw.contains(AccessFs::Refer));
 }
 
-impl From<&NonEmptySet<JsonFsAccessItem>> for BitFlags<AccessFs> {
-    fn from(set: &NonEmptySet<JsonFsAccessItem>) -> Self {
-        set.iter().fold(BitFlags::EMPTY, |flags, item| {
-            let access: BitFlags<AccessFs> = item.into();
-            flags | access
+impl NonEmptySet<JsonFsAccessItem> {
+    pub fn resolve_bitflags(&self, abi: Option<ABI>) -> Result<BitFlags<AccessFs>, ResolveError> {
+        self.iter().try_fold(BitFlags::EMPTY, |flags, item| {
+            let access = ValueAccessFs::resolve_bitflags(item, abi)?;
+            Ok(flags | access)
         })
     }
 }
@@ -473,6 +564,8 @@ impl From<&NonEmptySet<JsonFsAccessItem>> for BitFlags<AccessFs> {
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub(crate) enum JsonNetAccessItem {
+    #[serde(rename = "abi.all")]
+    AbiAll,
     BindTcp,
     ConnectTcp,
     #[serde(rename = "v4.all")]
@@ -483,23 +576,38 @@ pub(crate) enum JsonNetAccessItem {
     V6All,
 }
 
-impl From<&JsonNetAccessItem> for BitFlags<AccessNet> {
-    fn from(js: &JsonNetAccessItem) -> Self {
-        match js {
-            JsonNetAccessItem::BindTcp => AccessNet::BindTcp.into(),
-            JsonNetAccessItem::ConnectTcp => AccessNet::ConnectTcp.into(),
-            JsonNetAccessItem::V4All => AccessNet::from_all(ABI::V4),
-            JsonNetAccessItem::V5All => AccessNet::from_all(ABI::V5),
-            JsonNetAccessItem::V6All => AccessNet::from_all(ABI::V6),
+enum AbiGroupNet {
+    All,
+}
+
+impl AbiGroup<AccessNet> for AbiGroupNet {
+    fn resolve_bitflags(&self, abi: ABI) -> BitFlags<AccessNet> {
+        match self {
+            Self::All => AccessNet::from_all(abi),
         }
     }
 }
 
-impl From<&NonEmptySet<JsonNetAccessItem>> for BitFlags<AccessNet> {
-    fn from(set: &NonEmptySet<JsonNetAccessItem>) -> Self {
-        set.iter().fold(BitFlags::EMPTY, |flags, item| {
-            let access: BitFlags<AccessNet> = item.into();
-            flags | access
+type ValueAccessNet = ValueAccess<AccessNet, AbiGroupNet>;
+
+impl From<&JsonNetAccessItem> for ValueAccessNet {
+    fn from(js: &JsonNetAccessItem) -> Self {
+        match js {
+            JsonNetAccessItem::AbiAll => Self::Group(AbiGroupNet::All),
+            JsonNetAccessItem::BindTcp => AccessNet::BindTcp.into(),
+            JsonNetAccessItem::ConnectTcp => AccessNet::ConnectTcp.into(),
+            JsonNetAccessItem::V4All => AbiGroupNet::All.resolve_bitflags(ABI::V4).into(),
+            JsonNetAccessItem::V5All => AbiGroupNet::All.resolve_bitflags(ABI::V5).into(),
+            JsonNetAccessItem::V6All => AbiGroupNet::All.resolve_bitflags(ABI::V6).into(),
+        }
+    }
+}
+
+impl NonEmptySet<JsonNetAccessItem> {
+    pub fn resolve_bitflags(&self, abi: Option<ABI>) -> Result<BitFlags<AccessNet>, ResolveError> {
+        self.iter().try_fold(BitFlags::EMPTY, |flags, item| {
+            let access = ValueAccessNet::resolve_bitflags(item, abi)?;
+            Ok(flags | access)
         })
     }
 }
@@ -507,27 +615,44 @@ impl From<&NonEmptySet<JsonNetAccessItem>> for BitFlags<AccessNet> {
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub(crate) enum JsonScopeItem {
+    #[serde(rename = "abi.all")]
+    AbiAll,
     AbstractUnixSocket,
     Signal,
     #[serde(rename = "v6.all")]
     V6All,
 }
 
-impl From<&JsonScopeItem> for BitFlags<Scope> {
-    fn from(js: &JsonScopeItem) -> Self {
-        match js {
-            JsonScopeItem::AbstractUnixSocket => Scope::AbstractUnixSocket.into(),
-            JsonScopeItem::Signal => Scope::Signal.into(),
-            JsonScopeItem::V6All => Scope::from_all(ABI::V6),
+enum AbiGroupScope {
+    All,
+}
+
+impl AbiGroup<Scope> for AbiGroupScope {
+    fn resolve_bitflags(&self, abi: ABI) -> BitFlags<Scope> {
+        match self {
+            Self::All => Scope::from_all(abi),
         }
     }
 }
 
-impl From<&NonEmptySet<JsonScopeItem>> for BitFlags<Scope> {
-    fn from(set: &NonEmptySet<JsonScopeItem>) -> Self {
-        set.iter().fold(BitFlags::EMPTY, |flags, item| {
-            let scope: BitFlags<Scope> = item.into();
-            flags | scope
+type ValueScope = ValueAccess<Scope, AbiGroupScope>;
+
+impl From<&JsonScopeItem> for ValueScope {
+    fn from(js: &JsonScopeItem) -> Self {
+        match js {
+            JsonScopeItem::AbiAll => Self::Group(AbiGroupScope::All),
+            JsonScopeItem::AbstractUnixSocket => Scope::AbstractUnixSocket.into(),
+            JsonScopeItem::Signal => Scope::Signal.into(),
+            JsonScopeItem::V6All => AbiGroupScope::All.resolve_bitflags(ABI::V6).into(),
+        }
+    }
+}
+
+impl NonEmptySet<JsonScopeItem> {
+    pub fn resolve_bitflags(&self, abi: Option<ABI>) -> Result<BitFlags<Scope>, ResolveError> {
+        self.iter().try_fold(BitFlags::EMPTY, |flags, item| {
+            let access = ValueScope::resolve_bitflags(item, abi)?;
+            Ok(flags | access)
         })
     }
 }
@@ -641,6 +766,66 @@ impl From<TomlNetPort> for JsonNetPort {
     }
 }
 
+struct JsonAbiVisitor;
+
+impl JsonAbiVisitor {
+    fn visit_integer<E, I>(value: I, unexpected: Unexpected) -> Result<JsonAbi, E>
+    where
+        E: de::Error,
+        I: TryInto<i32>,
+    {
+        match value.try_into() {
+            Ok(abi) if abi > 0 => Ok(JsonAbi(abi)),
+            _ => Err(E::invalid_value(
+                unexpected,
+                &"ABI version must be between 1 and 2^31 - 1 (inclusive)",
+            )),
+        }
+    }
+}
+
+impl<'de> Visitor<'de> for JsonAbiVisitor {
+    type Value = JsonAbi;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str("a Landlock ABI version")
+    }
+
+    // u64 deserialization is needed for JSON.
+    fn visit_u64<E>(self, value: u64) -> Result<JsonAbi, E>
+    where
+        E: de::Error,
+    {
+        Self::visit_integer(value, Unexpected::Unsigned(value))
+    }
+
+    // i64 deserialization is needed for TOML.
+    fn visit_i64<E>(self, value: i64) -> Result<JsonAbi, E>
+    where
+        E: de::Error,
+    {
+        Self::visit_integer(value, Unexpected::Signed(value))
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct JsonAbi(i32);
+
+impl From<JsonAbi> for ABI {
+    fn from(abi: JsonAbi) -> Self {
+        abi.0.into()
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for JsonAbi {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_u64(JsonAbiVisitor)
+    }
+}
+
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
 #[serde(deny_unknown_fields)]
 #[allow(non_snake_case)]
@@ -656,6 +841,7 @@ type TomlVariable = JsonVariable;
 #[serde(deny_unknown_fields)]
 #[allow(non_snake_case)]
 pub(crate) struct JsonConfig {
+    pub(crate) abi: Option<JsonAbi>,
     pub(crate) variable: Option<NonEmptySet<JsonVariable>>,
     pub(crate) ruleset: Option<NonEmptySet<NonEmptyStruct<JsonRuleset>>>,
     pub(crate) pathBeneath: Option<NonEmptySet<JsonPathBeneath>>,
@@ -677,6 +863,7 @@ impl NonEmptyStructInner for JsonConfig {
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct TomlConfig {
+    abi: Option<JsonAbi>,
     variable: Option<NonEmptySet<TomlVariable>>,
     ruleset: Option<NonEmptySet<NonEmptyStruct<TomlRuleset>>>,
     path_beneath: Option<NonEmptySet<TomlPathBeneath>>,
@@ -697,6 +884,7 @@ impl NonEmptyStructInner for TomlConfig {
 impl From<TomlConfig> for JsonConfig {
     fn from(toml: TomlConfig) -> Self {
         Self {
+            abi: toml.abi,
             variable: toml.variable,
             ruleset: toml
                 .ruleset

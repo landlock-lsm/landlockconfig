@@ -5,7 +5,7 @@ use crate::parser::{JsonConfig, TemplateString, TomlConfig};
 use crate::variable::{NameError, ResolveError, Variables, VecStringIterator};
 use landlock::{
     AccessFs, AccessNet, BitFlags, NetPort, PathBeneath, PathFd, PathFdError, Ruleset, RulesetAttr,
-    RulesetCreated, RulesetCreatedAttr, RulesetError, Scope,
+    RulesetCreated, RulesetCreatedAttr, RulesetError, Scope, ABI,
 };
 use std::collections::BTreeMap;
 use std::fs::{self, File};
@@ -27,6 +27,9 @@ pub enum BuildRulesetError {
 #[cfg_attr(test, derive(Default))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Config {
+    /// This ABI is the configured local variable, which might be different than
+    /// the ABI required to support all listed access rights.
+    pub(crate) abi: Option<ABI>,
     pub(crate) variables: Variables,
     pub(crate) handled_fs: BitFlags<AccessFs>,
     pub(crate) handled_net: BitFlags<AccessNet>,
@@ -53,6 +56,8 @@ pub struct ResolvedConfig {
 pub enum ConfigError {
     #[error(transparent)]
     Name(#[from] NameError),
+    #[error(transparent)]
+    Resolve(#[from] ResolveError),
 }
 
 impl TryFrom<NonEmptyStruct<JsonConfig>> for Config {
@@ -61,6 +66,8 @@ impl TryFrom<NonEmptyStruct<JsonConfig>> for Config {
     fn try_from(json: NonEmptyStruct<JsonConfig>) -> Result<Self, Self::Error> {
         let mut config = Self::empty();
         let json = json.into_inner();
+
+        config.abi = json.abi.map(Into::into);
 
         for variable in json.variable.unwrap_or_default() {
             let name = variable.name.parse()?;
@@ -73,48 +80,56 @@ impl TryFrom<NonEmptyStruct<JsonConfig>> for Config {
             let ruleset = ruleset.into_inner();
             config.handled_fs |= ruleset
                 .handledAccessFs
-                .as_ref()
-                .map(BitFlags::<AccessFs>::from)
+                .map(|access| access.resolve_bitflags(config.abi))
+                .transpose()?
                 .unwrap_or_default();
             config.handled_net |= ruleset
                 .handledAccessNet
-                .as_ref()
-                .map(BitFlags::<AccessNet>::from)
+                .map(|access| access.resolve_bitflags(config.abi))
+                .transpose()?
                 .unwrap_or_default();
             config.scoped |= ruleset
                 .scoped
-                .as_ref()
-                .map(BitFlags::<Scope>::from)
+                .map(|scoped| scoped.resolve_bitflags(config.abi))
+                .transpose()?
                 .unwrap_or_default();
         }
 
         for path_beneath in json.pathBeneath.unwrap_or_default() {
-            let access: BitFlags<AccessFs> = (&path_beneath.allowedAccess).into();
+            let access = path_beneath.allowedAccess.resolve_bitflags(config.abi)?;
 
-            /* Automatically augment and keep the ruleset consistent. */
-            config.handled_fs |= access;
+            // It is possible to have rules with empty access because of empty
+            // access group resolution.
+            if !access.is_empty() {
+                // Automatically augment and keep the ruleset consistent.
+                config.handled_fs |= access;
 
-            for parent in path_beneath.parent {
-                config
-                    .rules_path_beneath
-                    .entry(parent)
-                    .and_modify(|a| *a |= access)
-                    .or_insert(access);
+                for parent in path_beneath.parent {
+                    config
+                        .rules_path_beneath
+                        .entry(parent)
+                        .and_modify(|a| *a |= access)
+                        .or_insert(access);
+                }
             }
         }
 
         for net_port in json.netPort.unwrap_or_default() {
-            let access: BitFlags<AccessNet> = (&net_port.allowedAccess).into();
+            let access = net_port.allowedAccess.resolve_bitflags(config.abi)?;
 
-            /* Automatically augment and keep the ruleset consistent. */
-            config.handled_net |= access;
+            // It is possible to have rules with empty access because of empty
+            // access group resolution.
+            if !access.is_empty() {
+                // Automatically augment and keep the ruleset consistent.
+                config.handled_net |= access;
 
-            for port in net_port.port {
-                config
-                    .rules_net_port
-                    .entry(port)
-                    .and_modify(|a| *a |= access)
-                    .or_insert(access);
+                for port in net_port.port {
+                    config
+                        .rules_net_port
+                        .entry(port)
+                        .and_modify(|a| *a |= access)
+                        .or_insert(access);
+                }
             }
         }
 
@@ -198,6 +213,7 @@ impl Config {
     // could not be updated with public methods (e.g. compose).
     fn empty() -> Self {
         Self {
+            abi: Default::default(),
             variables: Default::default(),
             handled_fs: Default::default(),
             handled_net: Default::default(),
@@ -274,6 +290,14 @@ impl Config {
         self.handled_fs &= other.handled_fs;
         self.handled_net &= other.handled_net;
         self.scoped &= other.scoped;
+
+        // Fifth step: downgrade the ABI version.
+        self.abi = match (self.abi, other.abi) {
+            (Some(a), Some(b)) => Some(a.min(b)),
+            (Some(a), None) => Some(a),
+            (None, Some(b)) => Some(b),
+            (None, None) => None,
+        };
     }
 
     pub fn parse_json<R>(reader: R) -> Result<Self, ParseJsonError>
@@ -442,6 +466,7 @@ impl ResolvedConfig {
 impl TryFrom<Config> for ResolvedConfig {
     type Error = ResolveError;
 
+    /// Resolve all (composed) variables but not local (synthetic) variables such as `abi.*`.
     fn try_from(config: Config) -> Result<Self, Self::Error> {
         let mut rules_path_beneath: BTreeMap<PathBuf, BitFlags<AccessFs>> = Default::default();
         for (path_beneath, access) in config.rules_path_beneath {
@@ -536,5 +561,65 @@ mod tests_compose {
                 ..Default::default()
             }
         );
+    }
+
+    #[test]
+    fn test_abi_none_none() {
+        let c1 = Config {
+            abi: None,
+            ..Default::default()
+        };
+        let mut c1_mut = c1.clone();
+        let mut c2_mut = Config {
+            abi: None,
+            ..Default::default()
+        };
+
+        c1_mut.compose(&c2_mut);
+        assert_eq!(c1_mut.abi, None);
+
+        // Test commutativity
+        c2_mut.compose(&c1);
+        assert_eq!(c1_mut, c2_mut);
+    }
+
+    #[test]
+    fn test_abi_some_none() {
+        let c1 = Config {
+            abi: Some(ABI::V2),
+            ..Default::default()
+        };
+        let mut c1_mut = c1.clone();
+        let mut c2_mut = Config {
+            abi: None,
+            ..Default::default()
+        };
+
+        c1_mut.compose(&c2_mut);
+        assert_eq!(c1_mut.abi, Some(ABI::V2));
+
+        // Test commutativity
+        c2_mut.compose(&c1);
+        assert_eq!(c1_mut, c2_mut);
+    }
+
+    #[test]
+    fn test_abi_some_some() {
+        let c1 = Config {
+            abi: Some(ABI::V1),
+            ..Default::default()
+        };
+        let mut c1_mut = c1.clone();
+        let mut c2_mut = Config {
+            abi: Some(ABI::V2),
+            ..Default::default()
+        };
+
+        c1_mut.compose(&c2_mut);
+        assert_eq!(c1_mut.abi, Some(ABI::V1));
+
+        // Test commutativity
+        c2_mut.compose(&c1);
+        assert_eq!(c1_mut, c2_mut);
     }
 }

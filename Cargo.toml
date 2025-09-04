@@ -9,7 +9,7 @@ license = "MIT OR Apache-2.0"
 description = "Sandboxer library leveraging Landlock with JSON or TOML configuration"
 
 [workspace.dependencies]
-landlock = "0.4.2"
+landlock = "0.4.3"
 
 [package]
 name = "landlockconfig"

@@ -7,7 +7,7 @@ use std::path::PathBuf;
 fn test_idempotence(config: &Config) {
     let mut bkp = config.clone();
     bkp.compose(config);
-    assert_eq!(bkp, *config);
+    assert_eq!(*config, bkp);
 }
 
 fn get_composition(json1: &str, json2: &str) -> ResolvedConfig {
@@ -362,6 +362,194 @@ fn test_compose_same_resolved_path() {
             handled_fs: AccessFs::Execute | AccessFs::ReadFile,
             rules_path_beneath: [(PathBuf::from("a"), AccessFs::Execute | AccessFs::ReadFile)]
                 .into(),
+            ..Default::default()
+        }
+    );
+}
+
+// Test with composition of two different ABIs (different than user variables,
+// see TryFrom<Config> for ResolvedConfig).
+#[test]
+fn test_abi_compose_all() {
+    // ruleset.scoped is tested by test_compose_most_fs_net().
+    let json1 = r#"{
+        "abi": 1,
+        "ruleset": [
+            {
+                "handledAccessFs": [ "abi.all" ],
+                "handledAccessNet": [ "abi.all" ]
+            }
+        ],
+        "pathBeneath": [
+            {
+                "allowedAccess": [ "abi.read_execute" ],
+                "parent": [ "." ]
+            }
+        ],
+        "netPort": [
+            {
+                "allowedAccess": [ "abi.all" ],
+                "port": [ 1 ]
+            }
+        ]
+    }"#;
+    let json2 = r#"{
+        "abi": 2,
+        "ruleset": [
+            {
+                "handledAccessFs": [ "abi.all" ],
+                "handledAccessNet": [ "abi.all" ]
+            }
+        ],
+        "pathBeneath": [
+            {
+                "allowedAccess": [ "abi.read_write" ],
+                "parent": [ "." ]
+            }
+        ],
+        "netPort": [
+            {
+                "allowedAccess": [ "abi.all" ],
+                "port": [ 1 ]
+            }
+        ]
+    }"#;
+
+    assert_eq!(
+        get_composition(json1, json2),
+        ResolvedConfig {
+            handled_fs: AccessFs::from_all(ABI::V1),
+            // No handled_net nor rules_net_port because not supported by ABI v1.
+            rules_path_beneath: [(PathBuf::from("."), AccessFs::from_all(ABI::V1))].into(),
+            ..Default::default()
+        }
+    );
+}
+
+#[test]
+fn test_abi_compose_read_write_v1() {
+    let json1 = r#"{
+        "abi": 1,
+        "ruleset": [
+            {
+                "handledAccessFs": [ "abi.all" ],
+                "handledAccessNet": [ "abi.all" ]
+            }
+        ],
+        "pathBeneath": [
+            {
+                "allowedAccess": [ "abi.read_execute" ],
+                "parent": [ "." ]
+            }
+        ],
+        "netPort": [
+            {
+                "allowedAccess": [ "abi.all" ],
+                "port": [ 1 ]
+            }
+        ]
+    }"#;
+    let json2 = r#"{
+        "abi": 2,
+        "ruleset": [
+            {
+                "handledAccessFs": [ "abi.read_write" ],
+                "handledAccessNet": [ "bind_tcp" ]
+            }
+        ],
+        "pathBeneath": [
+            {
+                "allowedAccess": [ "abi.read_write" ],
+                "parent": [ "." ]
+            }
+        ],
+        "netPort": [
+            {
+                "allowedAccess": [ "abi.all" ],
+                "port": [ 1 ]
+            }
+        ]
+    }"#;
+
+    assert_eq!(
+        get_composition(json1, json2),
+        ResolvedConfig {
+            handled_fs: AccessFs::from_all(ABI::V1)
+                & AccessFs::from_all(ABI::V2)
+                & !AccessFs::Execute,
+            // No handled_net nor rules_net_port because not supported by ABI v1.
+            rules_path_beneath: [(
+                PathBuf::from("."),
+                // Execution is not handled by json2.
+                AccessFs::from_all(ABI::V1) & !AccessFs::Execute
+            )]
+            .into(),
+            ..Default::default()
+        }
+    );
+}
+
+#[test]
+fn test_abi_compose_read_write_v4() {
+    let json1 = r#"{
+        "abi": 4,
+        "ruleset": [
+            {
+                "handledAccessFs": [ "abi.all" ],
+                "handledAccessNet": [ "abi.all" ]
+            }
+        ],
+        "pathBeneath": [
+            {
+                "allowedAccess": [ "abi.read_execute" ],
+                "parent": [ "." ]
+            }
+        ],
+        "netPort": [
+            {
+                "allowedAccess": [ "abi.all" ],
+                "port": [ 1 ]
+            }
+        ]
+    }"#;
+    let json2 = r#"{
+        "abi": 6,
+        "ruleset": [
+            {
+                "handledAccessFs": [ "abi.read_write" ],
+                "handledAccessNet": [ "bind_tcp" ]
+            }
+        ],
+        "pathBeneath": [
+            {
+                "allowedAccess": [ "abi.read_write" ],
+                "parent": [ "." ]
+            }
+        ],
+        "netPort": [
+            {
+                "allowedAccess": [ "abi.all" ],
+                "port": [ 1 ]
+            }
+        ]
+    }"#;
+
+    assert_eq!(
+        get_composition(json1, json2),
+        ResolvedConfig {
+            handled_fs: AccessFs::from_all(ABI::V4)
+                & AccessFs::from_all(ABI::V4)
+                & !AccessFs::Execute,
+            // Only bind_tcp is explicitly handled by json2, but a rule
+            // implicitly handles connect_tcp.
+            handled_net: AccessNet::from_all(ABI::V4),
+            rules_path_beneath: [(
+                PathBuf::from("."),
+                // Execution is not handled by json2.
+                AccessFs::from_all(ABI::V4) & !AccessFs::Execute
+            )]
+            .into(),
+            rules_net_port: [(1, AccessNet::from_all(ABI::V4))].into(),
             ..Default::default()
         }
     );

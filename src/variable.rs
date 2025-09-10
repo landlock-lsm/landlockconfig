@@ -22,15 +22,18 @@ impl FromStr for Name {
     type Err = NameError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.is_empty() {
-            return Err(NameError::Empty);
+        let mut chars = s.chars();
+
+        match chars.next() {
+            None => return Err(NameError::Empty),
+            Some(first) => {
+                if !first.is_ascii_alphabetic() {
+                    return Err(NameError::InvalidFirstCharacter(s.to_string()));
+                }
+            }
         }
 
-        if !s.chars().next().unwrap().is_ascii_alphabetic() {
-            return Err(NameError::InvalidFirstCharacter(s.to_string()));
-        }
-
-        if !s.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+        if !chars.all(|c| c.is_ascii_alphanumeric() || c == '_') {
             return Err(NameError::InvalidCharacter(s.to_string()));
         }
 
@@ -60,7 +63,10 @@ pub enum ResolveError {
 }
 
 impl Variables {
-    pub(crate) fn extend(&mut self, key: Name, values: BTreeSet<String>) {
+    pub(crate) fn extend<I>(&mut self, key: Name, values: I)
+    where
+        I: IntoIterator<Item = String>,
+    {
         self.0.entry(key).or_default().extend(values);
     }
 
@@ -93,7 +99,7 @@ impl Variables {
     where
         K: AsRef<str>,
         V: IntoIterator<Item = S>,
-        S: AsRef<str>,
+        S: Into<String>,
         I: IntoIterator<Item = (K, V)>,
     {
         let mut map = BTreeMap::new();
@@ -103,7 +109,7 @@ impl Variables {
                 name,
                 values
                     .into_iter()
-                    .map(|s| s.as_ref().to_string())
+                    .map(|s| s.into())
                     .collect::<BTreeSet<_>>(),
             );
         }

@@ -50,7 +50,7 @@ fn test_without_value() {
             }
         ]
     }"#;
-    let empty: &[&str] = &[];
+    let empty: &[String] = &[];
     assert_eq!(
         parse_json(json),
         Ok(Config {

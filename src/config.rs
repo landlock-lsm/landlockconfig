@@ -66,7 +66,7 @@ impl TryFrom<NonEmptyStruct<JsonConfig>> for Config {
             let name = variable.name.parse()?;
             let literal = variable.literal.unwrap_or_default();
             // TODO: Check and warn if users tried to use variable in literal strings?
-            config.variables.extend(name, literal.into_iter().collect());
+            config.variables.extend(name, literal);
         }
 
         for ruleset in json.ruleset.unwrap_or_default() {

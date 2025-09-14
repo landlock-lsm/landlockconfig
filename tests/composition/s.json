@@ -1,4 +1,5 @@
 {
+  "abi": 4,
   "variable": [
     {
       "name": "rw",
@@ -12,7 +13,7 @@
   "pathBeneath": [
     {
       "allowedAccess": [
-        "v4.read_execute"
+        "abi.read_execute"
       ],
       "parent": [
         "/bin",
@@ -26,7 +27,7 @@
     },
     {
       "allowedAccess": [
-        "v4.read_write"
+        "abi.read_write"
       ],
       "parent": [
         "${rw}"

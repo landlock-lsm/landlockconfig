@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use crate::config::ResolvedConfig;
-use crate::tests_helpers::{assert_json, parse_json, parse_toml, validate_json, LATEST_ABI};
+use crate::tests_helpers::{parse_json, parse_toml, validate_json, LATEST_ABI};
 use crate::Config;
 use landlock::{Access, AccessFs, AccessNet, Scope, ABI};
 use serde_json::error::Category;
@@ -14,39 +14,6 @@ fn test_json_schema() {
     }"#;
 
     validate_json(test_json).expect_err("JSON schema validator should return a type error")
-}
-
-fn assert_versions<F>(first_known_version: ABI, ruleset_property: F)
-where
-    F: Fn(u32) -> Vec<String>,
-{
-    let latest_version = LATEST_ABI as u32;
-    let known_versions = (first_known_version as u32)..=latest_version;
-    let next_version = latest_version + 1;
-    for version in 0..=next_version {
-        let expected = if known_versions.contains(&version) {
-            Ok(())
-        } else {
-            Err(Category::Data)
-        };
-        println!("Testing version {version} and expecting {:?}", expected);
-        for property in ruleset_property(version) {
-            println!("  Testing property {property:?}");
-            assert_json(
-                format!(
-                    r#"{{
-                        "ruleset": [
-                            {{
-                                {property}
-                            }}
-                        ]
-                    }}"#
-                )
-                .as_ref(),
-                expected,
-            );
-        }
-    }
 }
 
 /* Test "empty configuration" error. */
@@ -292,51 +259,41 @@ fn test_one_handled_access_fs() {
 
 #[test]
 fn test_all_handled_access_fs_json() {
-    let json = r#"{
-        "ruleset": [
-            {
-                "handledAccessFs": [
-                    "execute",
-                    "write_file",
-                    "read_file",
-                    "read_dir",
-                    "remove_dir",
-                    "remove_file",
-                    "make_char",
-                    "make_dir",
-                    "make_reg",
-                    "make_sock",
-                    "make_fifo",
-                    "make_block",
-                    "make_sym",
-                    "v1.all",
-                    "v1.read_execute",
-                    "v1.read_write",
-                    "refer",
-                    "v2.all",
-                    "v2.read_execute",
-                    "v2.read_write",
-                    "truncate",
-                    "v3.all",
-                    "v3.read_execute",
-                    "v3.read_write",
-                    "v4.all",
-                    "v4.read_execute",
-                    "v4.read_write",
-                    "ioctl_dev",
-                    "v5.all",
-                    "v5.read_execute",
-                    "v5.read_write",
-                    "v6.all",
-                    "v6.read_execute",
-                    "v6.read_write"
-                    ]
-            }
-        ]
-    }"#;
+    let json = format!(
+        r#"{{
+            "abi": {},
+            "ruleset": [
+                {{
+                    "handledAccessFs": [
+                        "abi.all",
+                        "abi.read_execute",
+                        "abi.read_write",
+                        "execute",
+                        "write_file",
+                        "read_file",
+                        "read_dir",
+                        "remove_dir",
+                        "remove_file",
+                        "make_char",
+                        "make_dir",
+                        "make_reg",
+                        "make_sock",
+                        "make_fifo",
+                        "make_block",
+                        "make_sym",
+                        "refer",
+                        "truncate",
+                        "ioctl_dev"
+                        ]
+                }}
+            ]
+        }}"#,
+        LATEST_ABI as u32
+    );
     assert_eq!(
-        parse_json(json),
+        parse_json(&json),
         Ok(Config {
+            abi: Some(LATEST_ABI),
             handled_fs: AccessFs::from_all(LATEST_ABI),
             ..Default::default()
         })
@@ -345,9 +302,14 @@ fn test_all_handled_access_fs_json() {
 
 #[test]
 fn test_all_handled_access_fs_toml() {
-    let toml = r#"
+    let toml = format!(
+        r#"
+        abi = {}
         [[ruleset]]
         handled_access_fs = [
+            "abi.all",
+            "abi.read_execute",
+            "abi.read_write",
             "execute",
             "write_file",
             "read_file",
@@ -361,47 +323,21 @@ fn test_all_handled_access_fs_toml() {
             "make_fifo",
             "make_block",
             "make_sym",
-            "v1.all",
-            "v1.read_execute",
-            "v1.read_write",
             "refer",
-            "v2.all",
-            "v2.read_execute",
-            "v2.read_write",
             "truncate",
-            "v3.all",
-            "v3.read_execute",
-            "v3.read_write",
-            "v4.all",
-            "v4.read_execute",
-            "v4.read_write",
             "ioctl_dev",
-            "v5.all",
-            "v5.read_execute",
-            "v5.read_write",
-            "v6.all",
-            "v6.read_execute",
-            "v6.read_write",
         ]
-    "#;
+        "#,
+        LATEST_ABI as u32
+    );
     assert_eq!(
-        parse_toml(toml).unwrap(),
+        parse_toml(&toml).unwrap(),
         Config {
+            abi: Some(LATEST_ABI),
             handled_fs: AccessFs::from_all(LATEST_ABI),
             ..Default::default()
         }
     );
-}
-
-#[test]
-fn test_versions_access_fs() {
-    assert_versions(ABI::V1, |version| {
-        vec![
-            format!(r#""handledAccessFs": [ "v{version}.all" ]"#),
-            format!(r#""handledAccessFs": [ "v{version}.read_write" ]"#),
-            format!(r#""handledAccessFs": [ "v{version}.read_execute" ]"#),
-        ]
-    });
 }
 
 #[test]
@@ -681,14 +617,13 @@ fn test_one_handled_access_net() {
 #[test]
 fn test_all_handled_access_net() {
     let json = r#"{
+        "abi": 6,
         "ruleset": [
             {
                 "handledAccessNet": [
                     "bind_tcp",
                     "connect_tcp",
-                    "v4.all",
-                    "v5.all",
-                    "v6.all"
+                    "abi.all"
                     ]
             }
         ]
@@ -696,17 +631,11 @@ fn test_all_handled_access_net() {
     assert_eq!(
         parse_json(json),
         Ok(Config {
-            handled_net: AccessNet::from_all(LATEST_ABI),
+            abi: Some(ABI::V6),
+            handled_net: AccessNet::from_all(ABI::V6),
             ..Default::default()
         }),
     );
-}
-
-#[test]
-fn test_versions_access_net() {
-    assert_versions(ABI::V4, |version| {
-        vec![format!(r#""handledAccessNet": [ "v{version}.all" ]"#)]
-    });
 }
 
 #[test]
@@ -901,12 +830,13 @@ fn test_one_scoped() {
 #[test]
 fn test_all_scoped() {
     let json = r#"{
+        "abi": 6,
         "ruleset": [
             {
                 "scoped": [
                     "abstract_unix_socket",
                     "signal",
-                    "v6.all"
+                    "abi.all"
                     ]
             }
         ]
@@ -914,17 +844,11 @@ fn test_all_scoped() {
     assert_eq!(
         parse_json(json),
         Ok(Config {
-            scoped: Scope::from_all(LATEST_ABI),
+            abi: Some(ABI::V6),
+            scoped: Scope::from_all(ABI::V6),
             ..Default::default()
         }),
     );
-}
-
-#[test]
-fn test_versions_scope() {
-    assert_versions(ABI::V6, |version| {
-        vec![format!(r#""scoped": [ "v{version}.all" ]"#)]
-    });
 }
 
 #[test]

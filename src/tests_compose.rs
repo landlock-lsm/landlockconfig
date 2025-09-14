@@ -34,24 +34,26 @@ fn get_composition(json1: &str, json2: &str) -> ResolvedConfig {
 #[test]
 fn test_compose_most_fs_net() {
     let json1 = r#"{
+        "abi": 4,
         "ruleset": [
             {
-                "handledAccessFs": [ "v4.all" ],
-                "handledAccessNet": [ "v4.all" ],
-                "scoped": [ "v6.all" ]
+                "handledAccessFs": [ "abi.all" ],
+                "handledAccessNet": [ "abi.all" ],
+                "scoped": [ "abi.all" ]
             }
         ]
     }"#;
     let json2 = r#"{
+        "abi": 6,
         "pathBeneath": [
             {
-                "allowedAccess": [ "v6.all" ],
+                "allowedAccess": [ "abi.all" ],
                 "parent": [ "a" ]
             }
         ],
         "netPort": [
             {
-                "allowedAccess": [ "v6.all" ],
+                "allowedAccess": [ "abi.all" ],
                 "port": [ 1 ]
             }
         ]
@@ -79,9 +81,10 @@ fn test_compose_scope() {
         ]
     }"#;
     let json2 = r#"{
+        "abi": 6,
         "ruleset": [
             {
-                "scoped": [ "v6.all" ]
+                "scoped": [ "abi.all" ]
             }
         ]
     }"#;

@@ -3,52 +3,58 @@
 ## [TOML source #1](source/s1.toml)
 
 ```toml
+abi = 5
+
 [[variable]]
 name = "rw"
 literal = ["/tmp", "/var/tmp"]
 
 # Main system file hierarchies can be read and executed.
 [[path_beneath]]
-allowed_access = ["v5.read_execute"]
+allowed_access = ["abi.read_execute"]
 parent = ["/bin", "/lib", "/usr", "/dev", "/proc", "/etc"]
 
 # Only allow writing to temporary and home directories.
 [[path_beneath]]
-allowed_access = ["v5.read_write"]
+allowed_access = ["abi.read_write"]
 parent = ["${rw}"]
 ```
 
 ## [TOML source #2](source/s2.toml)
 
 ```toml
+abi = 4
+
 [[variable]]
 name = "rw"
 literal = ["/home/user/tmp"]
 
 [[ruleset]]
-handled_access_fs = ["v4.all"]
+handled_access_fs = ["abi.all"]
 
 # Custom apps.
 [[path_beneath]]
-allowed_access = ["v4.read_execute"]
+allowed_access = ["abi.read_execute"]
 parent = ["/home/user/bin"]
 ```
 
 ## [TOML composition](s.toml)
 
 ```toml
+abi = 4
+
 [[variable]]
 name = "rw"
 literal = ["/tmp", "/var/tmp", "/home/user/tmp"]
 
 # Main system file hierarchies can be read and executed.
 [[path_beneath]]
-allowed_access = ["v4.read_execute"]
+allowed_access = ["abi.read_execute"]
 parent = ["/bin", "/lib", "/usr", "/dev", "/proc", "/etc", "/home/user/bin"]
 
 # Only allow writing to temporary and home directories.
 [[path_beneath]]
-allowed_access = ["v4.read_write"]
+allowed_access = ["abi.read_write"]
 parent = ["${rw}"]
 ```
 
@@ -56,6 +62,7 @@ parent = ["${rw}"]
 
 ```json
 {
+  "abi": 4,
   "variable": [
     {
       "name": "rw",
@@ -69,7 +76,7 @@ parent = ["${rw}"]
   "pathBeneath": [
     {
       "allowedAccess": [
-        "v4.read_execute"
+        "abi.read_execute"
       ],
       "parent": [
         "/bin",
@@ -83,7 +90,7 @@ parent = ["${rw}"]
     },
     {
       "allowedAccess": [
-        "v4.read_write"
+        "abi.read_write"
       ],
       "parent": [
         "${rw}"

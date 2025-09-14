@@ -1,11 +1,13 @@
+abi = 4
+
 [[variable]]
 name = "rw"
 literal = ["/home/user/tmp"]
 
 [[ruleset]]
-handled_access_fs = ["v4.all"]
+handled_access_fs = ["abi.all"]
 
 # Custom apps.
 [[path_beneath]]
-allowed_access = ["v4.read_execute"]
+allowed_access = ["abi.read_execute"]
 parent = ["/home/user/bin"]

@@ -323,45 +323,9 @@ pub(crate) enum JsonFsAccessItem {
     MakeFifo,
     MakeBlock,
     MakeSym,
-    #[serde(rename = "v1.all")]
-    V1All,
-    #[serde(rename = "v1.read_execute")]
-    V1ReadExecute,
-    #[serde(rename = "v1.read_write")]
-    V1ReadWrite,
     Refer,
-    #[serde(rename = "v2.all")]
-    V2All,
-    #[serde(rename = "v2.read_execute")]
-    V2ReadExecute,
-    #[serde(rename = "v2.read_write")]
-    V2ReadWrite,
     Truncate,
-    #[serde(rename = "v3.all")]
-    V3All,
-    #[serde(rename = "v3.read_execute")]
-    V3ReadExecute,
-    #[serde(rename = "v3.read_write")]
-    V3ReadWrite,
-    #[serde(rename = "v4.all")]
-    V4All,
-    #[serde(rename = "v4.read_execute")]
-    V4ReadExecute,
-    #[serde(rename = "v4.read_write")]
-    V4ReadWrite,
     IoctlDev,
-    #[serde(rename = "v5.all")]
-    V5All,
-    #[serde(rename = "v5.read_execute")]
-    V5ReadExecute,
-    #[serde(rename = "v5.read_write")]
-    V5ReadWrite,
-    #[serde(rename = "v6.all")]
-    V6All,
-    #[serde(rename = "v6.read_execute")]
-    V6ReadExecute,
-    #[serde(rename = "v6.read_write")]
-    V6ReadWrite,
 }
 
 trait AbiGroup<A>
@@ -397,8 +361,7 @@ where
     A: Access,
     G: AbiGroup<A>,
 {
-    // TODO: Replace with Value(A) when removing old vN groups.
-    Value(BitFlags<A>),
+    Value(A),
     Group(G),
 }
 
@@ -412,7 +375,7 @@ where
         V: Into<Self>,
     {
         match access.into() {
-            Self::Value(a) => Ok(a),
+            Self::Value(a) => Ok(a.into()),
             Self::Group(g) => {
                 // Simulate a missing variable
                 Ok(g.resolve_bitflags(
@@ -429,17 +392,7 @@ where
     G: AbiGroup<A>,
 {
     fn from(access: A) -> Self {
-        Self::Value(access.into())
-    }
-}
-
-impl<A, G> From<BitFlags<A>> for ValueAccess<A, G>
-where
-    A: Access,
-    G: AbiGroup<A>,
-{
-    fn from(a: BitFlags<A>) -> Self {
-        Self::Value(a)
+        Self::Value(access)
     }
 }
 
@@ -462,46 +415,17 @@ impl From<&JsonFsAccessItem> for ValueAccessFs {
             JsonFsAccessItem::MakeFifo => AccessFs::MakeFifo.into(),
             JsonFsAccessItem::MakeBlock => AccessFs::MakeBlock.into(),
             JsonFsAccessItem::MakeSym => AccessFs::MakeSym.into(),
-            JsonFsAccessItem::V1All => AbiGroupFs::All.resolve_bitflags(ABI::V1).into(),
-            JsonFsAccessItem::V1ReadExecute => {
-                AbiGroupFs::ReadExecute.resolve_bitflags(ABI::V1).into()
-            }
-            JsonFsAccessItem::V1ReadWrite => AbiGroupFs::ReadWrite.resolve_bitflags(ABI::V1).into(),
             JsonFsAccessItem::Refer => AccessFs::Refer.into(),
-            JsonFsAccessItem::V2All => AbiGroupFs::All.resolve_bitflags(ABI::V2).into(),
-            JsonFsAccessItem::V2ReadExecute => {
-                AbiGroupFs::ReadExecute.resolve_bitflags(ABI::V2).into()
-            }
-            JsonFsAccessItem::V2ReadWrite => AbiGroupFs::ReadWrite.resolve_bitflags(ABI::V2).into(),
             JsonFsAccessItem::Truncate => AccessFs::Truncate.into(),
-            JsonFsAccessItem::V3All => AbiGroupFs::All.resolve_bitflags(ABI::V3).into(),
-            JsonFsAccessItem::V3ReadExecute => {
-                AbiGroupFs::ReadExecute.resolve_bitflags(ABI::V3).into()
-            }
-            JsonFsAccessItem::V3ReadWrite => AbiGroupFs::ReadWrite.resolve_bitflags(ABI::V3).into(),
-            JsonFsAccessItem::V4All => AbiGroupFs::All.resolve_bitflags(ABI::V4).into(),
-            JsonFsAccessItem::V4ReadExecute => {
-                AbiGroupFs::ReadExecute.resolve_bitflags(ABI::V4).into()
-            }
-            JsonFsAccessItem::V4ReadWrite => AbiGroupFs::ReadWrite.resolve_bitflags(ABI::V4).into(),
             JsonFsAccessItem::IoctlDev => AccessFs::IoctlDev.into(),
-            JsonFsAccessItem::V5All => AbiGroupFs::All.resolve_bitflags(ABI::V5).into(),
-            JsonFsAccessItem::V5ReadExecute => {
-                AbiGroupFs::ReadExecute.resolve_bitflags(ABI::V5).into()
-            }
-            JsonFsAccessItem::V5ReadWrite => AbiGroupFs::ReadWrite.resolve_bitflags(ABI::V5).into(),
-            JsonFsAccessItem::V6All => AbiGroupFs::All.resolve_bitflags(ABI::V6).into(),
-            JsonFsAccessItem::V6ReadExecute => {
-                AbiGroupFs::ReadExecute.resolve_bitflags(ABI::V6).into()
-            }
-            JsonFsAccessItem::V6ReadWrite => AbiGroupFs::ReadWrite.resolve_bitflags(ABI::V6).into(),
         }
     }
 }
 
 #[test]
 fn test_v1_read_execute() {
-    let rx = ValueAccessFs::resolve_bitflags(&JsonFsAccessItem::V1ReadExecute, None).unwrap();
+    let rx =
+        ValueAccessFs::resolve_bitflags(&JsonFsAccessItem::AbiReadExecute, Some(ABI::V1)).unwrap();
     assert_eq!(
         rx,
         AccessFs::Execute | AccessFs::ReadFile | AccessFs::ReadDir
@@ -515,14 +439,16 @@ fn test_v1_read_execute() {
 
 #[test]
 fn test_v2_read_execute() {
-    let rx = ValueAccessFs::resolve_bitflags(&JsonFsAccessItem::V2ReadExecute, None).unwrap();
+    let rx =
+        ValueAccessFs::resolve_bitflags(&JsonFsAccessItem::AbiReadExecute, Some(ABI::V2)).unwrap();
     assert!(rx.contains(AccessFs::Execute));
     assert!(rx.contains(AccessFs::Refer));
 }
 
 #[test]
 fn test_v1_read_write() {
-    let rw = ValueAccessFs::resolve_bitflags(&JsonFsAccessItem::V1ReadWrite, None).unwrap();
+    let rw =
+        ValueAccessFs::resolve_bitflags(&JsonFsAccessItem::AbiReadWrite, Some(ABI::V1)).unwrap();
     assert_eq!(
         rw,
         AccessFs::WriteFile
@@ -547,7 +473,8 @@ fn test_v1_read_write() {
 
 #[test]
 fn test_v2_read_write() {
-    let rw = ValueAccessFs::resolve_bitflags(&JsonFsAccessItem::V2ReadWrite, None).unwrap();
+    let rw =
+        ValueAccessFs::resolve_bitflags(&JsonFsAccessItem::AbiReadWrite, Some(ABI::V2)).unwrap();
     assert!(!rw.contains(AccessFs::Execute));
     assert!(rw.contains(AccessFs::Refer));
 }
@@ -568,12 +495,6 @@ pub(crate) enum JsonNetAccessItem {
     AbiAll,
     BindTcp,
     ConnectTcp,
-    #[serde(rename = "v4.all")]
-    V4All,
-    #[serde(rename = "v5.all")]
-    V5All,
-    #[serde(rename = "v6.all")]
-    V6All,
 }
 
 enum AbiGroupNet {
@@ -596,9 +517,6 @@ impl From<&JsonNetAccessItem> for ValueAccessNet {
             JsonNetAccessItem::AbiAll => Self::Group(AbiGroupNet::All),
             JsonNetAccessItem::BindTcp => AccessNet::BindTcp.into(),
             JsonNetAccessItem::ConnectTcp => AccessNet::ConnectTcp.into(),
-            JsonNetAccessItem::V4All => AbiGroupNet::All.resolve_bitflags(ABI::V4).into(),
-            JsonNetAccessItem::V5All => AbiGroupNet::All.resolve_bitflags(ABI::V5).into(),
-            JsonNetAccessItem::V6All => AbiGroupNet::All.resolve_bitflags(ABI::V6).into(),
         }
     }
 }
@@ -619,8 +537,6 @@ pub(crate) enum JsonScopeItem {
     AbiAll,
     AbstractUnixSocket,
     Signal,
-    #[serde(rename = "v6.all")]
-    V6All,
 }
 
 enum AbiGroupScope {
@@ -643,7 +559,6 @@ impl From<&JsonScopeItem> for ValueScope {
             JsonScopeItem::AbiAll => Self::Group(AbiGroupScope::All),
             JsonScopeItem::AbstractUnixSocket => Scope::AbstractUnixSocket.into(),
             JsonScopeItem::Signal => Scope::Signal.into(),
-            JsonScopeItem::V6All => AbiGroupScope::All.resolve_bitflags(ABI::V6).into(),
         }
     }
 }

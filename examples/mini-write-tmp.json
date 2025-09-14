@@ -1,8 +1,9 @@
 {
+  "abi": 5,
   "ruleset": [
     {
       "handledAccessFs": [
-        "v5.all"
+        "abi.all"
       ],
       "handledAccessNet": [
         "bind_tcp"
@@ -12,7 +13,7 @@
   "pathBeneath": [
     {
       "allowedAccess": [
-        "v5.read_execute"
+        "abi.read_execute"
       ],
       "parent": [
         ".",
@@ -26,7 +27,7 @@
     },
     {
       "allowedAccess": [
-        "v5.read_write"
+        "abi.read_write"
       ],
       "parent": [
         "/tmp"

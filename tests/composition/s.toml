@@ -1,13 +1,15 @@
+abi = 4
+
 [[variable]]
 name = "rw"
 literal = ["/tmp", "/var/tmp", "/home/user/tmp"]
 
 # Main system file hierarchies can be read and executed.
 [[path_beneath]]
-allowed_access = ["v4.read_execute"]
+allowed_access = ["abi.read_execute"]
 parent = ["/bin", "/lib", "/usr", "/dev", "/proc", "/etc", "/home/user/bin"]
 
 # Only allow writing to temporary and home directories.
 [[path_beneath]]
-allowed_access = ["v4.read_write"]
+allowed_access = ["abi.read_write"]
 parent = ["${rw}"]

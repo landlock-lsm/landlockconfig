@@ -31,10 +31,6 @@ pub(crate) fn validate_json(json: &str) -> Result<(), ()> {
     })
 }
 
-pub(crate) fn assert_json(data: &str, ret: Result<(), Category>) {
-    assert_eq!(parse_json(data).map(|_| ()), ret);
-}
-
 // TODO: Return ParseJsonError
 pub(crate) fn parse_json_schema(json: &str, with_schema: bool) -> Result<Config, Category> {
     let cursor = std::io::Cursor::new(json);

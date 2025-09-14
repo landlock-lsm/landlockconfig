@@ -134,6 +134,8 @@ variables, access right groups, and list of directory hierarchies for
 conciseness.
 
 ```toml
+abi = 6
+
 [[variable]]
 name = "tmp"
 literal = ["/tmp", "/var/tmp"]
@@ -148,12 +150,12 @@ literal = ["/etc"]
 
 # Main system file hierarchies can be read and executed.
 [[path_beneath]]
-allowed_access = ["v5.read_execute"]
+allowed_access = ["abi.read_execute"]
 parent = ["/bin", "/lib", "/usr", "/dev", "/proc", "${config}"]
 
 # Only allow writing to temporary and home directories.
 [[path_beneath]]
-allowed_access = ["v5.read_write"]
+allowed_access = ["abi.read_write"]
 parent = ["${tmp}", "${home}"]
 ```
 

@@ -30,10 +30,14 @@ mrproper: clean
 	rm -r $(OUT_DIR) || :
 
 run: all
-	LD_LIBRARY_PATH=$(LIB_DIR) $(OUT_DIR)/bin/$(BINARY) bash -i
+	LD_LIBRARY_PATH=$(LIB_DIR) $(OUT_DIR)/bin/$(BINARY) \
+		../../examples/mini-write-tmp.toml \
+		bash -i
 
 test: all
-	LD_LIBRARY_PATH=$(LIB_DIR) $(OUT_DIR)/bin/$(BINARY) true
+	LD_LIBRARY_PATH=$(LIB_DIR) $(OUT_DIR)/bin/$(BINARY) \
+		../../examples/mini-write-tmp.toml \
+		true
 
 $(OUT_DIR)/include/landlockconfig.h: FORCE
 	cargo cinstall --package=landlockconfig_ffi --release --prefix=$(OUT_DIR)

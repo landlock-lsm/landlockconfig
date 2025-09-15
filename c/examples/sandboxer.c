@@ -9,8 +9,6 @@
 
 #include <landlockconfig.h>
 
-static const char *config_file = "mini-write-tmp.toml";
-
 #ifndef landlock_restrict_self
 static inline int landlock_restrict_self(const int ruleset_fd, const int flags)
 {
@@ -22,12 +20,15 @@ int main(int argc, char *argv[], char *envp[])
 {
 	int config_fd, ruleset_fd;
 	struct landlockconfig *config;
+	const char *config_file;
 
-	if (argc <= 1) {
-		fprintf(stderr, "Error: No command specified.\n\n");
-		fprintf(stderr, "usage: %s <command> [args...]\n", argv[0]);
+	if (argc <= 2) {
+		fprintf(stderr, "Error: Missing config file or command.\n\n");
+		fprintf(stderr, "usage: %s <config_file> <command> [args...]\n", argv[0]);
 		return 1;
 	}
+
+	config_file = argv[1];
 
 	config_fd = open(config_file, O_RDONLY | O_CLOEXEC);
 	if (config_fd < 0) {
@@ -62,7 +63,7 @@ int main(int argc, char *argv[], char *envp[])
 	}
 	close(ruleset_fd);
 
-	execvp(argv[1], &argv[1]);
+	execvp(argv[2], &argv[2]);
 	perror("Failed to execute command");
 	return 1;
 

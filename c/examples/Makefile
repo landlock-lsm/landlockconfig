@@ -31,12 +31,15 @@ mrproper: clean
 
 run: all
 	LD_LIBRARY_PATH=$(LIB_DIR) $(OUT_DIR)/bin/$(BINARY) \
-		../../examples/mini-write-tmp.toml \
+		../../tests/composition/source/ \
 		bash -i
 
 test: all
 	LD_LIBRARY_PATH=$(LIB_DIR) $(OUT_DIR)/bin/$(BINARY) \
 		../../examples/mini-write-tmp.toml \
+		true
+	LD_LIBRARY_PATH=$(LIB_DIR) $(OUT_DIR)/bin/$(BINARY) \
+		../../tests/composition/source/ \
 		true
 
 $(OUT_DIR)/include/landlockconfig.h: FORCE

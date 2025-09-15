@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/prctl.h>
+#include <sys/stat.h>
 #include <syscall.h>
 #include <unistd.h>
 
@@ -21,6 +22,7 @@ int main(int argc, char *argv[], char *envp[])
 	int config_fd, ruleset_fd;
 	struct landlockconfig *config;
 	const char *config_file;
+	struct stat st;
 
 	if (argc <= 2) {
 		fprintf(stderr, "Error: Missing config file or command.\n\n");
@@ -36,8 +38,19 @@ int main(int argc, char *argv[], char *envp[])
 		return 1;
 	}
 
-	config = landlockconfig_parse_toml_file(config_fd, 0);
-	close(config_fd);
+	if (fstat(config_fd, &st) < 0) {
+		perror("Failed to stat configuration file");
+		close(config_fd);
+		return 1;
+	}
+	if (S_ISDIR(st.st_mode)) {
+		close(config_fd);
+		config = landlockconfig_parse_toml_directory(config_file, 0);
+	} else {
+		config = landlockconfig_parse_toml_file(config_fd, 0);
+		close(config_fd);
+	}
+
 	if ((long)config <= 0) {
 		fprintf(stderr, "Failed to parse configuration in '%s': %s\n",
 			config_file, strerror(-(long)config));

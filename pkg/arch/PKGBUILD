@@ -1,0 +1,61 @@
+# Maintainer: Mickaël Salaün
+#
+# For now, this package is only meant to be used for testing with the Landlock
+# Config repository.
+# TODO: Make it more generic while still efficient for development and CI (see
+# https://gitlab.archlinux.org/archlinux/packaging/packages/systemd/-/commit/16294a0b4415b15f48e07f9e939c49fdf069c506).
+
+pkgname=landlockconfig-git
+pkgver=0
+pkgrel=1
+pkgdesc="Sandboxer library leveraging Landlock with JSON or TOML configuration (git version)"
+arch=('x86_64' 'aarch64')
+url="https://landlock.io"
+license=('MIT' 'Apache-2.0')
+depends=('glibc' 'gcc-libs')
+makedepends=('cargo' 'cargo-c' 'git' 'rust')
+provides=('landlockconfig' 'liblandlockconfig.so')
+conflicts=('landlockconfig')
+
+# Disable debug package creation to avoid debug symlink issues.
+options=('!debug')
+
+# Build directly from the current repository.
+# Change this to remote URL for distribution: git+https://github.com/landlock-lsm/landlockconfig.git
+source=()
+sha256sums=()
+
+pkgver() {
+    cd "$startdir/../.."
+
+    local crate_version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml)
+    local rev_count=$(git rev-list --count HEAD)
+    local short_hash=$(git rev-parse --short HEAD)
+    printf "%s.r%s.%s" "$crate_version" "$rev_count" "$short_hash"
+}
+
+build() {
+    # Work directly with the current repository and reuse cached target directory.
+    cd "$startdir/../.."
+
+    cargo cbuild --package=landlockconfig_ffi --release
+}
+
+check() {
+    cd "$startdir/../.."
+
+    cargo test
+}
+
+package() {
+    cd "$startdir/../.."
+
+    cargo cinstall --package=landlockconfig_ffi --release \
+        --prefix=/usr --destdir="$pkgdir"
+
+    install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
+    install -Dm644 COPYRIGHT "$pkgdir/usr/share/doc/$pkgname/COPYRIGHT"
+
+    install -Dm644 LICENSE-MIT "$pkgdir/usr/share/licenses/$pkgname/LICENSE-MIT"
+    install -Dm644 LICENSE-APACHE "$pkgdir/usr/share/licenses/$pkgname/LICENSE-APACHE"
+}

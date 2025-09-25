@@ -89,6 +89,13 @@ jobs:
     - name: Install cargo-c
       run: sudo apt install cargo-c
 
+    - name: Cache Cargo registry
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+        key: cargo-registry
+
     - uses: actions/checkout@v4
       with:
         ref: ${{ matrix.commit }}
@@ -98,7 +105,7 @@ jobs:
       with:
         path: |
           target
-          ~/.cargo
+          ~/.cargo/bin
           ~/.rustup
         key: rust-msrv
         restore-keys: |
@@ -141,6 +148,13 @@ jobs:
     - name: Install cargo-c
       run: sudo apt install cargo-c
 
+    - name: Cache Cargo registry
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+        key: cargo-registry
+
     - uses: actions/checkout@v4
       with:
         ref: ${{ matrix.commit }}
@@ -150,7 +164,7 @@ jobs:
       with:
         path: |
           target
-          ~/.cargo
+          ~/.cargo/bin
           ~/.rustup
         key: rust-stable
         restore-keys: |
@@ -222,3 +236,59 @@ jobs:
 
     - name: Test C example
       run: make -C c/examples test
+
+  archlinux_package:
+    runs-on: ubuntu-24.04
+    needs: commit_list
+    strategy:
+      fail-fast: false
+      matrix:
+        commit: ${{ fromJSON(needs.commit_list.outputs.commits) }}
+    steps:
+
+    - uses: docker/setup-buildx-action@v3
+
+    - name: Get user IDs
+      id: ids
+      run: |
+        echo "uid=$(id -u)" >> $GITHUB_OUTPUT
+        echo "gid=$(id -g)" >> $GITHUB_OUTPUT
+
+    - name: Build Arch Linux container
+      uses: docker/build-push-action@v5
+      with:
+        file: pkg/arch/Dockerfile
+        build-args: |
+          UID=${{ steps.ids.outputs.uid }}
+          GID=${{ steps.ids.outputs.gid }}
+        tags: landlockconfig-archlinux
+        cache-from: type=gha
+        cache-to: type=gha,mode=min
+        load: true
+
+    - name: Cache Cargo registry
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+        key: cargo-registry
+
+    - uses: actions/checkout@v4
+      with:
+        ref: ${{ matrix.commit }}
+
+    - name: Cache build for Arch Linux
+      uses: actions/cache@v4
+      with:
+        path: |
+          target
+        key: rust-archlinux
+        restore-keys: |
+          rust-
+
+    - name: Build and install Arch Linux package
+      run: |
+        docker run --rm \
+          --volume "$HOME/.cargo/registry:/home/builder/.cargo/registry" \
+          --volume "$PWD:/landlockconfig" \
+          landlockconfig-archlinux

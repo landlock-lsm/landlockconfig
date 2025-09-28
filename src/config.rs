@@ -191,6 +191,20 @@ pub enum ParseDirectoryError {
     NoConfigFile,
 }
 
+impl From<ParseDirectoryError> for std::io::Error {
+    fn from(err: ParseDirectoryError) -> Self {
+        match err {
+            ParseDirectoryError::Io(err) => err,
+            ParseDirectoryError::ParseFiles(_) => {
+                std::io::Error::new(std::io::ErrorKind::InvalidData, err)
+            }
+            ParseDirectoryError::NoConfigFile => {
+                std::io::Error::new(std::io::ErrorKind::NotFound, err)
+            }
+        }
+    }
+}
+
 pub enum ConfigFormat {
     Json,
     #[cfg(feature = "toml")]

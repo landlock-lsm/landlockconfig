@@ -22,6 +22,17 @@ where
     -errno
 }
 
+/// Convert std::io::Error to Errno while preserving raw OS error codes.
+/// This ensures that errno values like ENOTDIR and ENOENT are preserved correctly.
+///
+/// TODO: Remove once From<Error> for Errno is fixed in the Landlock crate.
+fn io_error_to_errno(err: Error) -> Errno {
+    match err.raw_os_error() {
+        Some(errno) => Errno::new(errno),
+        None => Errno::from(err),
+    }
+}
+
 fn parse_file<F>(config_fd: RawFd, flags: u32, parser: F) -> Result<*mut Config, Errno>
 where
     F: FnOnce(File) -> Result<Config, Error>,
@@ -33,8 +44,7 @@ where
     let fd = unsafe { BorrowedFd::borrow_raw(config_fd) };
     // Checks if it is a valid file descriptor.
     let file = File::from(fd.try_clone_to_owned()?);
-    let config = parser(file).map_err(Errno::from)?;
-    Ok(Box::into_raw(Box::new(config)))
+    Ok(Box::into_raw(Box::new(parser(file)?)))
 }
 
 // TODO: Pass a set of buffers for warnings and errors.
@@ -180,11 +190,9 @@ fn parse_directory(
         return Err(Errno::new(libc::EFAULT));
     }
 
-    let path = unsafe { CStr::from_ptr(dir_path) }
-        .to_str()
-        .map_err(|_| Errno::new(libc::EINVAL))?;
+    let path = unsafe { CStr::from_ptr(dir_path) }.to_str()?;
     let config =
-        Config::parse_directory(path, format).map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
+        Config::parse_directory(path, format).map_err(|e| io_error_to_errno(Error::from(e)))?;
     Ok(Box::into_raw(Box::new(config)))
 }
 
@@ -282,4 +290,52 @@ pub unsafe extern "C" fn landlockconfig_build_ruleset(config: *const Config, fla
             fd.map(|fd| fd.into_raw_fd()).unwrap_or(-1)
         })
         .unwrap_or_else(unwrap_errno)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::ffi::CString;
+
+    #[test]
+    fn test_parse_directory_enotdir() {
+        let file_path =
+            CString::new(std::env::current_exe().unwrap().as_path().to_str().unwrap()).unwrap();
+        let result = parse_directory(file_path.as_ptr(), 0, ConfigFormat::Json);
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(*err, libc::ENOTDIR);
+    }
+
+    #[test]
+    fn test_parse_directory_null_path() {
+        let result = parse_directory(std::ptr::null(), 0, ConfigFormat::Json);
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(*err, libc::EFAULT);
+    }
+
+    #[test]
+    fn test_parse_directory_invalid_flags() {
+        let file_path =
+            CString::new(std::env::current_exe().unwrap().as_path().to_str().unwrap()).unwrap();
+        let result = parse_directory(file_path.as_ptr(), 1, ConfigFormat::Json);
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(*err, libc::EINVAL);
+    }
+
+    #[test]
+    fn test_parse_directory_nonexistent() {
+        let nonexistent_path = CString::new("/nonexistent/directory/").unwrap();
+
+        let result = parse_directory(nonexistent_path.as_ptr(), 0, ConfigFormat::Json);
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(*err, libc::ENOENT);
+    }
 }

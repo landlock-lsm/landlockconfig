@@ -100,9 +100,9 @@ jobs:
           target
           ~/.cargo
           ~/.rustup
-        key: build-msrv-${{ github.sha }}
+        key: rust-msrv
         restore-keys: |
-          build-msrv-
+          rust-
 
     - name: Get MSRV
       run: sed -n 's/^rust-version = "\([0-9.]\+\)"$/RUST_TOOLCHAIN=\1/p' Cargo.toml >> $GITHUB_ENV
@@ -152,9 +152,9 @@ jobs:
           target
           ~/.cargo
           ~/.rustup
-        key: build-stable-${{ github.sha }}
+        key: rust-stable
         restore-keys: |
-          build-stable-
+          rust-
 
     - name: Install Rust stable
       run: |

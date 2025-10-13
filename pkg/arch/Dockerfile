@@ -22,5 +22,6 @@ RUN pacman -Syu --noconfirm \
     echo "builder ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
 USER builder
+RUN mkdir -p ~/.cargo/registry
 WORKDIR /landlockconfig
 CMD ["make", "-C", "pkg/arch", "install"]

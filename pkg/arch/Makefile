@@ -8,7 +8,7 @@ build:
 	sed -i -e 's/^pkgver=.*/pkgver=0/' PKGBUILD
 
 install: build
-	sudo pacman -U --noconfirm -- "$$(ls -t landlockconfig-git-*.pkg.tar.zst | head -n 1)"
+	sudo pacman -U --noconfirm -- "$$(ls -1t landlockconfig-git-*.pkg.tar.zst | head -n 1)"
 
 # Build package using Docker container
 # Prerequisites: Install rustup and cargo-c (see .github/workflows/ci.yml)

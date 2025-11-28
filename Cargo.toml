@@ -4,7 +4,7 @@ members = ["ffi"]
 
 [workspace.package]
 edition = "2021"
-rust-version = "1.82"
+rust-version = "1.83"
 license = "MIT OR Apache-2.0"
 description = "Sandboxer library leveraging Landlock with JSON or TOML configuration"
 

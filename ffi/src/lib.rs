@@ -114,7 +114,7 @@ where
 
     let buffer = if buffer_size == 0 {
         // Treat 0-sized buffer as null-terminated string.
-        let c_str = unsafe { std::ffi::CStr::from_ptr(buffer_ptr as *const i8) };
+        let c_str = unsafe { std::ffi::CStr::from_ptr(buffer_ptr as *const std::ffi::c_char) };
         c_str.to_bytes()
     } else {
         unsafe { std::slice::from_raw_parts(buffer_ptr, buffer_size) }

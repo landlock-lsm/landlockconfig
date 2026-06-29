@@ -1,0 +1,18 @@
+[package]
+name = "llconfig"
+version = "0.0.0"
+edition.workspace = true
+rust-version.workspace = true
+description = "Command-line tool for the Landlock Config format"
+homepage = "https://landlock.io"
+repository = "https://github.com/landlock-lsm/landlockconfig"
+license.workspace = true
+keywords = ["landlock", "security", "sandbox", "json", "toml"]
+categories = ["command-line-utilities", "config", "os::linux-apis"]
+exclude = [".gitignore"]
+
+[dependencies]
+anyhow = "1.0.95"
+clap = { version = "4.5.28", features = ["derive"] }
+landlock.workspace = true
+landlockconfig = { path = "..", features = ["toml"] }

@@ -190,31 +190,33 @@ jobs:
     - name: Run tests
       run: rustup run stable cargo test --all --verbose
 
-    - name: Run the sandboxer example with JSON
-      run: rustup run stable cargo run --example sandboxer -- --json examples/mini-write-tmp.json true
+    - name: Run the llconfig tool with JSON
+      run: rustup run stable cargo run --package llconfig -- run --json examples/mini-write-tmp.json true
 
-    - name: Run the sandboxer example with TOML
-      run: rustup run stable cargo run --example sandboxer -- --toml examples/mini-write-tmp.toml true
+    - name: Run the llconfig tool with TOML
+      run: rustup run stable cargo run --package llconfig -- run --toml examples/mini-write-tmp.toml true
 
-    - name: Run the sandboxer example with TOML (micro)
-      run: rustup run stable cargo run --example sandboxer -- --toml examples/micro-write-tmp.toml true
+    - name: Run the llconfig tool with TOML (micro)
+      run: rustup run stable cargo run --package llconfig -- run --toml examples/micro-write-tmp.toml true
 
-    - name: Run the sandboxer example with FS-only restrictions
-      run: rustup run stable cargo run --example sandboxer -- --json examples/verbose-write-tmp.json true
+    - name: Run the llconfig tool with FS-only restrictions
+      run: rustup run stable cargo run --package llconfig -- run --json examples/verbose-write-tmp.json true
 
-    - name: Run the sandboxer example with scope restrictions
-      run: rustup run stable cargo run --example sandboxer -- --json examples/mini-scoped.json true
+    - name: Run the llconfig tool with scope restrictions
+      run: rustup run stable cargo run --package llconfig -- run --json examples/mini-scoped.json true
 
-    - name: Run the sandboxer example with composed configurations, and compare to golden file
+    - name: Run the llconfig tool with composed configurations, and compare to golden file
       run: |
         diff -u "tests/composition/golden-debug.txt" \
-          <(rustup run stable cargo run --quiet --example sandboxer -- --toml tests/composition/source/s1.toml --toml tests/composition/source/s2.toml --debug true 2>&1)
+          <(rustup run stable cargo run --quiet --package llconfig -- run --toml tests/composition/source/s1.toml --toml tests/composition/source/s2.toml --debug true 2>&1)
         diff -u "tests/composition/golden-debug.txt" \
-          <(rustup run stable cargo run --quiet --example sandboxer -- --toml tests/composition/s.toml --debug true 2>&1)
+          <(rustup run stable cargo run --quiet --package llconfig -- run --toml tests/composition/s.toml --debug true 2>&1)
         diff -u "tests/composition/golden-debug.txt" \
-          <(rustup run stable cargo run --quiet --example sandboxer -- --json tests/composition/s.json --debug true 2>&1)
+          <(rustup run stable cargo run --quiet --package llconfig -- run --json tests/composition/s.json --debug true 2>&1)
         diff -u "tests/composition/golden-debug.txt" \
-          <(rustup run stable cargo run --quiet --example sandboxer -- --toml tests/composition/source/ --debug true 2>&1)
+          <(rustup run stable cargo run --quiet --package llconfig -- run --toml tests/composition/source/ --debug true 2>&1)
+        diff -u "tests/composition/golden-debug.txt" \
+          <(rustup run stable cargo run --quiet --package llconfig -- run --json tests/composition/source/s1.json --toml tests/composition/source/s2.toml --debug true 2>&1)
 
     - name: Check format
       run: rustup run stable cargo fmt --all -- --check

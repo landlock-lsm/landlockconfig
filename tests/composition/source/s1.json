@@ -1,0 +1,35 @@
+{
+  "abi": 5,
+  "variable": [
+    {
+      "name": "rw",
+      "literal": [
+        "/tmp",
+        "/var/tmp"
+      ]
+    }
+  ],
+  "pathBeneath": [
+    {
+      "allowedAccess": [
+        "abi.read_execute"
+      ],
+      "parent": [
+        "/bin",
+        "/lib",
+        "/usr",
+        "/dev",
+        "/proc",
+        "/etc"
+      ]
+    },
+    {
+      "allowedAccess": [
+        "abi.read_write"
+      ],
+      "parent": [
+        "${rw}"
+      ]
+    }
+  ]
+}

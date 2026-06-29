@@ -113,19 +113,26 @@ can be used to test the library implementation against a set of valid and
 invalid samples. This could also be used to test Landlock libraries to make sure
 the execution traces are similar.
 
-## Sandboxer example
+## llconfig tool
 
-Here are the steps to build and use the sandboxer example:
+The `llconfig` tool is a standalone binary for running commands in a Landlock
+sandbox using JSON or TOML configuration files. It is intentionally minimal:
+it only relies on the `landlockconfig` library, which makes it a convenient
+reference tool for developers experimenting with configurations.
+
+End users looking for a full-featured sandboxing tool should use
+[Island](https://github.com/landlock-lsm/island) instead.
+
+Here are the steps to install and use the llconfig tool:
 ```sh
 git clone https://github.com/landlock-lsm/landlockconfig
 cd landlockconfig
-cargo run --example sandboxer -- --json examples/mini-write-tmp.json sh
+cargo install --path llconfig
+llconfig run --json examples/mini-write-tmp.json sh
 ```
 
 We can compose configurations by specifying `--json` or `--toml` (and related
 file paths) several times.
-
-A new dedicated tool will be published soon.
 
 ## TOML configuration example
 
@@ -161,5 +168,5 @@ parent = ["${tmp}", "${home}"]
 
 We can get a view of the created Landlock rules:
 ```sh
-cargo run --example sandboxer -- --toml examples/micro-var.toml --debug date
+llconfig run --toml examples/micro-var.toml --debug date
 ```

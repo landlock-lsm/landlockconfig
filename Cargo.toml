@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["ffi"]
+members = ["ffi", "llconfig"]
 
 [workspace.package]
 edition = "2021"
@@ -20,8 +20,8 @@ description.workspace = true
 homepage = "https://landlock.io"
 repository = "https://github.com/landlock-lsm/landlockconfig"
 license.workspace = true
-keywords = ["access-control", "linux", "sandbox", "security", "json", "toml"]
-categories = ["config", "filesystem", "os::linux-apis", "virtualization"]
+keywords = ["landlock", "security", "sandbox", "json", "toml"]
+categories = ["config", "os::linux-apis"]
 exclude = [".gitignore"]
 readme = "README.md"
 
@@ -36,11 +36,5 @@ thiserror = "2.0.11"
 toml = { version = "0.8.20", optional = true }
 
 [dev-dependencies]
-anyhow = "1.0.95"
-clap = { version = "4.5.28", features = ["derive"] }
 jsonschema = { version = "0.30.0", default-features = false }
 lazy_static = "1.5.0"
-
-[[example]]
-name = "sandboxer"
-required-features = ["toml"]

@@ -5,16 +5,17 @@ SOURCE = sandboxer.c
 OBJECT = $(SOURCE:.c=.o)
 
 OUT_DIR = out
-LIB_DIR = $(OUT_DIR)/lib
 
 PKG_NAME = landlockconfig
-PKG_CONFIG_PATH := $(LIB_DIR)/pkgconfig
+# cargo cinstall may install into a multiarch libdir (e.g.
+# lib/x86_64-linux-gnu), so locate the generated pkg-config file and let
+# pkg-config provide the paths instead of assuming a fixed layout.
+PKG_CONFIG = PKG_CONFIG_PATH="$(shell find $(OUT_DIR) -type d -name pkgconfig)" pkg-config
 
 CC = gcc
-CFLAGS = $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --cflags $(PKG_NAME)) \
-	-Wall -Werror
-LDFLAGS = $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs $(PKG_NAME)) \
-	-L$(LIB_DIR) -Wl,--gc-sections
+CFLAGS = $(shell $(PKG_CONFIG) --cflags $(PKG_NAME)) -Wall -Werror
+LDFLAGS = $(shell $(PKG_CONFIG) --libs $(PKG_NAME)) -Wl,--gc-sections
+LIB_DIR = $(shell $(PKG_CONFIG) --variable=libdir $(PKG_NAME))
 
 .PHONY: all clean mrproper run FORCE
 

@@ -77,8 +77,8 @@ jobs:
     - name: Check JSON compose
       run: ./schema/check.sh tests/composition/s.json
 
-  ubuntu_24_rust_msrv:
-    runs-on: ubuntu-24.04
+  ubuntu_26_rust_msrv:
+    runs-on: ubuntu-26.04
     needs: commit_list
     strategy:
       fail-fast: false
@@ -136,8 +136,8 @@ jobs:
     - name: Build FFI
       run: rustup run ${{ env.RUST_TOOLCHAIN }} cargo cinstall --package=landlockconfig_ffi --destdir=out
 
-  ubuntu_24_rust_stable:
-    runs-on: ubuntu-24.04
+  ubuntu_26_rust_stable:
+    runs-on: ubuntu-26.04
     needs: commit_list
     strategy:
       fail-fast: false
@@ -288,6 +288,9 @@ jobs:
 
     - name: Build and install Arch Linux package
       run: |
+        # Create the registry on the host so the bind mount below is owned
+        # by the runner user instead of root (cache miss leaves it absent).
+        mkdir -p "$HOME/.cargo/registry"
         docker run --rm \
           --volume "$HOME/.cargo/registry:/home/builder/.cargo/registry" \
           --volume "$PWD:/landlockconfig" \

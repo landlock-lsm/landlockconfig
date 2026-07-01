@@ -221,6 +221,9 @@ jobs:
         diff -u "tests/composition/golden-debug.txt" \
           <(rustup run stable cargo run --locked --quiet --package llconfig -- run --json tests/composition/source/s1.json --toml tests/composition/source/s2.toml --debug true 2>&1)
 
+    - name: Check the llconfig schema command matches the reference schema
+      run: diff -u <(jq . ./schema/landlockconfig.json) <(rustup run stable cargo run --locked --quiet --package llconfig -- schema)
+
     - name: Check format
       run: rustup run stable cargo fmt --all -- --check
 

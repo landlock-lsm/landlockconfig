@@ -65,6 +65,14 @@ enum Commands {
         )]
         command: Vec<String>,
     },
+
+    #[command(
+        about = "Print the JSON schema for Landlock configurations",
+        long_about = "Output the versioned JSON schema that describes the structure and \
+            validation rules for Landlock configuration files. The schema is printed to \
+            stdout in JSON format."
+    )]
+    Schema,
 }
 
 fn run(
@@ -137,6 +145,16 @@ fn run(
     Err(Command::new(name).args(command).exec().into())
 }
 
+fn schema() {
+    print!(
+        "{}",
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../schema/landlockconfig.json"
+        ))
+    );
+}
+
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
@@ -147,5 +165,9 @@ fn main() -> anyhow::Result<()> {
             debug,
             command,
         } => run(json, toml, debug, command),
+        Commands::Schema => {
+            schema();
+            Ok(())
+        }
     }
 }

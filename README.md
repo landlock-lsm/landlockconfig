@@ -134,6 +134,11 @@ llconfig run --json examples/mini-write-tmp.json sh
 We can compose configurations by specifying `--json` or `--toml` (and related
 file paths) several times.
 
+To retrieve the JSON schema for Landlock configurations:
+```sh
+llconfig schema
+```
+
 ## TOML configuration example
 
 Here is an example of a [TOML configuration](examples/micro-var.toml) that uses

@@ -15,7 +15,8 @@ use std::process::Command;
     name = "llconfig",
     about = "Command-line tool for the Landlock Config format",
     long_about = "llconfig is a simple command-line tool for the Landlock Config format. \
-        It reads Landlock configurations expressed as JSON or TOML and applies operations on them."
+        It reads Landlock configurations expressed as JSON or TOML and applies operations on them.",
+    version = concat!(env!("CARGO_PKG_VERSION"), " (", env!("GIT_COMMIT"), " ", env!("GIT_DATE"), ")")
 )]
 struct Cli {
     #[command(subcommand)]

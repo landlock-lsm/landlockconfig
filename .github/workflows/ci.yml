@@ -190,6 +190,9 @@ jobs:
     - name: Run tests
       run: rustup run stable cargo test --locked --all --verbose
 
+    - name: Run the llconfig tool with --version
+      run: rustup run stable cargo run --locked --package llconfig -- --version | grep -q '^llconfig 0\.0\.0 ('
+
     - name: Run the llconfig tool with JSON
       run: rustup run stable cargo run --locked --package llconfig -- run --json examples/mini-write-tmp.json true
 

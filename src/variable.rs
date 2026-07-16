@@ -176,11 +176,7 @@ where
         let mut ret = vec![];
         let mut carry = true;
         for set in self.vec.iter_mut().rev() {
-            if let Some(value) = set.iter.peek() {
-                ret.push((*value).as_ref());
-            } else {
-                return None;
-            }
+            ret.push((*set.iter.peek()?).as_ref());
             if carry {
                 set.iter.next();
                 if set.iter.peek().is_some() {

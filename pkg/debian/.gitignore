@@ -1,0 +1,2 @@
+# Cargo build output (CARGO_TARGET_DIR set in debian/rules)
+/target/

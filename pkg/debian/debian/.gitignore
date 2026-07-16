@@ -1,0 +1,12 @@
+*
+!.gitignore
+!changelog
+!control
+!copyright
+!liblandlockconfig-dev
+!liblandlockconfig0.docs
+!liblandlockconfig0.install
+!llconfig.docs
+!llconfig.install
+!rules
+!source/format

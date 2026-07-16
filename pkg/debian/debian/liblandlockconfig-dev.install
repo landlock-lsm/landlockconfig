@@ -1,0 +1,4 @@
+usr/include/landlockconfig.h
+usr/lib/*/liblandlockconfig.so
+usr/lib/*/liblandlockconfig.a
+usr/lib/*/pkgconfig/landlockconfig.pc

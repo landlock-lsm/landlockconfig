@@ -303,3 +303,53 @@ jobs:
           --volume "$HOME/.cargo/registry:/home/builder/.cargo/registry" \
           --volume "$PWD:/landlockconfig" \
           landlockconfig-archlinux
+
+  debian_package:
+    runs-on: ubuntu-24.04
+    needs: commit_list
+    strategy:
+      fail-fast: false
+      matrix:
+        commit: ${{ fromJSON(needs.commit_list.outputs.commits) }}
+    steps:
+
+    - uses: docker/setup-buildx-action@v3
+
+    - name: Get user IDs
+      id: ids
+      run: |
+        echo "uid=$(id -u)" >> $GITHUB_OUTPUT
+        echo "gid=$(id -g)" >> $GITHUB_OUTPUT
+
+    - name: Build Debian container
+      uses: docker/build-push-action@v5
+      with:
+        file: pkg/debian/Dockerfile
+        build-args: |
+          UID=${{ steps.ids.outputs.uid }}
+          GID=${{ steps.ids.outputs.gid }}
+        tags: landlockconfig-debian
+        cache-from: type=gha
+        cache-to: type=gha,mode=min
+        load: true
+
+    - name: Cache Cargo registry
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+        key: cargo-registry
+
+    - uses: actions/checkout@v4
+      with:
+        ref: ${{ matrix.commit }}
+
+    - name: Build and install Debian package
+      run: |
+        # Create the registry on the host so the bind mount below is owned
+        # by the runner user instead of root (cache miss leaves it absent).
+        mkdir -p "$HOME/.cargo/registry"
+        docker run --rm \
+          --volume "$HOME/.cargo/registry:/home/builder/.cargo/registry" \
+          --volume "$PWD:/landlockconfig" \
+          landlockconfig-debian

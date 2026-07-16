@@ -1,0 +1,44 @@
+Source: landlockconfig
+Section: libs
+Maintainer: Mickaël Salaün <mic@digikod.net>
+Build-Depends: debhelper-compat (= 13), pkg-config, cargo, cargo-c, rustc
+Standards-Version: 4.7.4
+Homepage: https://landlock.io
+Vcs-Browser: https://github.com/landlock-lsm/landlockconfig
+Vcs-Git: https://github.com/landlock-lsm/landlockconfig.git
+Rules-Requires-Root: no
+
+Package: liblandlockconfig0
+Architecture: any
+Section: libs
+Multi-Arch: same
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Sandboxer library leveraging Landlock - shared library
+ Landlockconfig provides a C shared library for sandboxing processes
+ using Landlock with JSON or TOML configuration files.
+ .
+ This package contains the shared library.
+
+Package: liblandlockconfig-dev
+Architecture: any
+Section: libdevel
+Multi-Arch: same
+Depends: liblandlockconfig0 (= ${binary:Version}), ${misc:Depends}
+Description: Sandboxer library leveraging Landlock - development files
+ Landlockconfig provides a C shared library for sandboxing processes
+ using Landlock with JSON or TOML configuration files.
+ .
+ This package contains the C header, pkg-config file, and development
+ symlink for building against liblandlockconfig.
+
+Package: llconfig
+Architecture: any
+Section: utils
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Command-line sandboxer using Landlock with JSON/TOML configuration
+ llconfig is a command-line tool that applies Landlock sandbox restrictions
+ defined in JSON or TOML configuration files, then executes a given command
+ within the sandbox.
+ .
+ It composes multiple configuration files and supports reading from files,
+ directories, or standard input.

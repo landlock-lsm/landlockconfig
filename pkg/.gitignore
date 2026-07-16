@@ -1,0 +1,4 @@
+# Debian package artifacts emitted by dpkg-buildpackage into this directory
+/*.deb
+/*.buildinfo
+/*.changes

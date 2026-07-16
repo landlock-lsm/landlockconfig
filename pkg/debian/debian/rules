@@ -1,0 +1,34 @@
+#!/usr/bin/make -f
+# SPDX-License-Identifier: Apache-2.0 OR MIT
+
+include /usr/share/dpkg/architecture.mk
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+# Emit full debuginfo in the release so that dh_strip has symbols for
+# the debug packages.
+export CARGO_PROFILE_RELEASE_DEBUG = 2
+
+# Build into a local target dir so build and install steps agree regardless of
+# the working directory dpkg-buildpackage runs debian/rules from.
+export CARGO_TARGET_DIR = $(CURDIR)/target
+
+%:
+	dh $@
+
+override_dh_auto_test:
+	cargo test
+
+override_dh_auto_build:
+	cargo cbuild --package=landlockconfig_ffi --release
+	cargo build --package=llconfig --release
+
+override_dh_auto_install:
+	cargo cinstall --package=landlockconfig_ffi --release \
+		--prefix=/usr \
+		--libdir=/usr/lib/$(DEB_HOST_MULTIARCH) \
+		--destdir=debian/tmp
+	install -Dm755 $(CARGO_TARGET_DIR)/release/llconfig debian/tmp/usr/bin/llconfig
+
+override_dh_auto_clean:
+	-cargo clean

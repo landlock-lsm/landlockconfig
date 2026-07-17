@@ -25,3 +25,6 @@ capi = []
 [package.metadata.capi.header]
 subdirectory = false
 generation = false
+
+[package.metadata.capi.library]
+version_suffix_components = 1

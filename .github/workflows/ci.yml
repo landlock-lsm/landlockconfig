@@ -122,19 +122,19 @@ jobs:
         rustup update ${{ env.RUST_TOOLCHAIN }}
 
     - name: Build
-      run: rustup run ${{ env.RUST_TOOLCHAIN }} cargo build --all --verbose
+      run: rustup run ${{ env.RUST_TOOLCHAIN }} cargo build --locked --all --verbose
 
     - name: Build tests
-      run: rustup run ${{ env.RUST_TOOLCHAIN }} cargo build --all --tests --verbose
+      run: rustup run ${{ env.RUST_TOOLCHAIN }} cargo build --locked --all --tests --verbose
 
     - name: Run tests
-      run: rustup run ${{ env.RUST_TOOLCHAIN }} cargo test --all --verbose
+      run: rustup run ${{ env.RUST_TOOLCHAIN }} cargo test --locked --all --verbose
 
     - name: Build examples
-      run: rustup run ${{ env.RUST_TOOLCHAIN }} cargo build --all --examples --verbose
+      run: rustup run ${{ env.RUST_TOOLCHAIN }} cargo build --locked --all --examples --verbose
 
     - name: Build FFI
-      run: rustup run ${{ env.RUST_TOOLCHAIN }} cargo cinstall --package=landlockconfig_ffi --destdir=out
+      run: rustup run ${{ env.RUST_TOOLCHAIN }} cargo cinstall --locked --package=landlockconfig_ffi --destdir=out
 
   ubuntu_26_rust_stable:
     runs-on: ubuntu-26.04
@@ -179,59 +179,59 @@ jobs:
         rustup update
 
     - name: Build
-      run: rustup run stable cargo build --all --verbose
+      run: rustup run stable cargo build --locked --all --verbose
 
     - name: Build examples
-      run: rustup run stable cargo build --all --examples --verbose
+      run: rustup run stable cargo build --locked --all --examples --verbose
 
     - name: Check golden file changes by ffi/build.rs
       run: s="$(set -o pipefail; git status --porcelain=1 | tee >(cat >&2))" && [[ -z "$s" ]]
 
     - name: Run tests
-      run: rustup run stable cargo test --all --verbose
+      run: rustup run stable cargo test --locked --all --verbose
 
     - name: Run the llconfig tool with JSON
-      run: rustup run stable cargo run --package llconfig -- run --json examples/mini-write-tmp.json true
+      run: rustup run stable cargo run --locked --package llconfig -- run --json examples/mini-write-tmp.json true
 
     - name: Run the llconfig tool with TOML
-      run: rustup run stable cargo run --package llconfig -- run --toml examples/mini-write-tmp.toml true
+      run: rustup run stable cargo run --locked --package llconfig -- run --toml examples/mini-write-tmp.toml true
 
     - name: Run the llconfig tool with TOML (micro)
-      run: rustup run stable cargo run --package llconfig -- run --toml examples/micro-write-tmp.toml true
+      run: rustup run stable cargo run --locked --package llconfig -- run --toml examples/micro-write-tmp.toml true
 
     - name: Run the llconfig tool with FS-only restrictions
-      run: rustup run stable cargo run --package llconfig -- run --json examples/verbose-write-tmp.json true
+      run: rustup run stable cargo run --locked --package llconfig -- run --json examples/verbose-write-tmp.json true
 
     - name: Run the llconfig tool with scope restrictions
-      run: rustup run stable cargo run --package llconfig -- run --json examples/mini-scoped.json true
+      run: rustup run stable cargo run --locked --package llconfig -- run --json examples/mini-scoped.json true
 
     - name: Run the llconfig tool with composed configurations, and compare to golden file
       run: |
         diff -u "tests/composition/golden-debug.txt" \
-          <(rustup run stable cargo run --quiet --package llconfig -- run --toml tests/composition/source/s1.toml --toml tests/composition/source/s2.toml --debug true 2>&1)
+          <(rustup run stable cargo run --locked --quiet --package llconfig -- run --toml tests/composition/source/s1.toml --toml tests/composition/source/s2.toml --debug true 2>&1)
         diff -u "tests/composition/golden-debug.txt" \
-          <(rustup run stable cargo run --quiet --package llconfig -- run --toml tests/composition/s.toml --debug true 2>&1)
+          <(rustup run stable cargo run --locked --quiet --package llconfig -- run --toml tests/composition/s.toml --debug true 2>&1)
         diff -u "tests/composition/golden-debug.txt" \
-          <(rustup run stable cargo run --quiet --package llconfig -- run --json tests/composition/s.json --debug true 2>&1)
+          <(rustup run stable cargo run --locked --quiet --package llconfig -- run --json tests/composition/s.json --debug true 2>&1)
         diff -u "tests/composition/golden-debug.txt" \
-          <(rustup run stable cargo run --quiet --package llconfig -- run --toml tests/composition/source/ --debug true 2>&1)
+          <(rustup run stable cargo run --locked --quiet --package llconfig -- run --toml tests/composition/source/ --debug true 2>&1)
         diff -u "tests/composition/golden-debug.txt" \
-          <(rustup run stable cargo run --quiet --package llconfig -- run --json tests/composition/source/s1.json --toml tests/composition/source/s2.toml --debug true 2>&1)
+          <(rustup run stable cargo run --locked --quiet --package llconfig -- run --json tests/composition/source/s1.json --toml tests/composition/source/s2.toml --debug true 2>&1)
 
     - name: Check format
       run: rustup run stable cargo fmt --all -- --check
 
     - name: Check source with Clippy
-      run: rustup run stable cargo clippy --all -- --deny warnings
+      run: rustup run stable cargo clippy --locked --all -- --deny warnings
 
     - name: Check tests with Clippy
-      run: rustup run stable cargo clippy --all --tests -- --deny warnings
+      run: rustup run stable cargo clippy --locked --all --tests -- --deny warnings
 
     - name: Check examples with Clippy
-      run: rustup run stable cargo clippy --all --examples -- --deny warnings
+      run: rustup run stable cargo clippy --locked --all --examples -- --deny warnings
 
     - name: Check documentation
-      run: rustup run stable cargo doc --no-deps
+      run: rustup run stable cargo doc --locked --no-deps
 
     - name: Build C example
       run: make -C c/examples

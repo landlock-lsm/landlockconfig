@@ -3,6 +3,7 @@
   lib,
   rustPlatform,
   versionCheckHook,
+  callPackage,
 }:
 let
   gitInfo = builtins.fetchGit ../..;
@@ -43,7 +44,9 @@ rustPlatform.buildRustPackage (finalAttrs: {
 
   env = { inherit GIT_COMMIT GIT_DATE; };
 
-  passthru.tests = { };
+  passthru.tests.composition = callPackage ./composition.nix {
+    llconfig = finalAttrs.finalPackage;
+  };
 
   meta = {
     description = "Command-line tool for the Landlock Config format";

@@ -38,19 +38,19 @@ build() {
     # Work directly with the current repository and reuse cached target directory.
     cd "$startdir/../.."
 
-    cargo cbuild --package=landlockconfig_ffi --release
+    cargo cbuild --locked --package=landlockconfig_ffi --release
 }
 
 check() {
     cd "$startdir/../.."
 
-    cargo test
+    cargo test --locked
 }
 
 package() {
     cd "$startdir/../.."
 
-    cargo cinstall --package=landlockconfig_ffi --release \
+    cargo cinstall --locked --package=landlockconfig_ffi --release \
         --prefix=/usr --destdir="$pkgdir"
 
     install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"

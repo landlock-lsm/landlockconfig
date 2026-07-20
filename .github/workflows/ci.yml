@@ -353,3 +353,12 @@ jobs:
           --volume "$HOME/.cargo/registry:/home/builder/.cargo/registry" \
           --volume "$PWD:/landlockconfig" \
           landlockconfig-debian
+
+    - name: Upload Debian packages
+      uses: actions/upload-artifact@v4
+      if: ${{ matrix.commit == (github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha) }}
+      with:
+        name: debian-packages-${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+        path: |
+          pkg/*.deb
+        if-no-files-found: error

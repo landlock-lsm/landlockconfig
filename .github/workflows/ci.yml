@@ -248,7 +248,7 @@ jobs:
         commit: ${{ fromJSON(needs.commit_list.outputs.commits) }}
     steps:
 
-    - uses: docker/setup-buildx-action@v3
+    - uses: docker/setup-buildx-action@v4
 
     - name: Get user IDs
       id: ids

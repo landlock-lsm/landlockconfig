@@ -89,17 +89,24 @@ jobs:
     - name: Install cargo-c
       run: sudo apt install cargo-c
 
+    - uses: actions/checkout@v4
+      with:
+        ref: ${{ matrix.commit }}
+
     - name: Cache Cargo registry
       uses: actions/cache@v4
       with:
         path: |
           ~/.cargo/registry
-        key: cargo-registry
+        key: cargo-registry-${{ hashFiles('Cargo.lock') }}
+        restore-keys: |
+          cargo-registry-
 
-    - uses: actions/checkout@v4
-      with:
-        ref: ${{ matrix.commit }}
-
+    # Build cache keys are prefixed per job (never a shared "rust-") so a job
+    # cannot restore another job's target/ built with different flags, and are
+    # suffixed with the Cargo.lock hash so they refresh when dependencies
+    # change.  The MSRV key also hashes Cargo.toml, where rust-version is
+    # pinned.
     - name: Cache MSRV build
       uses: actions/cache@v4
       with:
@@ -107,9 +114,9 @@ jobs:
           target
           ~/.cargo/bin
           ~/.rustup
-        key: rust-msrv
+        key: rust-msrv-${{ hashFiles('Cargo.lock', 'Cargo.toml') }}
         restore-keys: |
-          rust-
+          rust-msrv-
 
     - name: Get MSRV
       run: sed -n 's/^rust-version = "\([0-9.]\+\)"$/RUST_TOOLCHAIN=\1/p' Cargo.toml >> $GITHUB_ENV
@@ -148,16 +155,18 @@ jobs:
     - name: Install cargo-c
       run: sudo apt install cargo-c
 
+    - uses: actions/checkout@v4
+      with:
+        ref: ${{ matrix.commit }}
+
     - name: Cache Cargo registry
       uses: actions/cache@v4
       with:
         path: |
           ~/.cargo/registry
-        key: cargo-registry
-
-    - uses: actions/checkout@v4
-      with:
-        ref: ${{ matrix.commit }}
+        key: cargo-registry-${{ hashFiles('Cargo.lock') }}
+        restore-keys: |
+          cargo-registry-
 
     - name: Cache stable build
       uses: actions/cache@v4
@@ -166,9 +175,9 @@ jobs:
           target
           ~/.cargo/bin
           ~/.rustup
-        key: rust-stable
+        key: rust-stable-${{ hashFiles('Cargo.lock') }}
         restore-keys: |
-          rust-
+          rust-stable-
 
     - name: Install Rust stable
       run: |
@@ -274,25 +283,27 @@ jobs:
         cache-to: type=gha,mode=min
         load: true
 
+    - uses: actions/checkout@v4
+      with:
+        ref: ${{ matrix.commit }}
+
     - name: Cache Cargo registry
       uses: actions/cache@v4
       with:
         path: |
           ~/.cargo/registry
-        key: cargo-registry
-
-    - uses: actions/checkout@v4
-      with:
-        ref: ${{ matrix.commit }}
+        key: cargo-registry-${{ hashFiles('Cargo.lock') }}
+        restore-keys: |
+          cargo-registry-
 
     - name: Cache build for Arch Linux
       uses: actions/cache@v4
       with:
         path: |
           target
-        key: rust-archlinux
+        key: rust-archlinux-${{ hashFiles('Cargo.lock') }}
         restore-keys: |
-          rust-
+          rust-archlinux-
 
     - name: Build and install Arch Linux package
       run: |
@@ -333,16 +344,27 @@ jobs:
         cache-to: type=gha,mode=min
         load: true
 
+    - uses: actions/checkout@v4
+      with:
+        ref: ${{ matrix.commit }}
+
     - name: Cache Cargo registry
       uses: actions/cache@v4
       with:
         path: |
           ~/.cargo/registry
-        key: cargo-registry
+        key: cargo-registry-${{ hashFiles('Cargo.lock') }}
+        restore-keys: |
+          cargo-registry-
 
-    - uses: actions/checkout@v4
+    - name: Cache build for Debian
+      uses: actions/cache@v4
       with:
-        ref: ${{ matrix.commit }}
+        path: |
+          target
+        key: rust-debian-${{ hashFiles('Cargo.lock') }}
+        restore-keys: |
+          rust-debian-
 
     - name: Build and install Debian package
       run: |

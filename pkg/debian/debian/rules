@@ -9,9 +9,10 @@ export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 # the debug packages.
 export CARGO_PROFILE_RELEASE_DEBUG = 2
 
-# Build into a local target dir so build and install steps agree regardless of
+# Build into the repository-root target dir so the build path matches the
+# directory cached by CI, and so build and install steps agree regardless of
 # the working directory dpkg-buildpackage runs debian/rules from.
-export CARGO_TARGET_DIR = $(CURDIR)/target
+export CARGO_TARGET_DIR = $(CURDIR)/../../target
 
 %:
 	dh $@
@@ -29,6 +30,3 @@ override_dh_auto_install:
 		--libdir=/usr/lib/$(DEB_HOST_MULTIARCH) \
 		--destdir=debian/tmp
 	install -Dm755 $(CARGO_TARGET_DIR)/release/llconfig debian/tmp/usr/bin/llconfig
-
-override_dh_auto_clean:
-	-cargo clean

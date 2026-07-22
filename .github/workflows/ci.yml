@@ -326,6 +326,17 @@ jobs:
           --volume "$PWD:/landlock-policy" \
           landlock-policy-archlinux
 
+    # Upload only for the head commit: the job runs once per commit in the
+    # matrix and upload-artifact requires a unique artifact name per run.
+    - name: Upload Arch Linux packages
+      uses: actions/upload-artifact@v7
+      if: ${{ matrix.commit == (github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha) }}
+      with:
+        name: arch-packages-${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+        path: |
+          pkg/arch/*.pkg.tar.zst
+        if-no-files-found: error
+
   debian_package:
     runs-on: ubuntu-24.04
     needs: commit_list
@@ -387,6 +398,8 @@ jobs:
           --volume "$PWD:/landlock-policy" \
           landlock-policy-debian
 
+    # Upload only for the head commit: the job runs once per commit in the
+    # matrix and upload-artifact requires a unique artifact name per run.
     - name: Upload Debian packages
       uses: actions/upload-artifact@v7
       if: ${{ matrix.commit == (github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha) }}

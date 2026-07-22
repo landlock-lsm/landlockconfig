@@ -20,6 +20,7 @@ docker:
 		--build-arg "GID=$(shell id -g)" \
 		--tag landlock-policy-debian \
 		.
+	mkdir -p "$(HOME)/.cargo/registry"
 	# Preserve Git-less builds; mount existing worktree metadata read-only.
 	if git_common_dir="$$(cd ../.. && \
 		git_dir="$$(git rev-parse --git-common-dir)" && \
@@ -29,7 +30,7 @@ docker:
 		set --; \
 	fi; \
 	docker run --rm \
-		--volume "$(HOME)/.cargo/registry:/home/builder/.cargo/registry:ro" \
+		--volume "$(HOME)/.cargo/registry:/home/builder/.cargo/registry" \
 		--volume "$(CURDIR)/../..:/landlock-policy" \
 		"$$@" \
 		landlock-policy-debian

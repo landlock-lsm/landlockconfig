@@ -315,6 +315,15 @@ jobs:
           --volume "$PWD:/landlockconfig" \
           landlockconfig-archlinux
 
+    - name: Upload Arch Linux packages
+      uses: actions/upload-artifact@v4
+      if: ${{ matrix.commit == (github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha) }}
+      with:
+        name: arch-packages-${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+        path: |
+          pkg/arch/*.pkg.tar.zst
+        if-no-files-found: error
+
   debian_package:
     runs-on: ubuntu-24.04
     needs: commit_list

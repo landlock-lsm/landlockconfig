@@ -19,7 +19,7 @@ docker:
 		--tag landlockconfig-archlinux \
 		.
 	docker run --rm \
-		--volume "$(HOME)/.cargo/registry:/home/builder/.cargo/registry:ro" \
+		--volume "$(HOME)/.cargo/registry:/home/builder/.cargo/registry" \
 		--volume "$(CURDIR)/../..:/landlockconfig" \
 		landlockconfig-archlinux
 

@@ -245,6 +245,30 @@ jobs:
     - name: Test C example
       run: make -C c/examples test
 
+  nix_derivation:
+    runs-on: ubuntu-24.04
+    needs: commit_list
+    strategy:
+      fail-fast: false
+      matrix:
+        commit: ${{ fromJSON(needs.commit_list.outputs.commits) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.commit }}
+
+      - uses: cachix/install-nix-action@v31
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+
+      - name: Build nix derivations
+        run: |
+          make -C pkg/nix
+
+      - name: Run nix tests
+        run: |
+          make -C pkg/nix test
+
   archlinux_package:
     runs-on: ubuntu-24.04
     needs: commit_list

@@ -2,7 +2,7 @@
 
 use std::process::Command;
 
-fn run_git(args: &[&str]) -> String {
+fn run_git(env: &str, args: &[&str]) -> String {
     // A one-off git invocation is simpler than pulling in a crate for this.
     Command::new("git")
         .args(args)
@@ -17,24 +17,28 @@ fn run_git(args: &[&str]) -> String {
                 .collect()
         })
         .filter(|s: &String| !s.is_empty())
+        .or_else(|| std::env::var(env).ok())
         .unwrap_or_else(|| "unknown".to_string())
 }
 
 fn main() {
     println!(
         "cargo:rustc-env=GIT_COMMIT={}",
-        run_git(&[
-            "describe",
-            "--always",
-            // Do not rely on local configuration (i.e. core.abbrev) for length.
-            "--abbrev=12",
-            "--exclude=*",
-            "--dirty",
-        ])
+        run_git(
+            "GIT_COMMIT",
+            &[
+                "describe",
+                "--always",
+                // Do not rely on local configuration (i.e. core.abbrev) for length.
+                "--abbrev=12",
+                "--exclude=*",
+                "--dirty",
+            ]
+        )
     );
 
     println!(
         "cargo:rustc-env=GIT_DATE={}",
-        run_git(&["log", "--max-count=1", "--format=%cs"])
+        run_git("GIT_DATE", &["log", "--max-count=1", "--format=%cs"])
     );
 }

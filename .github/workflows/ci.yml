@@ -263,7 +263,7 @@ jobs:
         echo "gid=$(id -g)" >> $GITHUB_OUTPUT
 
     - name: Build Arch Linux container
-      uses: docker/build-push-action@v5
+      uses: docker/build-push-action@v7
       with:
         file: pkg/arch/Dockerfile
         build-args: |
@@ -322,7 +322,7 @@ jobs:
         echo "gid=$(id -g)" >> $GITHUB_OUTPUT
 
     - name: Build Debian container
-      uses: docker/build-push-action@v5
+      uses: docker/build-push-action@v7
       with:
         file: pkg/debian/Dockerfile
         build-args: |

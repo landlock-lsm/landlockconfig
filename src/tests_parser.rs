@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use crate::parser::LATEST_ABI;
-use crate::policy::ResolvedPolicy;
-use crate::tests_helpers::{parse_json, parse_toml, validate_json};
-use crate::Policy;
-use landlock::{Access, AccessFs, AccessNet, Scope, ABI};
+use crate::tests_helpers::{
+    parse_json, parse_json_schema, parse_toml, policy_with_abi_defaults,
+    resolved_policy_with_abi_defaults, validate_json,
+};
+use crate::{Policy, ResolvedPolicy};
+use landlock::{Access, AccessFs, AccessNet, BitFlags, Scope, ABI};
 use serde_json::error::Category;
 use std::path::PathBuf;
 
@@ -25,6 +27,36 @@ fn test_embedded_json_schema() {
         crate::JSON_SCHEMA,
         std::fs::read_to_string(schema_path).unwrap()
     );
+}
+
+#[test]
+fn test_examples() {
+    let mini_scoped = include_str!("../examples/mini-scoped.json");
+    assert_eq!(
+        parse_json(mini_scoped).unwrap(),
+        Policy {
+            abi: Some(ABI::V6),
+            scoped: Scope::from_all(ABI::V6),
+            ..Default::default()
+        }
+    );
+    validate_json(mini_scoped).unwrap();
+
+    for json in [
+        include_str!("../examples/mini-write-tmp.json"),
+        include_str!("../examples/verbose-write-tmp.json"),
+    ] {
+        parse_json(json).unwrap();
+        validate_json(json).unwrap();
+    }
+
+    for toml in [
+        include_str!("../examples/micro-var.toml"),
+        include_str!("../examples/micro-write-tmp.toml"),
+        include_str!("../examples/mini-write-tmp.toml"),
+    ] {
+        parse_toml(toml).unwrap();
+    }
 }
 
 /* Test "empty policy" error. */
@@ -159,7 +191,14 @@ fn test_empty_handled_access_fs_1() {
             }
         ]
     }"#;
-    assert_eq!(parse_json(json), Err(Category::Data));
+    assert_eq!(
+        parse_json(json),
+        Ok(Policy {
+            abi: Some(ABI::V6),
+            handled_fs: BitFlags::EMPTY,
+            ..policy_with_abi_defaults(ABI::V6)
+        })
+    );
 }
 
 #[test]
@@ -178,7 +217,39 @@ fn test_empty_handled_access_fs_2() {
             }
         ]
     }"#;
-    assert_eq!(parse_json(json), Err(Category::Data),);
+    assert_eq!(
+        parse_json(json),
+        Ok(Policy {
+            abi: Some(ABI::V6),
+            handled_fs: AccessFs::Execute.into(),
+            ..policy_with_abi_defaults(ABI::V6)
+        })
+    );
+}
+
+#[test]
+fn test_omitted_ruleset_entry_does_not_restore_fs_default() {
+    let json = r#"{
+        "abi": 6,
+        "ruleset": [
+            {
+                "handledAccessFs": []
+            },
+            {
+                "handledAccessNet": ["bind_tcp"]
+            }
+        ]
+    }"#;
+
+    assert_eq!(
+        parse_json(json),
+        Ok(Policy {
+            abi: Some(ABI::V6),
+            handled_fs: BitFlags::EMPTY,
+            handled_net: AccessNet::BindTcp.into(),
+            ..policy_with_abi_defaults(ABI::V6)
+        })
+    );
 }
 
 #[test]
@@ -191,7 +262,14 @@ fn test_empty_handled_access_net() {
             }
         ]
     }"#;
-    assert_eq!(parse_json(json), Err(Category::Data));
+    assert_eq!(
+        parse_json(json),
+        Ok(Policy {
+            abi: Some(ABI::V6),
+            handled_net: BitFlags::EMPTY,
+            ..policy_with_abi_defaults(ABI::V6)
+        })
+    );
 }
 
 #[test]
@@ -204,7 +282,40 @@ fn test_empty_scoped() {
             }
         ]
     }"#;
-    assert_eq!(parse_json(json), Err(Category::Data));
+    assert_eq!(
+        parse_json(json),
+        Ok(Policy {
+            abi: Some(ABI::V6),
+            scoped: BitFlags::EMPTY,
+            ..policy_with_abi_defaults(ABI::V6)
+        })
+    );
+}
+
+#[test]
+fn test_all_empty_categories() {
+    let json = r#"{
+        "abi": 6,
+        "ruleset": [
+            {
+                "handledAccessFs": [],
+                "handledAccessNet": [],
+                "scoped": []
+            }
+        ]
+    }"#;
+    let toml = r#"
+        abi = 6
+        [[ruleset]]
+        handled_access_fs = []
+        handled_access_net = []
+        scoped = []
+    "#;
+
+    // The schema accepts empty overrides because it cannot compute final masks
+    // after resolving ABI groups and augmenting them with rules.
+    assert_eq!(parse_json_schema(json, false), Err(Category::Data));
+    assert!(parse_toml(toml).is_err());
 }
 
 #[test]
@@ -324,7 +435,7 @@ fn test_full_ruleset_1() {
             handled_fs: AccessFs::Execute.into(),
             handled_net: AccessNet::BindTcp.into(),
             scoped: Scope::AbstractUnixSocket.into(),
-            ..Default::default()
+            ..policy_with_abi_defaults(ABI::V6)
         })
     );
 }
@@ -348,7 +459,7 @@ fn test_full_ruleset_2() {
             handled_fs: AccessFs::Execute.into(),
             handled_net: AccessNet::BindTcp.into(),
             scoped: Scope::AbstractUnixSocket.into(),
-            ..Default::default()
+            ..policy_with_abi_defaults(ABI::V6)
         })
     );
 }
@@ -370,7 +481,7 @@ fn test_one_handled_access_fs() {
         Ok(Policy {
             abi: Some(ABI::V6),
             handled_fs: AccessFs::Execute.into(),
-            ..Default::default()
+            ..policy_with_abi_defaults(ABI::V6)
         }),
     );
 }
@@ -413,7 +524,7 @@ fn test_all_handled_access_fs_json() {
         Ok(Policy {
             abi: Some(LATEST_ABI),
             handled_fs: AccessFs::from_all(LATEST_ABI),
-            ..Default::default()
+            ..policy_with_abi_defaults(LATEST_ABI)
         })
     );
 }
@@ -453,7 +564,7 @@ fn test_all_handled_access_fs_toml() {
         Policy {
             abi: Some(LATEST_ABI),
             handled_fs: AccessFs::from_all(LATEST_ABI),
-            ..Default::default()
+            ..policy_with_abi_defaults(LATEST_ABI)
         }
     );
 }
@@ -487,7 +598,7 @@ fn test_dup_handled_access_fs_1() {
         Ok(Policy {
             abi: Some(ABI::V6),
             handled_fs: AccessFs::Execute | AccessFs::WriteFile,
-            ..Default::default()
+            ..policy_with_abi_defaults(ABI::V6)
         }),
     );
 }
@@ -513,7 +624,7 @@ fn test_dup_handled_access_fs_2() {
         Ok(Policy {
             abi: Some(ABI::V6),
             handled_fs: AccessFs::Execute | AccessFs::WriteFile,
-            ..Default::default()
+            ..policy_with_abi_defaults(ABI::V6)
         }),
     );
 }
@@ -565,7 +676,7 @@ fn test_one_path_beneath_str() {
         Ok(ResolvedPolicy {
             handled_fs: AccessFs::Execute.into(),
             rules_path_beneath: [(PathBuf::from("."), AccessFs::Execute.into())].into(),
-            ..Default::default()
+            ..resolved_policy_with_abi_defaults(ABI::V6)
         }),
     );
 }
@@ -610,7 +721,7 @@ fn test_dup_path_beneath_1() {
         Ok(ResolvedPolicy {
             handled_fs: AccessFs::Execute.into(),
             rules_path_beneath: [(PathBuf::from("."), AccessFs::Execute.into())].into(),
-            ..Default::default()
+            ..resolved_policy_with_abi_defaults(ABI::V6)
         }),
     );
 }
@@ -640,7 +751,7 @@ fn test_dup_path_beneath_2() {
         Ok(ResolvedPolicy {
             handled_fs: AccessFs::Execute.into(),
             rules_path_beneath: [(PathBuf::from("."), AccessFs::Execute.into())].into(),
-            ..Default::default()
+            ..resolved_policy_with_abi_defaults(ABI::V6)
         }),
     );
 }
@@ -685,7 +796,7 @@ fn test_overlap_path_beneath() {
                 AccessFs::Execute | AccessFs::ReadFile | AccessFs::WriteFile
             )]
             .into(),
-            ..Default::default()
+            ..resolved_policy_with_abi_defaults(ABI::V6)
         }),
     );
 }
@@ -720,7 +831,7 @@ fn test_normalization_path_beneath() {
                 (PathBuf::from("c/../c"), AccessFs::Execute.into()),
             ]
             .into(),
-            ..Default::default()
+            ..resolved_policy_with_abi_defaults(ABI::V6)
         }),
     );
 }
@@ -742,7 +853,7 @@ fn test_one_handled_access_net() {
         Ok(Policy {
             abi: Some(ABI::V6),
             handled_net: AccessNet::BindTcp.into(),
-            ..Default::default()
+            ..policy_with_abi_defaults(ABI::V6)
         }),
     );
 }
@@ -766,7 +877,7 @@ fn test_all_handled_access_net() {
         Ok(Policy {
             abi: Some(ABI::V6),
             handled_net: AccessNet::from_all(ABI::V6),
-            ..Default::default()
+            ..policy_with_abi_defaults(ABI::V6)
         }),
     );
 }
@@ -786,7 +897,7 @@ fn test_dup_handled_access_net_1() {
         Ok(Policy {
             abi: Some(ABI::V6),
             handled_net: AccessNet::BindTcp | AccessNet::ConnectTcp,
-            ..Default::default()
+            ..policy_with_abi_defaults(ABI::V6)
         }),
     );
 }
@@ -812,7 +923,7 @@ fn test_dup_handled_access_net_2() {
         Ok(Policy {
             abi: Some(ABI::V6),
             handled_net: AccessNet::BindTcp | AccessNet::ConnectTcp,
-            ..Default::default()
+            ..policy_with_abi_defaults(ABI::V6)
         }),
     );
 }
@@ -865,7 +976,7 @@ fn test_one_net_port() {
             abi: Some(ABI::V6),
             handled_net: AccessNet::BindTcp.into(),
             rules_net_port: [(443, AccessNet::BindTcp.into())].into(),
-            ..Default::default()
+            ..policy_with_abi_defaults(ABI::V6)
         }),
     );
 }
@@ -900,7 +1011,7 @@ fn test_overlap_net_port() {
             abi: Some(ABI::V6),
             handled_net: AccessNet::BindTcp | AccessNet::ConnectTcp,
             rules_net_port: [(443, AccessNet::BindTcp | AccessNet::ConnectTcp)].into(),
-            ..Default::default()
+            ..policy_with_abi_defaults(ABI::V6)
         }),
     );
 }
@@ -924,7 +1035,7 @@ fn test_mix_handled_access_1() {
             abi: Some(ABI::V6),
             handled_fs: AccessFs::Execute.into(),
             handled_net: AccessNet::BindTcp.into(),
-            ..Default::default()
+            ..policy_with_abi_defaults(ABI::V6)
         })
     );
 }
@@ -949,7 +1060,7 @@ fn test_mix_handled_access_2() {
             abi: Some(ABI::V6),
             handled_fs: AccessFs::Execute.into(),
             handled_net: AccessNet::BindTcp | AccessNet::ConnectTcp,
-            ..Default::default()
+            ..policy_with_abi_defaults(ABI::V6)
         })
     );
 }
@@ -971,7 +1082,7 @@ fn test_one_scoped() {
         Ok(Policy {
             abi: Some(ABI::V6),
             scoped: Scope::AbstractUnixSocket.into(),
-            ..Default::default()
+            ..policy_with_abi_defaults(ABI::V6)
         }),
     );
 }
@@ -995,7 +1106,7 @@ fn test_all_scoped() {
         Ok(Policy {
             abi: Some(ABI::V6),
             scoped: Scope::from_all(ABI::V6),
-            ..Default::default()
+            ..policy_with_abi_defaults(ABI::V6)
         }),
     );
 }
@@ -1015,7 +1126,7 @@ fn test_dup_scoped_1() {
         Ok(Policy {
             abi: Some(ABI::V6),
             scoped: Scope::Signal | Scope::AbstractUnixSocket,
-            ..Default::default()
+            ..policy_with_abi_defaults(ABI::V6)
         }),
     );
 }
@@ -1041,7 +1152,7 @@ fn test_dup_scoped_2() {
         Ok(Policy {
             abi: Some(ABI::V6),
             scoped: Scope::Signal | Scope::AbstractUnixSocket,
-            ..Default::default()
+            ..policy_with_abi_defaults(ABI::V6)
         }),
     );
 }
@@ -1080,7 +1191,8 @@ fn test_infer_mixed_handled_and_rule() {
         "abi": 6,
         "ruleset": [
             {
-                "handledAccessFs": [ "execute" ]
+                "handledAccessFs": [ "execute" ],
+                "handledAccessNet": []
             }
         ],
         "netPort": [
@@ -1097,7 +1209,7 @@ fn test_infer_mixed_handled_and_rule() {
             handled_fs: AccessFs::Execute.into(),
             handled_net: AccessNet::BindTcp.into(),
             rules_net_port: [(443, AccessNet::BindTcp.into())].into(),
-            ..Default::default()
+            ..policy_with_abi_defaults(ABI::V6)
         }),
     );
 }
@@ -1128,9 +1240,43 @@ fn test_infer_handled_access_fs() {
             handled_fs: AccessFs::Execute | AccessFs::WriteFile | AccessFs::ReadFile,
             rules_path_beneath: [(PathBuf::from("."), AccessFs::WriteFile | AccessFs::ReadFile)]
                 .into(),
-            ..Default::default()
+            ..resolved_policy_with_abi_defaults(ABI::V6)
         })
     );
+}
+
+#[test]
+fn test_empty_fs_base_augmented_by_path_rule() {
+    let json = r#"{
+        "abi": 6,
+        "ruleset": [{
+            "handledAccessFs": [],
+            "handledAccessNet": [],
+            "scoped": []
+        }],
+        "pathBeneath": [{
+            "allowedAccess": ["write_file"],
+            "parent": ["."]
+        }]
+    }"#;
+    let toml = r#"
+        abi = 6
+        [[ruleset]]
+        handled_access_fs = []
+        handled_access_net = []
+        scoped = []
+        [[path_beneath]]
+        allowed_access = ["write_file"]
+        parent = ["."]
+    "#;
+    let expected = ResolvedPolicy {
+        handled_fs: AccessFs::WriteFile.into(),
+        rules_path_beneath: [(PathBuf::from("."), AccessFs::WriteFile.into())].into(),
+        ..Default::default()
+    };
+
+    assert_eq!(parse_json(json).unwrap().resolve(), Ok(expected.clone()));
+    assert_eq!(parse_toml(toml).unwrap().resolve(), Ok(expected));
 }
 
 #[test]
@@ -1155,13 +1301,13 @@ fn test_infer_handled_access_net() {
             abi: Some(ABI::V6),
             handled_net: AccessNet::BindTcp | AccessNet::ConnectTcp,
             rules_net_port: [(443, AccessNet::ConnectTcp.into())].into(),
-            ..Default::default()
+            ..policy_with_abi_defaults(ABI::V6)
         })
     );
 }
 
 #[test]
-fn test_path_beneath_alone() {
+fn test_path_beneath_with_default_handling() {
     let json = r#"{
         "abi": 6,
         "pathBeneath": [
@@ -1174,15 +1320,14 @@ fn test_path_beneath_alone() {
     assert_eq!(
         parse_json(json).unwrap().resolve(),
         Ok(ResolvedPolicy {
-            handled_fs: AccessFs::Execute.into(),
             rules_path_beneath: [(PathBuf::from("."), AccessFs::Execute.into())].into(),
-            ..Default::default()
+            ..resolved_policy_with_abi_defaults(ABI::V6)
         })
     );
 }
 
 #[test]
-fn test_net_port_alone() {
+fn test_net_port_with_default_handling() {
     let json = r#"{
         "abi": 6,
         "netPort": [
@@ -1196,9 +1341,8 @@ fn test_net_port_alone() {
         parse_json(json),
         Ok(Policy {
             abi: Some(ABI::V6),
-            handled_net: AccessNet::BindTcp.into(),
             rules_net_port: [(443, AccessNet::BindTcp.into())].into(),
-            ..Default::default()
+            ..policy_with_abi_defaults(ABI::V6)
         })
     );
 }

@@ -7,7 +7,7 @@ use crate::{
 use landlock::{Access, AccessFs, AccessNet, BitFlags, Scope, ABI};
 use serde::de::{Unexpected, Visitor};
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
-use std::str::FromStr;
+use std::{collections::BTreeSet, ops::Deref, str::FromStr};
 
 /// A policy property that may be omitted but not set to JSON null.
 ///
@@ -34,6 +34,19 @@ where
         Option::<T>::deserialize(deserializer)?
             .map(Self::Present)
             .ok_or_else(|| de::Error::custom("explicit null is not allowed"))
+    }
+}
+
+/// Set wrapper for handled and scoped overrides, where emptiness is meaningful.
+#[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
+#[serde(transparent)]
+pub(crate) struct AccessSet<T: Ord>(BTreeSet<T>);
+
+impl<T: Ord> Deref for AccessSet<T> {
+    type Target = BTreeSet<T>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
@@ -538,6 +551,15 @@ impl NonEmptySet<JsonFsAccessItem> {
     }
 }
 
+impl AccessSet<JsonFsAccessItem> {
+    pub fn resolve_bitflags(&self, abi: ABI) -> Result<BitFlags<AccessFs>, ResolveError> {
+        self.iter().try_fold(BitFlags::EMPTY, |flags, item| {
+            let access = ValueAccessFs::resolve_bitflags(item, abi)?;
+            Ok(flags | access)
+        })
+    }
+}
+
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub(crate) enum JsonNetAccessItem {
@@ -591,6 +613,15 @@ impl NonEmptySet<JsonNetAccessItem> {
     }
 }
 
+impl AccessSet<JsonNetAccessItem> {
+    pub fn resolve_bitflags(&self, abi: ABI) -> Result<BitFlags<AccessNet>, ResolveError> {
+        self.iter().try_fold(BitFlags::EMPTY, |flags, item| {
+            let access = ValueAccessNet::resolve_bitflags(item, abi)?;
+            Ok(flags | access)
+        })
+    }
+}
+
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub(crate) enum JsonScopeItem {
@@ -635,7 +666,7 @@ impl From<&JsonScopeItem> for ValueScope {
     }
 }
 
-impl NonEmptySet<JsonScopeItem> {
+impl AccessSet<JsonScopeItem> {
     pub fn resolve_bitflags(&self, abi: ABI) -> Result<BitFlags<Scope>, ResolveError> {
         self.iter().try_fold(BitFlags::EMPTY, |flags, item| {
             let access = ValueScope::resolve_bitflags(item, abi)?;
@@ -650,31 +681,20 @@ impl NonEmptySet<JsonScopeItem> {
 #[allow(non_snake_case)]
 pub(crate) struct JsonRuleset {
     #[serde(default)]
-    pub(crate) handledAccessFs: OptionalProperty<NonEmptySet<JsonFsAccessItem>>,
+    pub(crate) handledAccessFs: OptionalProperty<AccessSet<JsonFsAccessItem>>,
     #[serde(default)]
-    pub(crate) handledAccessNet: OptionalProperty<NonEmptySet<JsonNetAccessItem>>,
+    pub(crate) handledAccessNet: OptionalProperty<AccessSet<JsonNetAccessItem>>,
     #[serde(default)]
-    pub(crate) scoped: OptionalProperty<NonEmptySet<JsonScopeItem>>,
+    pub(crate) scoped: OptionalProperty<AccessSet<JsonScopeItem>>,
 }
 
 impl NonEmptyStructInner for JsonRuleset {
     const ERROR_MESSAGE: &'static str = "empty ruleset";
 
     fn is_empty(&self) -> bool {
-        let handled_access_fs = match &self.handledAccessFs {
-            OptionalProperty::Missing => true,
-            OptionalProperty::Present(set) => set.is_empty(),
-        };
-        let handled_access_net = match &self.handledAccessNet {
-            OptionalProperty::Missing => true,
-            OptionalProperty::Present(set) => set.is_empty(),
-        };
-        let scoped = match &self.scoped {
-            OptionalProperty::Missing => true,
-            OptionalProperty::Present(set) => set.is_empty(),
-        };
-
-        handled_access_fs && handled_access_net && scoped
+        matches!(&self.handledAccessFs, OptionalProperty::Missing)
+            && matches!(&self.handledAccessNet, OptionalProperty::Missing)
+            && matches!(&self.scoped, OptionalProperty::Missing)
     }
 }
 
@@ -683,31 +703,20 @@ impl NonEmptyStructInner for JsonRuleset {
 #[serde(deny_unknown_fields)]
 struct TomlRuleset {
     #[serde(default)]
-    handled_access_fs: OptionalProperty<NonEmptySet<JsonFsAccessItem>>,
+    handled_access_fs: OptionalProperty<AccessSet<JsonFsAccessItem>>,
     #[serde(default)]
-    handled_access_net: OptionalProperty<NonEmptySet<JsonNetAccessItem>>,
+    handled_access_net: OptionalProperty<AccessSet<JsonNetAccessItem>>,
     #[serde(default)]
-    scoped: OptionalProperty<NonEmptySet<JsonScopeItem>>,
+    scoped: OptionalProperty<AccessSet<JsonScopeItem>>,
 }
 
 impl NonEmptyStructInner for TomlRuleset {
     const ERROR_MESSAGE: &'static str = "empty ruleset";
 
     fn is_empty(&self) -> bool {
-        let handled_access_fs = match &self.handled_access_fs {
-            OptionalProperty::Missing => true,
-            OptionalProperty::Present(set) => set.is_empty(),
-        };
-        let handled_access_net = match &self.handled_access_net {
-            OptionalProperty::Missing => true,
-            OptionalProperty::Present(set) => set.is_empty(),
-        };
-        let scoped = match &self.scoped {
-            OptionalProperty::Missing => true,
-            OptionalProperty::Present(set) => set.is_empty(),
-        };
-
-        handled_access_fs && handled_access_net && scoped
+        matches!(&self.handled_access_fs, OptionalProperty::Missing)
+            && matches!(&self.handled_access_net, OptionalProperty::Missing)
+            && matches!(&self.scoped, OptionalProperty::Missing)
     }
 }
 
@@ -844,7 +853,7 @@ pub(crate) struct JsonVariable {
 
 type TomlVariable = JsonVariable;
 
-// At least one of the fields must be set, which is guaranteed when wrapped with NonEmptyStruct.
+// The mandatory ABI makes every top-level policy structurally nonempty.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[allow(non_snake_case)]
@@ -864,28 +873,11 @@ impl NonEmptyStructInner for JsonPolicy {
     const ERROR_MESSAGE: &'static str = "empty policy";
 
     fn is_empty(&self) -> bool {
-        let variable = match &self.variable {
-            OptionalProperty::Missing => true,
-            OptionalProperty::Present(set) => set.is_empty(),
-        };
-        let ruleset = match &self.ruleset {
-            OptionalProperty::Missing => true,
-            OptionalProperty::Present(set) => set.is_empty(),
-        };
-        let path_beneath = match &self.pathBeneath {
-            OptionalProperty::Missing => true,
-            OptionalProperty::Present(set) => set.is_empty(),
-        };
-        let net_port = match &self.netPort {
-            OptionalProperty::Missing => true,
-            OptionalProperty::Present(set) => set.is_empty(),
-        };
-
-        variable && ruleset && path_beneath && net_port
+        false
     }
 }
 
-// At least one of the fields must be set, which is guaranteed when wrapped with NonEmptyStruct.
+// The mandatory ABI makes every top-level policy structurally nonempty.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct TomlPolicy {
@@ -904,24 +896,7 @@ impl NonEmptyStructInner for TomlPolicy {
     const ERROR_MESSAGE: &'static str = "empty policy";
 
     fn is_empty(&self) -> bool {
-        let variable = match &self.variable {
-            OptionalProperty::Missing => true,
-            OptionalProperty::Present(set) => set.is_empty(),
-        };
-        let ruleset = match &self.ruleset {
-            OptionalProperty::Missing => true,
-            OptionalProperty::Present(set) => set.is_empty(),
-        };
-        let path_beneath = match &self.path_beneath {
-            OptionalProperty::Missing => true,
-            OptionalProperty::Present(set) => set.is_empty(),
-        };
-        let net_port = match &self.net_port {
-            OptionalProperty::Missing => true,
-            OptionalProperty::Present(set) => set.is_empty(),
-        };
-
-        variable && ruleset && path_beneath && net_port
+        false
     }
 }
 

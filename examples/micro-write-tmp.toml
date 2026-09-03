@@ -1,12 +1,6 @@
 abi = 5
 
-# Infered properties:
-# [[ruleset]]
-# handled_access_fs = ["abi.all"]
-# handled_access_net = ["bind_tcp"]
-#
-# We need to be careful to cover all access rights (e.g. abi.read_execute +
-# abi.read_write = abi.all), otherwise the missing accesses would not be denied.
+# The omitted ruleset defaults to all rights supported by ABI 5.
 
 # Main system directories can be read.
 [[path_beneath]]

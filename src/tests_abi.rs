@@ -6,7 +6,7 @@ use crate::{
     tests_helpers::{parse_json, parse_json_schema, parse_toml},
     Policy,
 };
-use landlock::{Access, AccessFs, AccessNet, Scope, ABI};
+use landlock::{Access, AccessFs, AccessNet, LandlockStatus, RulesetStatus, Scope, ABI};
 use serde_json::error::Category;
 
 fn assert_access_abi_error(
@@ -256,6 +256,43 @@ fn test_group_only_no_op() {
 }
 
 #[test]
+fn test_scope_default_boundary() {
+    let json = r#"{
+        "abi": 5,
+        "ruleset": [{
+            "handledAccessFs": [],
+            "handledAccessNet": []
+        }]
+    }"#;
+    let toml = r#"
+        abi = 5
+        [[ruleset]]
+        handled_access_fs = []
+        handled_access_net = []
+    "#;
+
+    assert!(matches!(
+        Policy::parse_json(std::io::Cursor::new(json)),
+        Err(ParseJsonError::Policy(PolicyError::EmptyRuleset))
+    ));
+    assert_eq!(parse_json_schema(json, false), Err(Category::Data));
+    assert!(matches!(
+        Policy::parse_toml(toml),
+        Err(ParseTomlError::Policy(PolicyError::EmptyRuleset))
+    ));
+
+    let json = json.replace("\"abi\": 5", "\"abi\": 6");
+    let toml = toml.replace("abi = 5", "abi = 6");
+    let policy = Policy {
+        abi: Some(ABI::V6),
+        scoped: Scope::from_all(ABI::V6),
+        ..Default::default()
+    };
+    assert_eq!(parse_json(&json).unwrap(), policy);
+    assert_eq!(parse_toml(&toml).unwrap(), policy);
+}
+
+#[test]
 fn test_path_allowance_abi_boundary() {
     let json = r#"{
         "abi": 1,
@@ -353,15 +390,21 @@ fn test_missing() {
 
 #[test]
 fn test_abi_only() {
-    let json = r#"{
-        "abi": 1
-    }"#;
-    let toml = r#"
-        abi = 1
-    "#;
+    for version in 1..=(LATEST_ABI as i32) {
+        let json = format!(r#"{{ "abi": {version} }}"#);
+        let toml = format!("abi = {version}");
+        let abi = ABI::from(version);
+        let config = Policy {
+            abi: Some(abi),
+            handled_fs: AccessFs::from_all(abi),
+            handled_net: AccessNet::from_all(abi),
+            scoped: Scope::from_all(abi),
+            ..Default::default()
+        };
 
-    assert_eq!(parse_json(json), Err(Category::Data));
-    assert!(parse_toml(toml).is_err());
+        assert_eq!(parse_json(&json).unwrap(), config);
+        assert_eq!(parse_toml(&toml).unwrap(), config);
+    }
 }
 
 #[test]
@@ -550,6 +593,8 @@ fn test_all_versions_abi_read_execute() {
         let policy = Policy {
             abi: Some(abi),
             handled_fs: expected_access,
+            handled_net: AccessNet::from_all(abi),
+            scoped: Scope::from_all(abi),
             rules_path_beneath: [(TemplateString::from_text("."), expected_access)].into(),
             ..Default::default()
         };
@@ -597,6 +642,8 @@ fn test_all_versions_abi_read_write() {
         let policy = Policy {
             abi: Some(abi),
             handled_fs: expected_access,
+            handled_net: AccessNet::from_all(abi),
+            scoped: Scope::from_all(abi),
             rules_path_beneath: [(TemplateString::from_text("."), expected_access)].into(),
             ..Default::default()
         };
@@ -651,6 +698,57 @@ fn test_negative() {
 }
 
 #[test]
+fn test_kernel_abi_downgrade() {
+    let Ok(kernel_abi) = std::env::var("LANDLOCK_CRATE_TEST_ABI") else {
+        eprintln!("Skipping test_kernel_abi_downgrade: LANDLOCK_CRATE_TEST_ABI is not set");
+        return;
+    };
+    let kernel_abi = kernel_abi.parse::<i32>().unwrap();
+    let latest = LATEST_ABI as i32;
+
+    for requested_abi in (1..=latest).chain([latest + 1, i32::MAX]) {
+        let status = std::thread::spawn(move || {
+            let json = format!(r#"{{ "abi": {requested_abi} }}"#);
+            let config = Policy::parse_json(json.as_bytes()).unwrap();
+            let resolved = config.resolve().unwrap();
+            let (ruleset, rule_errors) = resolved.build_ruleset().unwrap();
+            assert!(rule_errors.is_empty());
+            ruleset.restrict_self().unwrap()
+        })
+        .join()
+        .unwrap();
+
+        let policy_abi = requested_abi.min(latest);
+        let expected_ruleset = if kernel_abi == 0 {
+            RulesetStatus::NotEnforced
+        } else if kernel_abi >= policy_abi {
+            RulesetStatus::FullyEnforced
+        } else {
+            RulesetStatus::PartiallyEnforced
+        };
+        assert_eq!(status.ruleset, expected_ruleset);
+        assert!(status.no_new_privs);
+
+        match status.landlock {
+            LandlockStatus::NotEnabled | LandlockStatus::NotImplemented => {
+                assert_eq!(kernel_abi, 0);
+            }
+            LandlockStatus::Available {
+                effective_abi: kernel_effective_abi,
+                kernel_abi: reported_kernel_abi,
+            } => {
+                assert!(kernel_abi > 0);
+                assert_eq!(kernel_effective_abi, ABI::from(kernel_abi));
+                assert_eq!(
+                    reported_kernel_abi,
+                    (kernel_abi != kernel_effective_abi as i32).then_some(kernel_abi)
+                );
+            }
+        }
+    }
+}
+
+#[test]
 fn test_latest_supported() {
     assert_eq!(LATEST_ABI, ABI::V6);
 }
@@ -658,26 +756,13 @@ fn test_latest_supported() {
 #[test]
 fn test_latest_plus_one() {
     let requested = LATEST_ABI as i32 + 1;
-    let json = format!(
-        r#"{{
-            "abi": {requested},
-            "ruleset": [
-                {{
-                    "handledAccessFs": ["abi.all"]
-                }}
-            ]
-        }}"#
-    );
-    let toml = format!(
-        r#"
-        abi = {requested}
-        [[ruleset]]
-        handled_access_fs = ["abi.all"]
-        "#
-    );
+    let json = format!(r#"{{ "abi": {requested} }}"#);
+    let toml = format!("abi = {requested}");
     let config = Policy {
         abi: Some(LATEST_ABI),
         handled_fs: AccessFs::from_all(LATEST_ABI),
+        handled_net: AccessNet::from_all(LATEST_ABI),
+        scoped: Scope::from_all(LATEST_ABI),
         ..Default::default()
     };
 
@@ -688,22 +773,13 @@ fn test_latest_plus_one() {
 #[test]
 fn test_i32_max() {
     // 2^31 - 1
-    let json = r#"{
-        "abi": 2147483647,
-        "ruleset": [
-            {
-                "handledAccessFs": ["abi.all"]
-            }
-        ]
-    }"#;
-    let toml = r#"
-        abi = 2147483647
-        [[ruleset]]
-        handled_access_fs = ["abi.all"]
-    "#;
+    let json = r#"{ "abi": 2147483647 }"#;
+    let toml = "abi = 2147483647";
     let config = Policy {
         abi: Some(LATEST_ABI),
         handled_fs: AccessFs::from_all(LATEST_ABI),
+        handled_net: AccessNet::from_all(LATEST_ABI),
+        scoped: Scope::from_all(LATEST_ABI),
         ..Default::default()
     };
 

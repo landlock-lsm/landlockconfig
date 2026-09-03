@@ -60,7 +60,7 @@
   },
   "properties": {
     "abi": {
-      "description": "The mandatory Landlock ABI version used to resolve access groups.",
+      "description": "The mandatory Landlock ABI version used to resolve access groups and derive omitted ruleset categories.",
       "allOf": [
         {
           "$ref": "#/definitions/abi"
@@ -91,28 +91,29 @@
       }
     },
     "ruleset": {
+      "description": "Optional overrides for ABI-derived handled and scoped rights. Repeated entries are unioned.",
       "type": "array",
       "minItems": 1,
       "items": {
         "type": "object",
         "properties": {
           "handledAccessFs": {
+            "description": "Handled filesystem rights. If absent from every ruleset entry, all rights supported by the effective policy ABI are handled. Present arrays are unioned, and an empty array suppresses the ABI-derived base. Filesystem rules augment the resulting rights.",
             "type": "array",
-            "minItems": 1,
             "items": {
               "$ref": "#/definitions/accessFs"
             }
           },
           "handledAccessNet": {
+            "description": "Handled network rights. If absent from every ruleset entry, all rights supported by the effective policy ABI are handled. Present arrays are unioned, and an empty array suppresses the ABI-derived base. Network rules augment the resulting rights.",
             "type": "array",
-            "minItems": 1,
             "items": {
               "$ref": "#/definitions/accessNet"
             }
           },
           "scoped": {
+            "description": "Scoped rights. If absent from every ruleset entry, all scopes supported by the effective policy ABI are enabled. Present arrays are unioned, and an empty array suppresses the ABI-derived base. Rules do not augment scopes.",
             "type": "array",
-            "minItems": 1,
             "items": {
               "$ref": "#/definitions/scope"
             }
@@ -123,6 +124,7 @@
       }
     },
     "pathBeneath": {
+      "description": "Filesystem rules. Their allowed rights augment handled filesystem rights.",
       "type": "array",
       "minItems": 1,
       "items": {
@@ -151,6 +153,7 @@
       }
     },
     "netPort": {
+      "description": "Network port rules. Their allowed rights augment handled network rights.",
       "type": "array",
       "minItems": 1,
       "items": {
@@ -181,28 +184,6 @@
   },
   "required": [
     "abi"
-  ],
-  "anyOf": [
-    {
-      "required": [
-        "variable"
-      ]
-    },
-    {
-      "required": [
-        "ruleset"
-      ]
-    },
-    {
-      "required": [
-        "pathBeneath"
-      ]
-    },
-    {
-      "required": [
-        "netPort"
-      ]
-    }
   ],
   "additionalProperties": false
 }

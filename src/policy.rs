@@ -4,8 +4,8 @@ use crate::nonempty::NonEmptyStruct;
 use crate::parser::{ConcreteAccess, JsonPolicy, OptionalProperty, TemplateString, TomlPolicy};
 use crate::variable::{NameError, ResolveError, Variables, VecStringIterator};
 use landlock::{
-    AccessFs, AccessNet, BitFlags, NetPort, PathBeneath, PathFd, PathFdError, Ruleset, RulesetAttr,
-    RulesetCreated, RulesetCreatedAttr, RulesetError, Scope, ABI,
+    Access, AccessFs, AccessNet, BitFlags, NetPort, PathBeneath, PathFd, PathFdError, Ruleset,
+    RulesetAttr, RulesetCreated, RulesetCreatedAttr, RulesetError, Scope, ABI,
 };
 use std::collections::BTreeMap;
 use std::fs::{self, File};
@@ -67,6 +67,8 @@ pub enum PolicyError {
         policy_abi: ABI,
         required_abi: ABI,
     },
+    #[error("policy does not handle or scope any rights")]
+    EmptyRuleset,
 }
 
 fn validate_access_abi<I>(
@@ -112,6 +114,9 @@ impl TryFrom<NonEmptyStruct<JsonPolicy>> for Policy {
             }
         }
 
+        let mut has_handled_fs = false;
+        let mut has_handled_net = false;
+        let mut has_scoped = false;
         if let OptionalProperty::Present(rulesets) = json.ruleset {
             for ruleset in rulesets {
                 let ruleset = ruleset.into_inner();
@@ -121,6 +126,7 @@ impl TryFrom<NonEmptyStruct<JsonPolicy>> for Policy {
                         abi,
                         access.iter().filter_map(|item| item.concrete()),
                     )?;
+                    has_handled_fs = true;
                     policy.handled_fs |= access.resolve_bitflags(abi)?;
                 }
                 if let OptionalProperty::Present(access) = ruleset.handledAccessNet {
@@ -129,6 +135,7 @@ impl TryFrom<NonEmptyStruct<JsonPolicy>> for Policy {
                         abi,
                         access.iter().filter_map(|item| item.concrete()),
                     )?;
+                    has_handled_net = true;
                     policy.handled_net |= access.resolve_bitflags(abi)?;
                 }
                 if let OptionalProperty::Present(scoped) = ruleset.scoped {
@@ -137,9 +144,19 @@ impl TryFrom<NonEmptyStruct<JsonPolicy>> for Policy {
                         abi,
                         scoped.iter().filter_map(|item| item.concrete()),
                     )?;
+                    has_scoped = true;
                     policy.scoped |= scoped.resolve_bitflags(abi)?;
                 }
             }
+        }
+        if !has_handled_fs {
+            policy.handled_fs = AccessFs::from_all(abi);
+        }
+        if !has_handled_net {
+            policy.handled_net = AccessNet::from_all(abi);
+        }
+        if !has_scoped {
+            policy.scoped = Scope::from_all(abi);
         }
 
         if let OptionalProperty::Present(path_beneath_rules) = json.pathBeneath {
@@ -198,6 +215,11 @@ impl TryFrom<NonEmptyStruct<JsonPolicy>> for Policy {
                     }
                 }
             }
+        }
+
+        if policy.handled_fs.is_empty() && policy.handled_net.is_empty() && policy.scoped.is_empty()
+        {
+            return Err(PolicyError::EmptyRuleset);
         }
 
         Ok(policy)

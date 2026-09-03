@@ -157,6 +157,17 @@ The parser should limit error cases as much as possible. One way to achieve that
 is to automatically complete the known properties (e.g., handled access rights
 are automatically completed according to all used access rights).
 
+For each filesystem, network, and scoped category omitted from every ruleset
+entry, the policy handles or scopes all rights supported by its effective
+ABI. Present arrays override that category's base and are unioned across repeated
+ruleset entries; an empty array suppresses the ABI-derived base. Path and port
+rules continue to add their rights to the corresponding handled category, while
+rules do not augment scoped rights.
+
+A directly parsed policy whose final three masks are empty is rejected.
+Composition remains infallible and can later intersect every mask to empty; in
+that case, building the composed policy fails because there is no handled access.
+
 ## Reference implementation
 
 ### Shared Library
@@ -310,3 +321,24 @@ Policies accepted by earlier versions may require these updates:
 - A concrete access or scope right must be supported by the effective policy ABI.
   Remove an unsupported right or raise the ABI after reviewing and testing the
   additional Landlock features.
+- Omitting `handled_access_fs`, `handled_access_net`, or `scoped` previously
+  left that category unhandled. Omission now selects all rights supported by
+  the effective policy ABI. Use an explicit empty array to keep a category unhandled.
+
+For example, this policy previously handled only filesystem execution:
+
+```toml
+[[ruleset]]
+handled_access_fs = ["execute"]
+```
+
+After testing it against ABI 6, preserve that behavior with:
+
+```toml
+abi = 6
+
+[[ruleset]]
+handled_access_fs = ["execute"]
+handled_access_net = []
+scoped = []
+```

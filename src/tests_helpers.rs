@@ -2,13 +2,10 @@
 
 use crate::policy::{ParseJsonError, ParseTomlError};
 use crate::Policy;
-use landlock::ABI;
 use serde_json::error::Category;
 use serde_json::Value;
 use std::io::Write;
 use std::process::{Command, Output, Stdio};
-
-pub(crate) const LATEST_ABI: ABI = ABI::V6;
 
 lazy_static! {
     static ref JSON_VALIDATOR: jsonschema::Validator = {

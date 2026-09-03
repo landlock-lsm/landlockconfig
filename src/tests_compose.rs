@@ -74,6 +74,7 @@ fn test_compose_most_fs_net() {
 #[test]
 fn test_compose_scope() {
     let json1 = r#"{
+        "abi": 6,
         "ruleset": [
             {
                 "scoped": [ "abstract_unix_socket" ]
@@ -101,6 +102,7 @@ fn test_compose_scope() {
 #[test]
 fn test_compose_exclusive() {
     let json1 = r#"{
+        "abi": 6,
         "pathBeneath": [
             {
                 "allowedAccess": [ "execute" ],
@@ -109,6 +111,7 @@ fn test_compose_exclusive() {
         ]
     }"#;
     let json2 = r#"{
+        "abi": 6,
         "pathBeneath": [
             {
                 "allowedAccess": [ "read_file" ],
@@ -133,6 +136,7 @@ fn test_compose_exclusive() {
 #[test]
 fn test_compose_complement1() {
     let json1 = r#"{
+        "abi": 6,
         "ruleset": [
             {
                 "handledAccessFs": [ "read_file" ]
@@ -146,6 +150,7 @@ fn test_compose_complement1() {
         ]
     }"#;
     let json2 = r#"{
+        "abi": 6,
         "pathBeneath": [
             {
                 "allowedAccess": [ "read_file" ],
@@ -175,6 +180,7 @@ fn test_compose_complement1() {
 #[test]
 fn test_compose_complement2() {
     let json1 = r#"{
+        "abi": 6,
         "pathBeneath": [
             {
                 "allowedAccess": [ "execute" ],
@@ -183,6 +189,7 @@ fn test_compose_complement2() {
         ]
     }"#;
     let json2 = r#"{
+        "abi": 6,
         "ruleset": [
             {
                 "handledAccessFs": [ "execute" ]
@@ -213,6 +220,7 @@ fn test_compose_complement2() {
 #[test]
 fn test_compose_standalone_variable() {
     let json1 = r#"{
+        "abi": 6,
         "variable": [
             {
                 "name": "foo",
@@ -227,6 +235,7 @@ fn test_compose_standalone_variable() {
         ]
     }"#;
     let json2 = r#"{
+        "abi": 6,
         "ruleset": [
             {
                 "handledAccessFs": [ "execute" ]
@@ -261,6 +270,7 @@ fn test_compose_standalone_variable() {
 #[test]
 fn test_compose_shared_variable() {
     let json1 = r#"{
+        "abi": 6,
         "ruleset": [
             {
                 "handledAccessFs": [ "read_file" ]
@@ -280,6 +290,7 @@ fn test_compose_shared_variable() {
         ]
     }"#;
     let json2 = r#"{
+        "abi": 6,
         "ruleset": [
             {
                 "handledAccessFs": [ "execute" ]
@@ -321,6 +332,7 @@ fn test_compose_shared_variable() {
 #[test]
 fn test_compose_same_resolved_path() {
     let json1 = r#"{
+        "abi": 6,
         "ruleset": [
             {
                 "handledAccessFs": [ "read_file" ]
@@ -340,6 +352,7 @@ fn test_compose_same_resolved_path() {
         ]
     }"#;
     let json2 = r#"{
+        "abi": 6,
         "ruleset": [
             {
                 "handledAccessFs": [ "execute" ]

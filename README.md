@@ -113,6 +113,17 @@ The default behavior should then be to following a best-effort approach to
 protect users as much as possible.  See the "compatibility" modes in [the
 specification](schema/landlock-policy.json).
 
+Every policy must declare a positive Landlock ABI version. Declaring the ABI
+makes the policy's tested compatibility contract explicit and keeps its meaning
+stable across library upgrades. It is not inferred from the library version or
+the running kernel; runtime compatibility is applied separately after the
+policy is interpreted.
+
+If a requested ABI is newer than the library supports, the library uses its
+latest supported ABI to interpret the policy. This preserves the known subset
+of a future policy, but it does not make unknown access names, properties, or
+rule types valid; unknown syntax remains an error.
+
 **TODO:**
 In the case of an older user space and a newer kernel, it should be possible for
 users to still leverage a subset of the newer kernel features.  This means that
@@ -284,3 +295,11 @@ repository, they are replaced without compatibility aliases:
 - The Debian `liblandlockconfig0`, `liblandlockconfig-dev`, and `llconfig`
   packages are replaced by `liblandlock-policy0`, `liblandlock-policy-dev`,
   `landlock-policy`, and `landlock-exec`.
+
+## Policy format migration
+
+Policies accepted by earlier versions may require these updates:
+
+- Every policy must declare the Landlock ABI against which it was tested.
+  Choose the tested compatibility contract rather than blindly selecting the
+  newest ABI.

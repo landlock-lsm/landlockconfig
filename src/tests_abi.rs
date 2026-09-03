@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use crate::{
-    parser::TemplateString,
-    tests_helpers::{parse_json, parse_json_schema, parse_toml, LATEST_ABI},
+    parser::{TemplateString, LATEST_ABI},
+    tests_helpers::{parse_json, parse_json_schema, parse_toml},
     Policy,
 };
 use landlock::{Access, AccessFs, AccessNet, Scope, ABI};
@@ -38,35 +38,60 @@ fn test_access_fs_with_value() {
 }
 
 #[test]
-fn test_access_fs_without_value() {
+fn test_missing() {
     let json = r#"{
         "ruleset": [
             {
-                "handledAccessFs": [
-                    "abi.all"
-                    ]
+                "handledAccessFs": ["execute"]
             }
         ]
     }"#;
     let toml = r#"
         [[ruleset]]
-        handled_access_fs = [
-            "abi.all",
-        ]
+        handled_access_fs = ["execute"]
     "#;
 
-    assert_eq!(parse_json_schema(json, false), Err(Category::Data));
+    assert_eq!(parse_json(json), Err(Category::Data));
     assert!(parse_toml(toml).is_err());
 }
 
 #[test]
-fn test_format_error() {
+fn test_abi_only() {
     let json = r#"{
         "abi": 1
     }"#;
     let toml = r#"
         abi = 1
     "#;
+
+    assert_eq!(parse_json(json), Err(Category::Data));
+    assert!(parse_toml(toml).is_err());
+}
+
+#[test]
+fn test_non_integer() {
+    let json = r#"{
+        "abi": "6",
+        "ruleset": [
+            {
+                "handledAccessFs": ["execute"]
+            }
+        ]
+    }"#;
+    let toml = r#"
+        abi = "6"
+        [[ruleset]]
+        handled_access_fs = ["execute"]
+    "#;
+
+    assert_eq!(parse_json(json), Err(Category::Data));
+    assert!(parse_toml(toml).is_err());
+}
+
+#[test]
+fn test_fractional() {
+    let json = r#"{ "abi": 6.5 }"#;
+    let toml = "abi = 6.5";
 
     assert_eq!(parse_json(json), Err(Category::Data));
     assert!(parse_toml(toml).is_err());
@@ -330,36 +355,113 @@ fn test_negative() {
 }
 
 #[test]
-fn test_i32() {
+fn test_latest_supported() {
+    assert_eq!(LATEST_ABI, ABI::V6);
+}
+
+#[test]
+fn test_latest_plus_one() {
+    let requested = LATEST_ABI as i32 + 1;
+    let json = format!(
+        r#"{{
+            "abi": {requested},
+            "ruleset": [
+                {{
+                    "handledAccessFs": ["abi.all"]
+                }}
+            ]
+        }}"#
+    );
+    let toml = format!(
+        r#"
+        abi = {requested}
+        [[ruleset]]
+        handled_access_fs = ["abi.all"]
+        "#
+    );
+    let config = Policy {
+        abi: Some(LATEST_ABI),
+        handled_fs: AccessFs::from_all(LATEST_ABI),
+        ..Default::default()
+    };
+
+    assert_eq!(parse_json(&json).unwrap(), config);
+    assert_eq!(parse_toml(&toml).unwrap(), config);
+}
+
+#[test]
+fn test_i32_max() {
     // 2^31 - 1
     let json = r#"{
         "abi": 2147483647,
         "ruleset": [
             {
-                "handledAccessFs": [ "abi.all" ]
+                "handledAccessFs": ["abi.all"]
             }
         ]
     }"#;
     let toml = r#"
         abi = 2147483647
         [[ruleset]]
-        handled_access_fs = [
-            "abi.all",
-        ]
+        handled_access_fs = ["abi.all"]
     "#;
-
-    let abi = ABI::from(2147483647);
-    // To not require perfect syncing between this crate and the Landlock crate,
-    // only check that the returned ABI is greater than or equal to the
-    // currently greatest ABI.
-    assert!(abi >= LATEST_ABI);
-    let policy = Policy {
-        abi: Some(abi),
-        handled_fs: AccessFs::from_all(abi),
+    let config = Policy {
+        abi: Some(LATEST_ABI),
+        handled_fs: AccessFs::from_all(LATEST_ABI),
         ..Default::default()
     };
-    assert_eq!(parse_json(json).unwrap(), policy);
-    assert_eq!(parse_toml(toml).unwrap(), policy);
+
+    assert_eq!(parse_json(json).unwrap(), config);
+    assert_eq!(parse_toml(toml).unwrap(), config);
+}
+
+#[test]
+fn test_future_abi_unknown_syntax() {
+    let json = [
+        r#"{
+            "abi": 2147483647,
+            "ruleset": [
+                {
+                    "handledAccessFs": ["future_right"]
+                }
+            ]
+        }"#,
+        r#"{
+            "abi": 2147483647,
+            "ruleset": [
+                {
+                    "futureAccess": ["execute"]
+                }
+            ]
+        }"#,
+        r#"{
+            "abi": 2147483647,
+            "futureRule": []
+        }"#,
+    ];
+    let toml = [
+        r#"
+            abi = 2147483647
+            [[ruleset]]
+            handled_access_fs = ["future_right"]
+        "#,
+        r#"
+            abi = 2147483647
+            [[ruleset]]
+            future_access = ["execute"]
+        "#,
+        r#"
+            abi = 2147483647
+            [[future_rule]]
+        "#,
+    ];
+
+    for json in json {
+        assert_eq!(parse_json(json), Err(Category::Data));
+    }
+    for toml in toml {
+        assert!(parse_toml(toml).is_err());
+    }
 }
 
 #[test]

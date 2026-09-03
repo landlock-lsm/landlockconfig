@@ -67,10 +67,8 @@ impl TryFrom<NonEmptyStruct<JsonPolicy>> for Policy {
         let mut policy = Self::empty();
         let json = json.into_inner();
 
-        policy.abi = match json.abi {
-            OptionalProperty::Missing => None,
-            OptionalProperty::Present(abi) => Some(abi.into()),
-        };
+        let abi = json.abi.into();
+        policy.abi = Some(abi);
 
         if let OptionalProperty::Present(variables) = json.variable {
             for variable in variables {
@@ -88,20 +86,20 @@ impl TryFrom<NonEmptyStruct<JsonPolicy>> for Policy {
             for ruleset in rulesets {
                 let ruleset = ruleset.into_inner();
                 if let OptionalProperty::Present(access) = ruleset.handledAccessFs {
-                    policy.handled_fs |= access.resolve_bitflags(policy.abi)?;
+                    policy.handled_fs |= access.resolve_bitflags(abi)?;
                 }
                 if let OptionalProperty::Present(access) = ruleset.handledAccessNet {
-                    policy.handled_net |= access.resolve_bitflags(policy.abi)?;
+                    policy.handled_net |= access.resolve_bitflags(abi)?;
                 }
                 if let OptionalProperty::Present(scoped) = ruleset.scoped {
-                    policy.scoped |= scoped.resolve_bitflags(policy.abi)?;
+                    policy.scoped |= scoped.resolve_bitflags(abi)?;
                 }
             }
         }
 
         if let OptionalProperty::Present(path_beneath_rules) = json.pathBeneath {
             for path_beneath in path_beneath_rules {
-                let access = path_beneath.allowedAccess.resolve_bitflags(policy.abi)?;
+                let access = path_beneath.allowedAccess.resolve_bitflags(abi)?;
 
                 // It is possible to have rules with empty access because of empty
                 // access group resolution.
@@ -122,7 +120,7 @@ impl TryFrom<NonEmptyStruct<JsonPolicy>> for Policy {
 
         if let OptionalProperty::Present(net_port_rules) = json.netPort {
             for net_port in net_port_rules {
-                let access = net_port.allowedAccess.resolve_bitflags(policy.abi)?;
+                let access = net_port.allowedAccess.resolve_bitflags(abi)?;
 
                 // It is possible to have rules with empty access because of empty
                 // access group resolution.

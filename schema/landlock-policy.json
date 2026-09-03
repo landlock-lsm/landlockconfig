@@ -9,6 +9,7 @@
       "maximum": 18446744073709551615
     },
     "abi": {
+      "description": "A positive requested Landlock ABI version. Values newer than this implementation supports are accepted and clamped to its latest supported ABI.",
       "type": "integer",
       "minimum": 1,
       "maximum": 2147483647
@@ -56,7 +57,12 @@
   },
   "properties": {
     "abi": {
-      "$ref": "#/definitions/abi"
+      "description": "The mandatory Landlock ABI version used to resolve access groups.",
+      "allOf": [
+        {
+          "$ref": "#/definitions/abi"
+        }
+      ]
     },
     "variable": {
       "type": "array",
@@ -170,6 +176,9 @@
       }
     }
   },
+  "required": [
+    "abi"
+  ],
   "anyOf": [
     {
       "required": [

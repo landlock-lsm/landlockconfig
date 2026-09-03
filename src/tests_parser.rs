@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::parser::LATEST_ABI;
 use crate::policy::ResolvedPolicy;
-use crate::tests_helpers::{parse_json, parse_toml, validate_json, LATEST_ABI};
+use crate::tests_helpers::{parse_json, parse_toml, validate_json};
 use crate::Policy;
 use landlock::{Access, AccessFs, AccessNet, Scope, ABI};
 use serde_json::error::Category;
@@ -10,6 +11,7 @@ use std::path::PathBuf;
 #[test]
 fn test_json_schema() {
     let test_json = r#"{
+        "abi": 6,
         "ruleset": 0
     }"#;
 
@@ -37,6 +39,7 @@ fn test_empty_policy_json_1() {
 #[test]
 fn test_empty_policy_json_2() {
     let json = r#"{
+        "abi": 6,
         "ruleset": null
     }"#;
     assert_eq!(parse_json(json), Err(Category::Data));
@@ -49,7 +52,7 @@ fn test_empty_policy_toml() {
 }
 
 #[test]
-fn test_null_optional_fields_json() {
+fn test_null_fields_json() {
     let fields = [
         (
             "abi",
@@ -61,6 +64,7 @@ fn test_null_optional_fields_json() {
         (
             "variable",
             r#"{
+                "abi": 6,
                 "variable": null,
                 "ruleset": [{ "handledAccessFs": ["execute"] }]
             }"#,
@@ -68,6 +72,7 @@ fn test_null_optional_fields_json() {
         (
             "ruleset",
             r#"{
+                "abi": 6,
                 "ruleset": null,
                 "variable": [{ "name": "foo" }]
             }"#,
@@ -75,6 +80,7 @@ fn test_null_optional_fields_json() {
         (
             "pathBeneath",
             r#"{
+                "abi": 6,
                 "pathBeneath": null,
                 "ruleset": [{ "handledAccessFs": ["execute"] }]
             }"#,
@@ -82,6 +88,7 @@ fn test_null_optional_fields_json() {
         (
             "netPort",
             r#"{
+                "abi": 6,
                 "netPort": null,
                 "ruleset": [{ "handledAccessFs": ["execute"] }]
             }"#,
@@ -89,6 +96,7 @@ fn test_null_optional_fields_json() {
         (
             "handledAccessFs",
             r#"{
+                "abi": 6,
                 "ruleset": [{
                     "handledAccessFs": null,
                     "handledAccessNet": ["bind_tcp"]
@@ -98,6 +106,7 @@ fn test_null_optional_fields_json() {
         (
             "handledAccessNet",
             r#"{
+                "abi": 6,
                 "ruleset": [{
                     "handledAccessFs": ["execute"],
                     "handledAccessNet": null
@@ -107,6 +116,7 @@ fn test_null_optional_fields_json() {
         (
             "scoped",
             r#"{
+                "abi": 6,
                 "ruleset": [{
                     "handledAccessFs": ["execute"],
                     "scoped": null
@@ -116,6 +126,7 @@ fn test_null_optional_fields_json() {
         (
             "literal",
             r#"{
+                "abi": 6,
                 "variable": [{ "name": "foo", "literal": null }]
             }"#,
         ),
@@ -132,6 +143,7 @@ fn test_null_optional_fields_json() {
 #[test]
 fn test_empty_ruleset_array_json() {
     let json = r#"{
+        "abi": 6,
         "ruleset": [ ]
     }"#;
     assert_eq!(parse_json(json), Err(Category::Data));
@@ -140,6 +152,7 @@ fn test_empty_ruleset_array_json() {
 #[test]
 fn test_empty_handled_access_fs_1() {
     let json = r#"{
+        "abi": 6,
         "ruleset": [
             {
                 "handledAccessFs": [ ]
@@ -152,6 +165,7 @@ fn test_empty_handled_access_fs_1() {
 #[test]
 fn test_empty_handled_access_fs_2() {
     let json = r#"{
+        "abi": 6,
         "ruleset": [
             {
                 "handledAccessFs": [ ]
@@ -170,6 +184,7 @@ fn test_empty_handled_access_fs_2() {
 #[test]
 fn test_empty_handled_access_net() {
     let json = r#"{
+        "abi": 6,
         "ruleset": [
             {
                 "handledAccessNet": [ ]
@@ -182,6 +197,7 @@ fn test_empty_handled_access_net() {
 #[test]
 fn test_empty_scoped() {
     let json = r#"{
+        "abi": 6,
         "ruleset": [
             {
                 "scoped": [ ]
@@ -194,6 +210,7 @@ fn test_empty_scoped() {
 #[test]
 fn test_empty_path_beneath() {
     let json = r#"{
+        "abi": 6,
         "pathBeneath": [ ]
     }"#;
     assert_eq!(parse_json(json), Err(Category::Data));
@@ -202,6 +219,7 @@ fn test_empty_path_beneath() {
 #[test]
 fn test_empty_path_beneath_access() {
     let json = r#"{
+        "abi": 6,
         "pathBeneath": [
             {
                 "allowedAccess": [ ],
@@ -215,6 +233,7 @@ fn test_empty_path_beneath_access() {
 #[test]
 fn test_empty_path_beneath_parent() {
     let json = r#"{
+        "abi": 6,
         "pathBeneath": [
             {
                 "allowedAccess": [ "execute" ],
@@ -228,6 +247,7 @@ fn test_empty_path_beneath_parent() {
 #[test]
 fn test_empty_net_port() {
     let json = r#"{
+        "abi": 6,
         "netPort": [ ]
     }"#;
     assert_eq!(parse_json(json), Err(Category::Data));
@@ -236,6 +256,7 @@ fn test_empty_net_port() {
 #[test]
 fn test_empty_net_port_access() {
     let json = r#"{
+        "abi": 6,
         "netPort": [
             {
                 "allowedAccess": [ ],
@@ -249,6 +270,7 @@ fn test_empty_net_port_access() {
 #[test]
 fn test_empty_net_port_number() {
     let json = r#"{
+        "abi": 6,
         "netPort": [
             {
                 "allowedAccess": [ "bind_tcp" ],
@@ -264,6 +286,7 @@ fn test_empty_net_port_number() {
 #[test]
 fn test_empty_ruleset_json() {
     let json = r#"{
+        "abi": 6,
         "ruleset": [
             {}
         ]
@@ -274,6 +297,7 @@ fn test_empty_ruleset_json() {
 #[test]
 fn test_empty_ruleset_toml() {
     let toml = r#"
+        abi = 6
         [[ruleset]]
     "#;
     assert!(parse_toml(toml).is_err());
@@ -284,6 +308,7 @@ fn test_empty_ruleset_toml() {
 #[test]
 fn test_full_ruleset_1() {
     let json = r#"{
+        "abi": 6,
         "ruleset": [
             {
                 "handledAccessFs": [ "execute" ],
@@ -295,6 +320,7 @@ fn test_full_ruleset_1() {
     assert_eq!(
         parse_json(json),
         Ok(Policy {
+            abi: Some(ABI::V6),
             handled_fs: AccessFs::Execute.into(),
             handled_net: AccessNet::BindTcp.into(),
             scoped: Scope::AbstractUnixSocket.into(),
@@ -306,6 +332,7 @@ fn test_full_ruleset_1() {
 #[test]
 fn test_full_ruleset_2() {
     let json = r#"{
+        "abi": 6,
         "ruleset": [
             {
                 "handledAccessNet": [ "bind_tcp" ],
@@ -317,6 +344,7 @@ fn test_full_ruleset_2() {
     assert_eq!(
         parse_json(json),
         Ok(Policy {
+            abi: Some(ABI::V6),
             handled_fs: AccessFs::Execute.into(),
             handled_net: AccessNet::BindTcp.into(),
             scoped: Scope::AbstractUnixSocket.into(),
@@ -330,6 +358,7 @@ fn test_full_ruleset_2() {
 #[test]
 fn test_one_handled_access_fs() {
     let json = r#"{
+        "abi": 6,
         "ruleset": [
             {
                 "handledAccessFs": [ "execute" ]
@@ -339,6 +368,7 @@ fn test_one_handled_access_fs() {
     assert_eq!(
         parse_json(json),
         Ok(Policy {
+            abi: Some(ABI::V6),
             handled_fs: AccessFs::Execute.into(),
             ..Default::default()
         }),
@@ -431,6 +461,7 @@ fn test_all_handled_access_fs_toml() {
 #[test]
 fn test_unknown_ruleset_field() {
     let json = r#"{
+        "abi": 6,
         "ruleset": [
             {
                 "handledAccessFs": [ "execute" ]
@@ -444,6 +475,7 @@ fn test_unknown_ruleset_field() {
 #[test]
 fn test_dup_handled_access_fs_1() {
     let json = r#"{
+        "abi": 6,
         "ruleset": [
             {
                 "handledAccessFs": [ "execute", "write_file", "execute" ]
@@ -453,6 +485,7 @@ fn test_dup_handled_access_fs_1() {
     assert_eq!(
         parse_json(json),
         Ok(Policy {
+            abi: Some(ABI::V6),
             handled_fs: AccessFs::Execute | AccessFs::WriteFile,
             ..Default::default()
         }),
@@ -462,6 +495,7 @@ fn test_dup_handled_access_fs_1() {
 #[test]
 fn test_dup_handled_access_fs_2() {
     let json = r#"{
+        "abi": 6,
         "ruleset": [
             {
                 "handledAccessFs": [ "write_file" ]
@@ -477,6 +511,7 @@ fn test_dup_handled_access_fs_2() {
     assert_eq!(
         parse_json(json),
         Ok(Policy {
+            abi: Some(ABI::V6),
             handled_fs: AccessFs::Execute | AccessFs::WriteFile,
             ..Default::default()
         }),
@@ -486,6 +521,7 @@ fn test_dup_handled_access_fs_2() {
 #[test]
 fn test_unknown_handled_access_fs_1() {
     let json = r#"{
+        "abi": 6,
         "ruleset": [
             {
                 "handledAccessFs": [ "foo" ]
@@ -498,6 +534,7 @@ fn test_unknown_handled_access_fs_1() {
 #[test]
 fn test_unknown_handled_access_fs_2() {
     let json = r#"{
+        "abi": 6,
         "ruleset": [
             {
                 "handledAccessFs": [ "bind_tcp" ]
@@ -510,6 +547,7 @@ fn test_unknown_handled_access_fs_2() {
 #[test]
 fn test_one_path_beneath_str() {
     let json = r#"{
+        "abi": 6,
         "ruleset": [
             {
                 "handledAccessFs": [ "execute" ]
@@ -535,6 +573,7 @@ fn test_one_path_beneath_str() {
 #[test]
 fn test_one_path_beneath_int() {
     let json = r#"{
+        "abi": 6,
         "ruleset": [
             {
                 "handledAccessFs": [ "execute" ]
@@ -553,6 +592,7 @@ fn test_one_path_beneath_int() {
 #[test]
 fn test_dup_path_beneath_1() {
     let json = r#"{
+        "abi": 6,
         "ruleset": [
             {
                 "handledAccessFs": [ "execute" ]
@@ -578,6 +618,7 @@ fn test_dup_path_beneath_1() {
 #[test]
 fn test_dup_path_beneath_2() {
     let json = r#"{
+        "abi": 6,
         "ruleset": [
             {
                 "handledAccessFs": [ "execute" ]
@@ -607,6 +648,7 @@ fn test_dup_path_beneath_2() {
 #[test]
 fn test_overlap_path_beneath() {
     let json = r#"{
+        "abi": 6,
         "ruleset": [
             {
                 "handledAccessFs": [ "execute" ]
@@ -651,6 +693,7 @@ fn test_overlap_path_beneath() {
 #[test]
 fn test_normalization_path_beneath() {
     let json = r#"{
+        "abi": 6,
         "ruleset": [
             {
                 "handledAccessFs": [ "execute" ]
@@ -687,6 +730,7 @@ fn test_normalization_path_beneath() {
 #[test]
 fn test_one_handled_access_net() {
     let json = r#"{
+        "abi": 6,
         "ruleset": [
             {
                 "handledAccessNet": [ "bind_tcp" ]
@@ -696,6 +740,7 @@ fn test_one_handled_access_net() {
     assert_eq!(
         parse_json(json),
         Ok(Policy {
+            abi: Some(ABI::V6),
             handled_net: AccessNet::BindTcp.into(),
             ..Default::default()
         }),
@@ -729,6 +774,7 @@ fn test_all_handled_access_net() {
 #[test]
 fn test_dup_handled_access_net_1() {
     let json = r#"{
+        "abi": 6,
         "ruleset": [
             {
                 "handledAccessNet": [ "bind_tcp", "connect_tcp", "bind_tcp" ]
@@ -738,6 +784,7 @@ fn test_dup_handled_access_net_1() {
     assert_eq!(
         parse_json(json),
         Ok(Policy {
+            abi: Some(ABI::V6),
             handled_net: AccessNet::BindTcp | AccessNet::ConnectTcp,
             ..Default::default()
         }),
@@ -747,6 +794,7 @@ fn test_dup_handled_access_net_1() {
 #[test]
 fn test_dup_handled_access_net_2() {
     let json = r#"{
+        "abi": 6,
         "ruleset": [
             {
                 "handledAccessNet": [ "connect_tcp" ]
@@ -762,6 +810,7 @@ fn test_dup_handled_access_net_2() {
     assert_eq!(
         parse_json(json),
         Ok(Policy {
+            abi: Some(ABI::V6),
             handled_net: AccessNet::BindTcp | AccessNet::ConnectTcp,
             ..Default::default()
         }),
@@ -771,6 +820,7 @@ fn test_dup_handled_access_net_2() {
 #[test]
 fn test_unknown_handled_access_net_1() {
     let json = r#"{
+        "abi": 6,
         "ruleset": [
             {
                 "handledAccessNet": [ "foo" ]
@@ -783,6 +833,7 @@ fn test_unknown_handled_access_net_1() {
 #[test]
 fn test_unknown_handled_access_net_2() {
     let json = r#"{
+        "abi": 6,
         "ruleset": [
             {
                 "handledAccessNet": [ "execute" ]
@@ -795,6 +846,7 @@ fn test_unknown_handled_access_net_2() {
 #[test]
 fn test_one_net_port() {
     let json = r#"{
+        "abi": 6,
         "ruleset": [
             {
                 "handledAccessNet": [ "bind_tcp" ]
@@ -810,6 +862,7 @@ fn test_one_net_port() {
     assert_eq!(
         parse_json(json),
         Ok(Policy {
+            abi: Some(ABI::V6),
             handled_net: AccessNet::BindTcp.into(),
             rules_net_port: [(443, AccessNet::BindTcp.into())].into(),
             ..Default::default()
@@ -820,6 +873,7 @@ fn test_one_net_port() {
 #[test]
 fn test_overlap_net_port() {
     let json = r#"{
+        "abi": 6,
         "ruleset": [
             {
                 "handledAccessNet": [ "bind_tcp", "connect_tcp" ]
@@ -843,6 +897,7 @@ fn test_overlap_net_port() {
     assert_eq!(
         parse_json(json),
         Ok(Policy {
+            abi: Some(ABI::V6),
             handled_net: AccessNet::BindTcp | AccessNet::ConnectTcp,
             rules_net_port: [(443, AccessNet::BindTcp | AccessNet::ConnectTcp)].into(),
             ..Default::default()
@@ -855,6 +910,7 @@ fn test_overlap_net_port() {
 #[test]
 fn test_mix_handled_access_1() {
     let json = r#"{
+        "abi": 6,
         "ruleset": [
             {
                 "handledAccessFs": [ "execute" ],
@@ -865,6 +921,7 @@ fn test_mix_handled_access_1() {
     assert_eq!(
         parse_json(json),
         Ok(Policy {
+            abi: Some(ABI::V6),
             handled_fs: AccessFs::Execute.into(),
             handled_net: AccessNet::BindTcp.into(),
             ..Default::default()
@@ -875,6 +932,7 @@ fn test_mix_handled_access_1() {
 #[test]
 fn test_mix_handled_access_2() {
     let json = r#"{
+        "abi": 6,
         "ruleset": [
             {
                 "handledAccessFs": [ "execute" ],
@@ -888,6 +946,7 @@ fn test_mix_handled_access_2() {
     assert_eq!(
         parse_json(json),
         Ok(Policy {
+            abi: Some(ABI::V6),
             handled_fs: AccessFs::Execute.into(),
             handled_net: AccessNet::BindTcp | AccessNet::ConnectTcp,
             ..Default::default()
@@ -900,6 +959,7 @@ fn test_mix_handled_access_2() {
 #[test]
 fn test_one_scoped() {
     let json = r#"{
+        "abi": 6,
         "ruleset": [
             {
                 "scoped": [ "abstract_unix_socket" ]
@@ -909,6 +969,7 @@ fn test_one_scoped() {
     assert_eq!(
         parse_json(json),
         Ok(Policy {
+            abi: Some(ABI::V6),
             scoped: Scope::AbstractUnixSocket.into(),
             ..Default::default()
         }),
@@ -942,6 +1003,7 @@ fn test_all_scoped() {
 #[test]
 fn test_dup_scoped_1() {
     let json = r#"{
+        "abi": 6,
         "ruleset": [
             {
                 "scoped": [ "abstract_unix_socket", "signal", "abstract_unix_socket" ]
@@ -951,6 +1013,7 @@ fn test_dup_scoped_1() {
     assert_eq!(
         parse_json(json),
         Ok(Policy {
+            abi: Some(ABI::V6),
             scoped: Scope::Signal | Scope::AbstractUnixSocket,
             ..Default::default()
         }),
@@ -960,6 +1023,7 @@ fn test_dup_scoped_1() {
 #[test]
 fn test_dup_scoped_2() {
     let json = r#"{
+        "abi": 6,
         "ruleset": [
             {
                 "scoped": [ "signal" ]
@@ -975,6 +1039,7 @@ fn test_dup_scoped_2() {
     assert_eq!(
         parse_json(json),
         Ok(Policy {
+            abi: Some(ABI::V6),
             scoped: Scope::Signal | Scope::AbstractUnixSocket,
             ..Default::default()
         }),
@@ -984,6 +1049,7 @@ fn test_dup_scoped_2() {
 #[test]
 fn test_unknown_scoped_1() {
     let json = r#"{
+        "abi": 6,
         "ruleset": [
             {
                 "scoped": [ "foo" ]
@@ -996,6 +1062,7 @@ fn test_unknown_scoped_1() {
 #[test]
 fn test_unknown_scoped_2() {
     let json = r#"{
+        "abi": 6,
         "ruleset": [
             {
                 "scoped": [ "execute" ]
@@ -1010,6 +1077,7 @@ fn test_unknown_scoped_2() {
 #[test]
 fn test_infer_mixed_handled_and_rule() {
     let json = r#"{
+        "abi": 6,
         "ruleset": [
             {
                 "handledAccessFs": [ "execute" ]
@@ -1025,6 +1093,7 @@ fn test_infer_mixed_handled_and_rule() {
     assert_eq!(
         parse_json(json),
         Ok(Policy {
+            abi: Some(ABI::V6),
             handled_fs: AccessFs::Execute.into(),
             handled_net: AccessNet::BindTcp.into(),
             rules_net_port: [(443, AccessNet::BindTcp.into())].into(),
@@ -1036,6 +1105,7 @@ fn test_infer_mixed_handled_and_rule() {
 #[test]
 fn test_infer_handled_access_fs() {
     let json = r#"{
+        "abi": 6,
         "ruleset": [
             {
                 "handledAccessFs": [ "execute" ]
@@ -1066,6 +1136,7 @@ fn test_infer_handled_access_fs() {
 #[test]
 fn test_infer_handled_access_net() {
     let json = r#"{
+        "abi": 6,
         "ruleset": [
             {
                 "handledAccessNet": [ "bind_tcp" ]
@@ -1081,6 +1152,7 @@ fn test_infer_handled_access_net() {
     assert_eq!(
         parse_json(json),
         Ok(Policy {
+            abi: Some(ABI::V6),
             handled_net: AccessNet::BindTcp | AccessNet::ConnectTcp,
             rules_net_port: [(443, AccessNet::ConnectTcp.into())].into(),
             ..Default::default()
@@ -1091,6 +1163,7 @@ fn test_infer_handled_access_net() {
 #[test]
 fn test_path_beneath_alone() {
     let json = r#"{
+        "abi": 6,
         "pathBeneath": [
             {
                 "allowedAccess": [ "execute" ],
@@ -1111,6 +1184,7 @@ fn test_path_beneath_alone() {
 #[test]
 fn test_net_port_alone() {
     let json = r#"{
+        "abi": 6,
         "netPort": [
             {
                 "allowedAccess": [ "bind_tcp" ],
@@ -1121,6 +1195,7 @@ fn test_net_port_alone() {
     assert_eq!(
         parse_json(json),
         Ok(Policy {
+            abi: Some(ABI::V6),
             handled_net: AccessNet::BindTcp.into(),
             rules_net_port: [(443, AccessNet::BindTcp.into())].into(),
             ..Default::default()

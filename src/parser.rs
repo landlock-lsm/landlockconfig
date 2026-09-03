@@ -398,18 +398,13 @@ where
     A: Access,
     G: AbiGroup<A>,
 {
-    fn resolve_bitflags<V>(access: V, abi: Option<ABI>) -> Result<BitFlags<A>, ResolveError>
+    fn resolve_bitflags<V>(access: V, abi: ABI) -> Result<BitFlags<A>, ResolveError>
     where
         V: Into<Self>,
     {
         match access.into() {
             Self::Value(a) => Ok(a.into()),
-            Self::Group(g) => {
-                // Simulate a missing variable
-                Ok(g.resolve_bitflags(
-                    abi.ok_or(ResolveError::VariableNotFound(Name::from_str("abi")?))?,
-                ))
-            }
+            Self::Group(g) => Ok(g.resolve_bitflags(abi)),
         }
     }
 }
@@ -452,8 +447,7 @@ impl From<&JsonFsAccessItem> for ValueAccessFs {
 
 #[test]
 fn test_v1_read_execute() {
-    let rx =
-        ValueAccessFs::resolve_bitflags(&JsonFsAccessItem::AbiReadExecute, Some(ABI::V1)).unwrap();
+    let rx = ValueAccessFs::resolve_bitflags(&JsonFsAccessItem::AbiReadExecute, ABI::V1).unwrap();
     assert_eq!(
         rx,
         AccessFs::Execute | AccessFs::ReadFile | AccessFs::ReadDir
@@ -467,16 +461,14 @@ fn test_v1_read_execute() {
 
 #[test]
 fn test_v2_read_execute() {
-    let rx =
-        ValueAccessFs::resolve_bitflags(&JsonFsAccessItem::AbiReadExecute, Some(ABI::V2)).unwrap();
+    let rx = ValueAccessFs::resolve_bitflags(&JsonFsAccessItem::AbiReadExecute, ABI::V2).unwrap();
     assert!(rx.contains(AccessFs::Execute));
     assert!(rx.contains(AccessFs::Refer));
 }
 
 #[test]
 fn test_v1_read_write() {
-    let rw =
-        ValueAccessFs::resolve_bitflags(&JsonFsAccessItem::AbiReadWrite, Some(ABI::V1)).unwrap();
+    let rw = ValueAccessFs::resolve_bitflags(&JsonFsAccessItem::AbiReadWrite, ABI::V1).unwrap();
     assert_eq!(
         rw,
         AccessFs::WriteFile
@@ -501,14 +493,13 @@ fn test_v1_read_write() {
 
 #[test]
 fn test_v2_read_write() {
-    let rw =
-        ValueAccessFs::resolve_bitflags(&JsonFsAccessItem::AbiReadWrite, Some(ABI::V2)).unwrap();
+    let rw = ValueAccessFs::resolve_bitflags(&JsonFsAccessItem::AbiReadWrite, ABI::V2).unwrap();
     assert!(!rw.contains(AccessFs::Execute));
     assert!(rw.contains(AccessFs::Refer));
 }
 
 impl NonEmptySet<JsonFsAccessItem> {
-    pub fn resolve_bitflags(&self, abi: Option<ABI>) -> Result<BitFlags<AccessFs>, ResolveError> {
+    pub fn resolve_bitflags(&self, abi: ABI) -> Result<BitFlags<AccessFs>, ResolveError> {
         self.iter().try_fold(BitFlags::EMPTY, |flags, item| {
             let access = ValueAccessFs::resolve_bitflags(item, abi)?;
             Ok(flags | access)
@@ -550,7 +541,7 @@ impl From<&JsonNetAccessItem> for ValueAccessNet {
 }
 
 impl NonEmptySet<JsonNetAccessItem> {
-    pub fn resolve_bitflags(&self, abi: Option<ABI>) -> Result<BitFlags<AccessNet>, ResolveError> {
+    pub fn resolve_bitflags(&self, abi: ABI) -> Result<BitFlags<AccessNet>, ResolveError> {
         self.iter().try_fold(BitFlags::EMPTY, |flags, item| {
             let access = ValueAccessNet::resolve_bitflags(item, abi)?;
             Ok(flags | access)
@@ -592,7 +583,7 @@ impl From<&JsonScopeItem> for ValueScope {
 }
 
 impl NonEmptySet<JsonScopeItem> {
-    pub fn resolve_bitflags(&self, abi: Option<ABI>) -> Result<BitFlags<Scope>, ResolveError> {
+    pub fn resolve_bitflags(&self, abi: ABI) -> Result<BitFlags<Scope>, ResolveError> {
         self.iter().try_fold(BitFlags::EMPTY, |flags, item| {
             let access = ValueScope::resolve_bitflags(item, abi)?;
             Ok(flags | access)
@@ -727,6 +718,8 @@ impl From<TomlNetPort> for JsonNetPort {
     }
 }
 
+pub(crate) const LATEST_ABI: ABI = ABI::V6;
+
 struct JsonAbiVisitor;
 
 impl JsonAbiVisitor {
@@ -774,7 +767,7 @@ pub(crate) struct JsonAbi(i32);
 
 impl From<JsonAbi> for ABI {
     fn from(abi: JsonAbi) -> Self {
-        abi.0.into()
+        ABI::from(abi.0).min(LATEST_ABI)
     }
 }
 
@@ -803,8 +796,7 @@ type TomlVariable = JsonVariable;
 #[serde(deny_unknown_fields)]
 #[allow(non_snake_case)]
 pub(crate) struct JsonPolicy {
-    #[serde(default)]
-    pub(crate) abi: OptionalProperty<JsonAbi>,
+    pub(crate) abi: JsonAbi,
     #[serde(default)]
     pub(crate) variable: OptionalProperty<NonEmptySet<JsonVariable>>,
     #[serde(default)]
@@ -844,8 +836,7 @@ impl NonEmptyStructInner for JsonPolicy {
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct TomlPolicy {
-    #[serde(default)]
-    abi: OptionalProperty<JsonAbi>,
+    abi: JsonAbi,
     #[serde(default)]
     variable: OptionalProperty<NonEmptySet<TomlVariable>>,
     #[serde(default)]
@@ -930,8 +921,7 @@ mod tests_optional_property {
         let variable: JsonVariable = serde_json::from_str(r#"{"name":"name"}"#).unwrap();
         assert_missing(&variable.literal);
 
-        let policy: JsonPolicy = serde_json::from_str("{}").unwrap();
-        assert_missing(&policy.abi);
+        let policy: JsonPolicy = serde_json::from_str(r#"{"abi":1}"#).unwrap();
         assert_missing(&policy.variable);
         assert_missing(&policy.ruleset);
         assert_missing(&policy.pathBeneath);
@@ -949,8 +939,7 @@ mod tests_optional_property {
         let variable: TomlVariable = toml::from_str("name = \"name\"").unwrap();
         assert_missing(&variable.literal);
 
-        let policy: TomlPolicy = toml::from_str("").unwrap();
-        assert_missing(&policy.abi);
+        let policy: TomlPolicy = toml::from_str("abi = 1").unwrap();
         assert_missing(&policy.variable);
         assert_missing(&policy.ruleset);
         assert_missing(&policy.path_beneath);

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use crate::nonempty::NonEmptyStruct;
-use crate::parser::{JsonPolicy, TemplateString, TomlPolicy};
+use crate::parser::{JsonPolicy, OptionalProperty, TemplateString, TomlPolicy};
 use crate::variable::{NameError, ResolveError, Variables, VecStringIterator};
 use landlock::{
     AccessFs, AccessNet, BitFlags, NetPort, PathBeneath, PathFd, PathFdError, Ruleset, RulesetAttr,
@@ -67,68 +67,76 @@ impl TryFrom<NonEmptyStruct<JsonPolicy>> for Policy {
         let mut policy = Self::empty();
         let json = json.into_inner();
 
-        policy.abi = json.abi.map(Into::into);
+        policy.abi = match json.abi {
+            OptionalProperty::Missing => None,
+            OptionalProperty::Present(abi) => Some(abi.into()),
+        };
 
-        for variable in json.variable.unwrap_or_default() {
-            let name = variable.name.parse()?;
-            let literal = variable.literal.unwrap_or_default();
-            // TODO: Check and warn if users tried to use variable in literal strings?
-            policy.variables.extend(name, literal);
+        if let OptionalProperty::Present(variables) = json.variable {
+            for variable in variables {
+                let name = variable.name.parse()?;
+                let literal = match variable.literal {
+                    OptionalProperty::Missing => Default::default(),
+                    OptionalProperty::Present(literal) => literal,
+                };
+                // TODO: Check and warn if users tried to use variable in literal strings?
+                policy.variables.extend(name, literal);
+            }
         }
 
-        for ruleset in json.ruleset.unwrap_or_default() {
-            let ruleset = ruleset.into_inner();
-            policy.handled_fs |= ruleset
-                .handledAccessFs
-                .map(|access| access.resolve_bitflags(policy.abi))
-                .transpose()?
-                .unwrap_or_default();
-            policy.handled_net |= ruleset
-                .handledAccessNet
-                .map(|access| access.resolve_bitflags(policy.abi))
-                .transpose()?
-                .unwrap_or_default();
-            policy.scoped |= ruleset
-                .scoped
-                .map(|scoped| scoped.resolve_bitflags(policy.abi))
-                .transpose()?
-                .unwrap_or_default();
-        }
-
-        for path_beneath in json.pathBeneath.unwrap_or_default() {
-            let access = path_beneath.allowedAccess.resolve_bitflags(policy.abi)?;
-
-            // It is possible to have rules with empty access because of empty
-            // access group resolution.
-            if !access.is_empty() {
-                // Automatically augment and keep the ruleset consistent.
-                policy.handled_fs |= access;
-
-                for parent in path_beneath.parent {
-                    policy
-                        .rules_path_beneath
-                        .entry(parent)
-                        .and_modify(|a| *a |= access)
-                        .or_insert(access);
+        if let OptionalProperty::Present(rulesets) = json.ruleset {
+            for ruleset in rulesets {
+                let ruleset = ruleset.into_inner();
+                if let OptionalProperty::Present(access) = ruleset.handledAccessFs {
+                    policy.handled_fs |= access.resolve_bitflags(policy.abi)?;
+                }
+                if let OptionalProperty::Present(access) = ruleset.handledAccessNet {
+                    policy.handled_net |= access.resolve_bitflags(policy.abi)?;
+                }
+                if let OptionalProperty::Present(scoped) = ruleset.scoped {
+                    policy.scoped |= scoped.resolve_bitflags(policy.abi)?;
                 }
             }
         }
 
-        for net_port in json.netPort.unwrap_or_default() {
-            let access = net_port.allowedAccess.resolve_bitflags(policy.abi)?;
+        if let OptionalProperty::Present(path_beneath_rules) = json.pathBeneath {
+            for path_beneath in path_beneath_rules {
+                let access = path_beneath.allowedAccess.resolve_bitflags(policy.abi)?;
 
-            // It is possible to have rules with empty access because of empty
-            // access group resolution.
-            if !access.is_empty() {
-                // Automatically augment and keep the ruleset consistent.
-                policy.handled_net |= access;
+                // It is possible to have rules with empty access because of empty
+                // access group resolution.
+                if !access.is_empty() {
+                    // Automatically augment and keep the ruleset consistent.
+                    policy.handled_fs |= access;
 
-                for port in net_port.port {
-                    policy
-                        .rules_net_port
-                        .entry(port)
-                        .and_modify(|a| *a |= access)
-                        .or_insert(access);
+                    for parent in path_beneath.parent {
+                        policy
+                            .rules_path_beneath
+                            .entry(parent)
+                            .and_modify(|a| *a |= access)
+                            .or_insert(access);
+                    }
+                }
+            }
+        }
+
+        if let OptionalProperty::Present(net_port_rules) = json.netPort {
+            for net_port in net_port_rules {
+                let access = net_port.allowedAccess.resolve_bitflags(policy.abi)?;
+
+                // It is possible to have rules with empty access because of empty
+                // access group resolution.
+                if !access.is_empty() {
+                    // Automatically augment and keep the ruleset consistent.
+                    policy.handled_net |= access;
+
+                    for port in net_port.port {
+                        policy
+                            .rules_net_port
+                            .entry(port)
+                            .and_modify(|a| *a |= access)
+                            .or_insert(access);
+                    }
                 }
             }
         }

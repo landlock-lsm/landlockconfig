@@ -48,6 +48,85 @@ fn test_empty_policy_toml() {
     assert!(parse_toml(toml).is_err());
 }
 
+#[test]
+fn test_null_optional_fields_json() {
+    let fields = [
+        (
+            "abi",
+            r#"{
+                "abi": null,
+                "ruleset": [{ "handledAccessFs": ["execute"] }]
+            }"#,
+        ),
+        (
+            "variable",
+            r#"{
+                "variable": null,
+                "ruleset": [{ "handledAccessFs": ["execute"] }]
+            }"#,
+        ),
+        (
+            "ruleset",
+            r#"{
+                "ruleset": null,
+                "variable": [{ "name": "foo" }]
+            }"#,
+        ),
+        (
+            "pathBeneath",
+            r#"{
+                "pathBeneath": null,
+                "ruleset": [{ "handledAccessFs": ["execute"] }]
+            }"#,
+        ),
+        (
+            "netPort",
+            r#"{
+                "netPort": null,
+                "ruleset": [{ "handledAccessFs": ["execute"] }]
+            }"#,
+        ),
+        (
+            "handledAccessFs",
+            r#"{
+                "ruleset": [{
+                    "handledAccessFs": null,
+                    "handledAccessNet": ["bind_tcp"]
+                }]
+            }"#,
+        ),
+        (
+            "handledAccessNet",
+            r#"{
+                "ruleset": [{
+                    "handledAccessFs": ["execute"],
+                    "handledAccessNet": null
+                }]
+            }"#,
+        ),
+        (
+            "scoped",
+            r#"{
+                "ruleset": [{
+                    "handledAccessFs": ["execute"],
+                    "scoped": null
+                }]
+            }"#,
+        ),
+        (
+            "literal",
+            r#"{
+                "variable": [{ "name": "foo", "literal": null }]
+            }"#,
+        ),
+    ];
+
+    for (field, json) in fields {
+        println!("Testing null {field}");
+        assert_eq!(parse_json(json), Err(Category::Data));
+    }
+}
+
 /* Test "invalid length 0, expected at least one element" error. */
 
 #[test]

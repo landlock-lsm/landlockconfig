@@ -9,6 +9,34 @@ use serde::de::{Unexpected, Visitor};
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::str::FromStr;
 
+/// A policy property that may be omitted but not set to JSON null.
+///
+/// `Property` denotes a named policy member independently of its JSON or TOML
+/// spelling. Serde's `Option<T>` maps both an omitted JSON property and explicit
+/// `null` to `None`. Every field of this type must use `#[serde(default)]` so
+/// omission maps to `Missing`; otherwise omission reaches `Deserialize` and is
+/// rejected like `null`. Present values map to `Present(T)`.
+#[derive(Debug, Default, Ord, Eq, PartialOrd, PartialEq)]
+pub(crate) enum OptionalProperty<T> {
+    #[default]
+    Missing,
+    Present(T),
+}
+
+impl<'de, T> Deserialize<'de> for OptionalProperty<T>
+where
+    T: Deserialize<'de>,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Option::<T>::deserialize(deserializer)?
+            .map(Self::Present)
+            .ok_or_else(|| de::Error::custom("explicit null is not allowed"))
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum TemplateToken {
     Text(String),
@@ -577,23 +605,32 @@ impl NonEmptySet<JsonScopeItem> {
 #[serde(deny_unknown_fields)]
 #[allow(non_snake_case)]
 pub(crate) struct JsonRuleset {
-    pub(crate) handledAccessFs: Option<NonEmptySet<JsonFsAccessItem>>,
-    pub(crate) handledAccessNet: Option<NonEmptySet<JsonNetAccessItem>>,
-    pub(crate) scoped: Option<NonEmptySet<JsonScopeItem>>,
+    #[serde(default)]
+    pub(crate) handledAccessFs: OptionalProperty<NonEmptySet<JsonFsAccessItem>>,
+    #[serde(default)]
+    pub(crate) handledAccessNet: OptionalProperty<NonEmptySet<JsonNetAccessItem>>,
+    #[serde(default)]
+    pub(crate) scoped: OptionalProperty<NonEmptySet<JsonScopeItem>>,
 }
 
 impl NonEmptyStructInner for JsonRuleset {
     const ERROR_MESSAGE: &'static str = "empty ruleset";
 
     fn is_empty(&self) -> bool {
-        self.handledAccessFs
-            .as_ref()
-            .is_none_or(|set| set.is_empty())
-            && self
-                .handledAccessNet
-                .as_ref()
-                .is_none_or(|set| set.is_empty())
-            && self.scoped.as_ref().is_none_or(|set| set.is_empty())
+        let handled_access_fs = match &self.handledAccessFs {
+            OptionalProperty::Missing => true,
+            OptionalProperty::Present(set) => set.is_empty(),
+        };
+        let handled_access_net = match &self.handledAccessNet {
+            OptionalProperty::Missing => true,
+            OptionalProperty::Present(set) => set.is_empty(),
+        };
+        let scoped = match &self.scoped {
+            OptionalProperty::Missing => true,
+            OptionalProperty::Present(set) => set.is_empty(),
+        };
+
+        handled_access_fs && handled_access_net && scoped
     }
 }
 
@@ -601,23 +638,32 @@ impl NonEmptyStructInner for JsonRuleset {
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
 #[serde(deny_unknown_fields)]
 struct TomlRuleset {
-    handled_access_fs: Option<NonEmptySet<JsonFsAccessItem>>,
-    handled_access_net: Option<NonEmptySet<JsonNetAccessItem>>,
-    scoped: Option<NonEmptySet<JsonScopeItem>>,
+    #[serde(default)]
+    handled_access_fs: OptionalProperty<NonEmptySet<JsonFsAccessItem>>,
+    #[serde(default)]
+    handled_access_net: OptionalProperty<NonEmptySet<JsonNetAccessItem>>,
+    #[serde(default)]
+    scoped: OptionalProperty<NonEmptySet<JsonScopeItem>>,
 }
 
 impl NonEmptyStructInner for TomlRuleset {
     const ERROR_MESSAGE: &'static str = "empty ruleset";
 
     fn is_empty(&self) -> bool {
-        self.handled_access_fs
-            .as_ref()
-            .is_none_or(|set| set.is_empty())
-            && self
-                .handled_access_net
-                .as_ref()
-                .is_none_or(|set| set.is_empty())
-            && self.scoped.as_ref().is_none_or(|set| set.is_empty())
+        let handled_access_fs = match &self.handled_access_fs {
+            OptionalProperty::Missing => true,
+            OptionalProperty::Present(set) => set.is_empty(),
+        };
+        let handled_access_net = match &self.handled_access_net {
+            OptionalProperty::Missing => true,
+            OptionalProperty::Present(set) => set.is_empty(),
+        };
+        let scoped = match &self.scoped {
+            OptionalProperty::Missing => true,
+            OptionalProperty::Present(set) => set.is_empty(),
+        };
+
+        handled_access_fs && handled_access_net && scoped
     }
 }
 
@@ -746,7 +792,8 @@ impl<'de> serde::Deserialize<'de> for JsonAbi {
 #[allow(non_snake_case)]
 pub(crate) struct JsonVariable {
     pub(crate) name: String,
-    pub(crate) literal: Option<NonEmptySet<String>>,
+    #[serde(default)]
+    pub(crate) literal: OptionalProperty<NonEmptySet<String>>,
 }
 
 type TomlVariable = JsonVariable;
@@ -756,21 +803,40 @@ type TomlVariable = JsonVariable;
 #[serde(deny_unknown_fields)]
 #[allow(non_snake_case)]
 pub(crate) struct JsonPolicy {
-    pub(crate) abi: Option<JsonAbi>,
-    pub(crate) variable: Option<NonEmptySet<JsonVariable>>,
-    pub(crate) ruleset: Option<NonEmptySet<NonEmptyStruct<JsonRuleset>>>,
-    pub(crate) pathBeneath: Option<NonEmptySet<JsonPathBeneath>>,
-    pub(crate) netPort: Option<NonEmptySet<JsonNetPort>>,
+    #[serde(default)]
+    pub(crate) abi: OptionalProperty<JsonAbi>,
+    #[serde(default)]
+    pub(crate) variable: OptionalProperty<NonEmptySet<JsonVariable>>,
+    #[serde(default)]
+    pub(crate) ruleset: OptionalProperty<NonEmptySet<NonEmptyStruct<JsonRuleset>>>,
+    #[serde(default)]
+    pub(crate) pathBeneath: OptionalProperty<NonEmptySet<JsonPathBeneath>>,
+    #[serde(default)]
+    pub(crate) netPort: OptionalProperty<NonEmptySet<JsonNetPort>>,
 }
 
 impl NonEmptyStructInner for JsonPolicy {
     const ERROR_MESSAGE: &'static str = "empty policy";
 
     fn is_empty(&self) -> bool {
-        self.variable.as_ref().is_none_or(|set| set.is_empty())
-            && self.ruleset.as_ref().is_none_or(|set| set.is_empty())
-            && self.pathBeneath.as_ref().is_none_or(|set| set.is_empty())
-            && self.netPort.as_ref().is_none_or(|set| set.is_empty())
+        let variable = match &self.variable {
+            OptionalProperty::Missing => true,
+            OptionalProperty::Present(set) => set.is_empty(),
+        };
+        let ruleset = match &self.ruleset {
+            OptionalProperty::Missing => true,
+            OptionalProperty::Present(set) => set.is_empty(),
+        };
+        let path_beneath = match &self.pathBeneath {
+            OptionalProperty::Missing => true,
+            OptionalProperty::Present(set) => set.is_empty(),
+        };
+        let net_port = match &self.netPort {
+            OptionalProperty::Missing => true,
+            OptionalProperty::Present(set) => set.is_empty(),
+        };
+
+        variable && ruleset && path_beneath && net_port
     }
 }
 
@@ -778,38 +844,116 @@ impl NonEmptyStructInner for JsonPolicy {
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct TomlPolicy {
-    abi: Option<JsonAbi>,
-    variable: Option<NonEmptySet<TomlVariable>>,
-    ruleset: Option<NonEmptySet<NonEmptyStruct<TomlRuleset>>>,
-    path_beneath: Option<NonEmptySet<TomlPathBeneath>>,
-    net_port: Option<NonEmptySet<TomlNetPort>>,
+    #[serde(default)]
+    abi: OptionalProperty<JsonAbi>,
+    #[serde(default)]
+    variable: OptionalProperty<NonEmptySet<TomlVariable>>,
+    #[serde(default)]
+    ruleset: OptionalProperty<NonEmptySet<NonEmptyStruct<TomlRuleset>>>,
+    #[serde(default)]
+    path_beneath: OptionalProperty<NonEmptySet<TomlPathBeneath>>,
+    #[serde(default)]
+    net_port: OptionalProperty<NonEmptySet<TomlNetPort>>,
 }
 
 impl NonEmptyStructInner for TomlPolicy {
     const ERROR_MESSAGE: &'static str = "empty policy";
 
     fn is_empty(&self) -> bool {
-        self.variable.as_ref().is_none_or(|set| set.is_empty())
-            && self.ruleset.as_ref().is_none_or(|set| set.is_empty())
-            && self.path_beneath.as_ref().is_none_or(|set| set.is_empty())
-            && self.net_port.as_ref().is_none_or(|set| set.is_empty())
+        let variable = match &self.variable {
+            OptionalProperty::Missing => true,
+            OptionalProperty::Present(set) => set.is_empty(),
+        };
+        let ruleset = match &self.ruleset {
+            OptionalProperty::Missing => true,
+            OptionalProperty::Present(set) => set.is_empty(),
+        };
+        let path_beneath = match &self.path_beneath {
+            OptionalProperty::Missing => true,
+            OptionalProperty::Present(set) => set.is_empty(),
+        };
+        let net_port = match &self.net_port {
+            OptionalProperty::Missing => true,
+            OptionalProperty::Present(set) => set.is_empty(),
+        };
+
+        variable && ruleset && path_beneath && net_port
     }
 }
 
 impl From<TomlPolicy> for JsonPolicy {
     fn from(toml: TomlPolicy) -> Self {
+        let ruleset = match toml.ruleset {
+            OptionalProperty::Missing => OptionalProperty::Missing,
+            OptionalProperty::Present(set) => OptionalProperty::Present(
+                set.into_iter().map(|ruleset| ruleset.convert()).collect(),
+            ),
+        };
+        let path_beneath = match toml.path_beneath {
+            OptionalProperty::Missing => OptionalProperty::Missing,
+            OptionalProperty::Present(set) => {
+                OptionalProperty::Present(set.into_iter().map(Into::into).collect())
+            }
+        };
+        let net_port = match toml.net_port {
+            OptionalProperty::Missing => OptionalProperty::Missing,
+            OptionalProperty::Present(set) => {
+                OptionalProperty::Present(set.into_iter().map(Into::into).collect())
+            }
+        };
+
         Self {
             abi: toml.abi,
             variable: toml.variable,
-            ruleset: toml
-                .ruleset
-                .map(|set| set.into_iter().map(|r| r.convert()).collect()),
-            pathBeneath: toml
-                .path_beneath
-                .map(|set| set.into_iter().map(Into::into).collect()),
-            netPort: toml
-                .net_port
-                .map(|set| set.into_iter().map(Into::into).collect()),
+            ruleset,
+            pathBeneath: path_beneath,
+            netPort: net_port,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests_optional_property {
+    use super::*;
+
+    fn assert_missing<T>(property: &OptionalProperty<T>) {
+        assert!(matches!(property, OptionalProperty::Missing));
+    }
+
+    #[test]
+    fn test_omitted_json_properties() {
+        let ruleset: JsonRuleset = serde_json::from_str("{}").unwrap();
+        assert_missing(&ruleset.handledAccessFs);
+        assert_missing(&ruleset.handledAccessNet);
+        assert_missing(&ruleset.scoped);
+
+        let variable: JsonVariable = serde_json::from_str(r#"{"name":"name"}"#).unwrap();
+        assert_missing(&variable.literal);
+
+        let policy: JsonPolicy = serde_json::from_str("{}").unwrap();
+        assert_missing(&policy.abi);
+        assert_missing(&policy.variable);
+        assert_missing(&policy.ruleset);
+        assert_missing(&policy.pathBeneath);
+        assert_missing(&policy.netPort);
+    }
+
+    #[cfg(feature = "toml")]
+    #[test]
+    fn test_omitted_toml_properties() {
+        let ruleset: TomlRuleset = toml::from_str("").unwrap();
+        assert_missing(&ruleset.handled_access_fs);
+        assert_missing(&ruleset.handled_access_net);
+        assert_missing(&ruleset.scoped);
+
+        let variable: TomlVariable = toml::from_str("name = \"name\"").unwrap();
+        assert_missing(&variable.literal);
+
+        let policy: TomlPolicy = toml::from_str("").unwrap();
+        assert_missing(&policy.abi);
+        assert_missing(&policy.variable);
+        assert_missing(&policy.ruleset);
+        assert_missing(&policy.path_beneath);
+        assert_missing(&policy.net_port);
     }
 }

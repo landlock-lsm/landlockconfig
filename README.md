@@ -26,6 +26,72 @@ guarantees.
 
 ## Policy principles
 
+### Policy composition and authority
+
+A Landlock policy can be assembled by composing component compatibility policies
+stored in separate files. Keeping these compatibility declarations separate
+lets callers share and reuse them as policy snippets. It also lets ownership and
+maintenance of a component's declarations be delegated to the party responsible
+for that component, such as an application or library maintainer or a
+distribution packager. Each policy describes the restrictions and resource
+allowances under which its component is expected to work. Each owner is
+responsible for maintaining and testing its component with the declarations in
+that policy, and for retesting it after changing them.
+
+For example, an application may depend on several libraries or plugins, each
+delivered by a separate package and maintained by a different party. Each party
+can own and maintain the compatibility policy for its component. A caller that
+trusts all of these parties can compose their policies into one policy while
+leaving each component owner responsible for its declarations.
+
+Composing policies computes one policy intended to preserve the declared
+compatibility requirements of every represented component. It does not combine
+independent security requirements. Composition:
+
+- intersects handled filesystem and network rights;
+- intersects scoped rights;
+- unions literal values declared for the same variable name; and
+- unions path and port allowances, then limits them to the commonly handled
+  rights.
+
+Variable names share one composition-wide namespace. When multiple component
+policies declare the same name, templates using that name expand over the union
+of their literal values. Component owners must therefore coordinate shared names
+or account for every resulting expansion in their compatibility tests.
+
+This is intentionally compatibility-oriented. For ordinary access rights, the
+composed policy only enforces a restriction if every selected policy declares
+that its component tolerates that restriction. When every component handles a
+right, the composed policy retains the resource allowances requested by all of
+them.
+
+A policy can therefore weaken the resulting confinement by leaving rights out
+of an explicit handled array or requesting broad allowances. The caller must
+trust every selected policy to state its component's compatibility requirements
+accurately. Composition provides confinement only to the extent implied by the
+selected compatibility declarations. It is not a security boundary between
+mutually distrusting policy authors. It cannot prove that a component was tested
+correctly.
+
+When restrictions come from independent security authorities and must not be
+weakened by a component policy, apply separate Landlock ruleset layers instead
+of composing the policies. Landlock makes denials from stacked layers
+cumulative: for rights restricted by multiple layers, an operation must satisfy
+every relevant layer, and an allowance in one layer cannot override another
+layer's denial. For example, an application and its libraries may compose their
+compatibility policies, while a service manager or system administrator applies
+another layer containing mandatory site restrictions.
+
+In short:
+
+```text
+policy composition          = preserve declared component compatibility by
+                              enforcing only common handled restrictions and
+                              retaining requested allowances for commonly
+                              handled rights
+stacked Landlock rulesets   = enforce every independent authority's restrictions
+```
+
 ### JSON specification
 
 The JSON format is used to define a Landlock security policy as specified by the
@@ -154,8 +220,10 @@ cargo install --path landlock-exec
 landlock-exec --json examples/mini-write-tmp.json sh
 ```
 
-Policy inputs can be composed by specifying `--json` or `--toml` (and related
-file or directory paths) several times.
+Component compatibility policies can be composed by specifying `--json` or
+`--toml` (and related file or directory paths) several times. See
+[Policy composition and authority](#policy-composition-and-authority)
+before combining policies from different maintainers.
 
 ## TOML policy example
 

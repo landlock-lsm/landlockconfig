@@ -58,7 +58,7 @@ enum TemplateState {
 
 struct TemplateStringVisitor;
 
-impl<'de> de::Visitor<'de> for TemplateStringVisitor {
+impl de::Visitor<'_> for TemplateStringVisitor {
     type Value = TemplateString;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -699,7 +699,7 @@ impl JsonAbiVisitor {
     }
 }
 
-impl<'de> Visitor<'de> for JsonAbiVisitor {
+impl Visitor<'_> for JsonAbiVisitor {
     type Value = JsonAbi;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {

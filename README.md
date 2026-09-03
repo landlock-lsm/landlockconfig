@@ -48,6 +48,7 @@ Composing policies computes one policy intended to preserve the declared
 compatibility requirements of every represented component. It does not combine
 independent security requirements. Composition:
 
+- uses the minimum effective policy ABI;
 - intersects handled filesystem and network rights;
 - intersects scoped rights;
 - unions literal values declared for the same variable name; and
@@ -108,25 +109,29 @@ service managers, container runtimes) might be newer or older than the running
 kernel.
 
 In the case of an older kernel and a newer user space, an up-to-date Landlock
-policy should be still compatible as much as possible with older kernels.
-The default behavior should then be to following a best-effort approach to
-protect users as much as possible.  See the "compatibility" modes in [the
-specification](schema/landlock-policy.json).
+policy should remain as compatible as possible with older kernels. The default
+behavior therefore follows a best-effort approach that protects users with the
+supported functionality.
 
-Every policy must declare a positive Landlock ABI version. Declaring the ABI
-makes the policy's tested compatibility contract explicit and keeps its meaning
-stable across library upgrades. It is not inferred from the library version or
-the running kernel; runtime compatibility is applied separately after the
-policy is interpreted.
+Every policy must declare a Landlock ABI version from 1 through 2^31 - 1, the
+positive `i32` range. Declaring the ABI makes the policy's tested compatibility
+contract explicit and keeps its meaning stable across library upgrades. It is
+not inferred from the library version or the running kernel.
 
-If a requested ABI is newer than the library supports, the library uses its
-latest supported ABI to interpret the policy. This preserves the known subset
-of a future policy, but it does not make unknown access names, properties, or
-rule types valid; unknown syntax remains an error.
+If an in-range requested ABI is newer than the library supports, the library
+uses its latest supported ABI to interpret the policy. The resulting ruleset
+then follows rust-landlock's compatibility handling for the running kernel,
+which may further reduce the rights handled and enforced. This preserves the
+known subset of a future policy, but it does not make unknown access names,
+properties, or rule types valid; unknown syntax remains an error.
 
 Concrete access and scope names must be supported by the effective policy ABI.
 Known fields and positive `abi.*` groups remain valid at every ABI; each group
 resolves only to rights supported by that ABI and may resolve to an empty set.
+
+Changing a component policy's ABI or any handled, scoped, exception, variable,
+or allowance declaration changes its compatibility contract. The component
+owner must retest the component after any such change.
 
 **TODO:**
 In the case of an older user space and a newer kernel, it should be possible for
@@ -162,7 +167,12 @@ entry, the policy handles or scopes all rights supported by its effective
 ABI. Present arrays override that category's base and are unioned across repeated
 ruleset entries; an empty array suppresses the ABI-derived base. Path and port
 rules continue to add their rights to the corresponding handled category, while
-rules do not augment scoped rights.
+rules do not augment scoped rights. Only omission selects a default; explicit
+JSON `null` is invalid. Because explicit arrays can reduce handled rights, they
+should describe tested component compatibility requirements.
+
+A policy containing only an ABI is valid and selects these defaults
+without adding resource allowances.
 
 A directly parsed policy whose final three masks are empty is rejected.
 Composition remains infallible and can later intersect every mask to empty; in
@@ -208,9 +218,7 @@ groups are masked by the exception before they augment handled rights; a rule
 that explicitly lists the excepted concrete right is an error. Negative groups
 and negative resource-rule allowances are invalid.
 
-Changing a policy ABI, handled or scoped expression, exception, variable, or
-allowance changes its compatibility contract. The component owner must retest
-the component after any such change.
+Each exception is therefore a tested component compatibility decision.
 
 ## Reference implementation
 
@@ -297,13 +305,13 @@ before combining policies from different maintainers.
 
 ## TOML policy example
 
-Here is an example of a [TOML policy](examples/micro-var.toml) that uses
-variables, access right groups, and list of directory hierarchies for
-conciseness.
+Here is an abridged [TOML policy](examples/micro-var.toml) that uses variables,
+access right groups, and a list of directory hierarchies for conciseness.
 
 ```toml
-abi = 6
+abi = 5
 
+# The omitted ruleset defaults to all rights supported by ABI 5.
 [[variable]]
 name = "tmp"
 literal = ["/tmp", "/var/tmp"]

@@ -1,6 +1,6 @@
-# Debian package
+# Debian packages
 
-This directory contains files for building Debian packages of Landlock Config.
+This directory contains files for building Debian packages of Landlock Policy.
 
 Built packages are only meant for development and testing.
 

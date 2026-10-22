@@ -1,4 +1,4 @@
-# Composition of configurations
+# Composition of policies
 
 ## [TOML source #1](source/s1.toml)
 

@@ -1,8 +1,10 @@
 # Arch Linux package
 
-This directory contains files for building an Arch Linux package of Landlock Config.
+This directory contains files for building the library-only Arch Linux package
+of Landlock Policy.
 
-Built packages are only [meant for development and testing](https://github.com/landlock-lsm/landlockconfig/pull/52).
+Built packages are only [meant for development and
+testing](https://github.com/landlock-lsm/landlock-policy/pull/52).
 
 ## Building the package
 
@@ -24,6 +26,7 @@ make build
 
 ## Output
 
-The build creates a package file: `landlockconfig-git-*.pkg.tar.zst`
+The build creates a library-only package file:
+`landlock-policy-git-*.pkg.tar.zst`
 
-Install with: `sudo pacman -U landlockconfig-git-*.pkg.tar.zst`
+Install with: `sudo pacman -U landlock-policy-git-*.pkg.tar.zst`

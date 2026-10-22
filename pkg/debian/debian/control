@@ -13,9 +13,8 @@ Architecture: any
 Section: libs
 Multi-Arch: same
 Depends: ${shlibs:Depends}, ${misc:Depends}
-Description: Sandboxer library leveraging Landlock - shared library
- Landlock Policy provides a C shared library for sandboxing processes
- using Landlock with JSON or TOML configuration files.
+Description: Landlock policy library - shared library
+ Landlock Policy provides a C shared library for JSON or TOML policy files.
  .
  This package contains the shared library.
 
@@ -24,9 +23,8 @@ Architecture: any
 Section: libdevel
 Multi-Arch: same
 Depends: liblandlock-policy0 (= ${binary:Version}), ${misc:Depends}
-Description: Sandboxer library leveraging Landlock - development files
- Landlock Policy provides a C shared library for sandboxing processes
- using Landlock with JSON or TOML configuration files.
+Description: Landlock policy library - development files
+ Landlock Policy provides a C shared library for JSON or TOML policy files.
  .
  This package contains the C header, pkg-config file, and development
  symlink for building against liblandlock-policy.
@@ -35,8 +33,8 @@ Package: landlock-policy
 Architecture: any
 Section: utils
 Depends: ${shlibs:Depends}, ${misc:Depends}
-Description: Landlock policy development and inspection tool
- landlock-policy develops, inspects, and transforms Landlock policies.
+Description: Landlock policy development, inspection, and transformation tool
+ landlock-policy develops, inspects, and transforms Landlock policy files.
  .
  This package contains the schema inspection tool.
 
@@ -45,8 +43,8 @@ Architecture: any
 Section: utils
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: Landlock policy enforcement and execution wrapper
- landlock-exec is a focused reference wrapper that applies Landlock restrictions
- defined in JSON or TOML policy files, then executes a given command.
+ landlock-exec is a focused reference wrapper that applies restrictions from
+ JSON or TOML policy files, then executes a given command.
  .
  It composes multiple policy files and supports reading from files, directories,
  or standard input.

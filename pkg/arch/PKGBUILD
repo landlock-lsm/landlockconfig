@@ -1,14 +1,14 @@
 # Maintainer: Mickaël Salaün
 #
 # For now, this package is only meant to be used for testing with the Landlock
-# Config repository.
+# Policy repository.
 # TODO: Make it more generic while still efficient for development and CI (see
 # https://gitlab.archlinux.org/archlinux/packaging/packages/systemd/-/commit/16294a0b4415b15f48e07f9e939c49fdf069c506).
 
 pkgname=landlock-policy-git
 pkgver=0
 pkgrel=1
-pkgdesc="Sandboxer library leveraging Landlock with JSON or TOML configuration (git version)"
+pkgdesc="Landlock policy library for JSON or TOML policy files (git version)"
 arch=('x86_64' 'aarch64')
 url="https://landlock.io"
 license=('MIT' 'Apache-2.0')

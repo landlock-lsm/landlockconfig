@@ -82,7 +82,7 @@ are automatically completed according to all used access rights).
 
 This repository enables developers to build an ELF shared object library, which
 can then be used by any program and most programming languages via a foreign
-function interface (FFI) and a [C API](c/landlockconfig.h).
+function interface (FFI) and a [C API](c/landlock-policy.h).
 
 To install this library, first install
 [cargo-c](https://github.com/lu-zero/cargo-c) using your package manager or with

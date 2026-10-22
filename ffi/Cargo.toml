@@ -23,6 +23,7 @@ cbindgen = "0.28.0"
 capi = []
 
 [package.metadata.capi.header]
+name = "landlock-policy"
 subdirectory = false
 generation = false
 

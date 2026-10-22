@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-pub use config::{
+pub use policy::{
     BuildRulesetError, Config, ConfigFormat, OptionalConfig, ParseDirectoryError, ResolvedConfig,
     RuleError,
 };
 pub use variable::ResolveError;
 
-mod config;
 mod nonempty;
 mod parser;
+mod policy;
 mod variable;
 
 #[cfg(test)]

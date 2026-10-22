@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::{config::ResolvedConfig, tests_helpers::parse_json, Config};
+use crate::{policy::ResolvedConfig, tests_helpers::parse_json, Config};
 use landlock::{Access, AccessFs, AccessNet, Scope, ABI};
 use std::path::PathBuf;
 

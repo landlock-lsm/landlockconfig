@@ -21,7 +21,7 @@ for file in "$@"; do
         exit 1
     }
 
-    check-jsonschema --schemafile "${BASE_DIR}/landlockconfig.json" "${file}" || {
+    check-jsonschema --schemafile "${BASE_DIR}/landlock-policy.json" "${file}" || {
         echo
         echo "ERROR: Not validated by schema: ${file}" >&2
         exit 1

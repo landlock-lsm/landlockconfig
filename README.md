@@ -29,7 +29,7 @@ guarantees.
 ### JSON specification
 
 The JSON format is used to define a Landlock security policy as specified by the
-related [JSON schema](schema/landlockconfig.json).
+related [JSON schema](schema/landlock-policy.json).
 
 As the Landlock kernel maintainers, we can guarantee that the specification and
 the library will be kept in sync with kernel changes.
@@ -45,7 +45,7 @@ In the case of an older kernel and a newer user space, an up-to-date Landlock
 configuration should be still compatible as much as possible with older kernels.
 The default behavior should then be to following a best-effort approach to
 protect users as much as possible.  See the "compatibility" modes in [the
-specification](schema/landlockconfig.json).
+specification](schema/landlock-policy.json).
 
 **TODO:**
 In the case of an older user space and a newer kernel, it should be possible for

@@ -150,7 +150,7 @@ fn schema() {
         "{}",
         include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../schema/landlockconfig.json"
+            "/../schema/landlock-policy.json"
         ))
     );
 }

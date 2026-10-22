@@ -6,7 +6,7 @@ members = ["ffi", "landlock-exec", "landlock-policy-cli"]
 edition = "2021"
 rust-version = "1.85"
 license = "MIT OR Apache-2.0"
-description = "Sandboxer library leveraging Landlock with JSON or TOML configuration"
+description = "Landlock policy specification and reference implementation"
 
 [workspace.dependencies]
 landlock = "0.4.3"

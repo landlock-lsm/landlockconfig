@@ -2,10 +2,10 @@
 
 use crate::{
     parser::{TemplateString, TemplateToken},
-    policy::ResolvedConfig,
+    policy::ResolvedPolicy,
     tests_helpers::{parse_json, parse_json_schema, parse_toml},
     variable::{Name, ResolveError, Variables},
-    Config,
+    Policy,
 };
 use landlock::AccessFs;
 use serde_json::error::Category;
@@ -53,7 +53,7 @@ fn test_without_value() {
     let empty: &[String] = &[];
     assert_eq!(
         parse_json(json),
-        Ok(Config {
+        Ok(Policy {
             variables: Variables::try_from([("bar", empty)]).unwrap(),
             ..Default::default()
         })
@@ -72,7 +72,7 @@ fn test_one_variable_json() {
     }"#;
     assert_eq!(
         parse_json(json),
-        Ok(Config {
+        Ok(Policy {
             variables: Variables::try_from([("bar", ["foo"])]).unwrap(),
             ..Default::default()
         })
@@ -90,7 +90,7 @@ fn test_one_variable_toml() {
     "#;
     assert_eq!(
         parse_toml(toml).unwrap(),
-        Config {
+        Policy {
             variables: Variables::try_from([("bar", ["foo"])]).unwrap(),
             ..Default::default()
         }
@@ -109,7 +109,7 @@ fn test_one_variable_simple_1() {
     }"#;
     assert_eq!(
         parse_json(json),
-        Ok(Config {
+        Ok(Policy {
             variables: Variables::try_from([("foo", vec!["a", "b"])]).unwrap(),
             ..Default::default()
         })
@@ -191,7 +191,7 @@ fn test_variable_name_invalid() {
 fn assert_valid_var_name(name: &str) {
     assert_eq!(
         parse_json(&json_var_declaration(name)),
-        Ok(Config {
+        Ok(Policy {
             variables: Variables::try_from([(name, ["value"])]).unwrap(),
             ..Default::default()
         })
@@ -232,7 +232,7 @@ fn test_variable_name_valid() {
 fn test_variable_name_valid_single_letter() {
     assert_eq!(
         parse_json(&json_var_declaration("a")),
-        Ok(Config {
+        Ok(Policy {
             variables: Variables::try_from([("a", ["value"])]).unwrap(),
             ..Default::default()
         })
@@ -344,7 +344,7 @@ fn test_one_variable_json_toml_template() {
         ]
     "#;
 
-    let config = Config {
+    let policy = Policy {
         variables: Variables::try_from([("foo", vec!["a", "b"])]).unwrap(),
         handled_fs: AccessFs::Execute.into(),
         rules_path_beneath: [(
@@ -354,7 +354,7 @@ fn test_one_variable_json_toml_template() {
         .into(),
         ..Default::default()
     };
-    let resolved = ResolvedConfig {
+    let resolved = ResolvedPolicy {
         handled_fs: AccessFs::Execute.into(),
         rules_path_beneath: [
             (PathBuf::from("a"), AccessFs::Execute.into()),
@@ -365,19 +365,19 @@ fn test_one_variable_json_toml_template() {
     };
 
     let out_json = parse_json(json).unwrap();
-    assert_eq!(out_json, config);
+    assert_eq!(out_json, policy);
     assert_eq!(out_json.resolve().unwrap(), resolved);
 
     let out_json_reverse = parse_json(json_reverse).unwrap();
-    assert_eq!(out_json_reverse, config);
+    assert_eq!(out_json_reverse, policy);
     assert_eq!(out_json_reverse.resolve().unwrap(), resolved);
 
     let out_toml = parse_toml(toml).unwrap();
-    assert_eq!(out_toml, config);
+    assert_eq!(out_toml, policy);
     assert_eq!(out_toml.resolve().unwrap(), resolved);
 
     let out_toml_reverse = parse_toml(toml_reverse).unwrap();
-    assert_eq!(out_toml_reverse, config);
+    assert_eq!(out_toml_reverse, policy);
     assert_eq!(out_toml_reverse.resolve().unwrap(), resolved);
 }
 
@@ -401,10 +401,10 @@ fn test_two_variable_template() {
             }
         ]
     }"#;
-    let config = parse_json(json).unwrap();
+    let policy = parse_json(json).unwrap();
     assert_eq!(
-        config,
-        Config {
+        policy,
+        Policy {
             variables: Variables::try_from([("foo", vec!["a", "b"]), ("bar", vec!["X", "Y", "Z"])])
                 .unwrap(),
             handled_fs: AccessFs::Execute.into(),
@@ -423,8 +423,8 @@ fn test_two_variable_template() {
         }
     );
     assert_eq!(
-        config.resolve(),
-        Ok(ResolvedConfig {
+        policy.resolve(),
+        Ok(ResolvedPolicy {
             handled_fs: AccessFs::Execute.into(),
             rules_path_beneath: [
                 (PathBuf::from("before/a/X/after"), AccessFs::Execute.into()),
@@ -463,7 +463,7 @@ fn test_special_characters() {
     }"#;
     assert_eq!(
         parse_json(json).unwrap().resolve(),
-        Ok(ResolvedConfig {
+        Ok(ResolvedPolicy {
             handled_fs: AccessFs::Execute.into(),
             rules_path_beneath: [
                 (PathBuf::from("$"), AccessFs::Execute.into()),

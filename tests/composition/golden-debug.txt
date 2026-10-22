@@ -1,4 +1,4 @@
-ResolvedConfig {
+ResolvedPolicy {
     handled_fs: BitFlags<AccessFs> {
         bits: 0b111111111111111,
         flags: Execute | WriteFile | ReadFile | ReadDir | RemoveDir | RemoveFile | MakeChar | MakeDir | MakeReg | MakeSock | MakeFifo | MakeBlock | MakeSym | Refer | Truncate,

@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::{policy::ResolvedConfig, tests_helpers::parse_json, Config};
+use crate::{policy::ResolvedPolicy, tests_helpers::parse_json, Policy};
 use landlock::{Access, AccessFs, AccessNet, Scope, ABI};
 use std::path::PathBuf;
 
-fn test_idempotence(config: &Config) {
-    let mut bkp = config.clone();
-    bkp.compose(config);
-    assert_eq!(*config, bkp);
+fn test_idempotence(policy: &Policy) {
+    let mut bkp = policy.clone();
+    bkp.compose(policy);
+    assert_eq!(*policy, bkp);
 }
 
-fn get_composition(json1: &str, json2: &str) -> ResolvedConfig {
+fn get_composition(json1: &str, json2: &str) -> ResolvedPolicy {
     let j1 = parse_json(json1).unwrap();
     test_idempotence(&j1);
 
@@ -61,7 +61,7 @@ fn test_compose_most_fs_net() {
 
     assert_eq!(
         get_composition(json1, json2),
-        ResolvedConfig {
+        ResolvedPolicy {
             handled_fs: AccessFs::from_all(ABI::V4),
             handled_net: AccessNet::from_all(ABI::V4),
             rules_path_beneath: [(PathBuf::from("a"), AccessFs::from_all(ABI::V4))].into(),
@@ -91,7 +91,7 @@ fn test_compose_scope() {
 
     assert_eq!(
         get_composition(json1, json2),
-        ResolvedConfig {
+        ResolvedPolicy {
             scoped: Scope::AbstractUnixSocket.into(),
             ..Default::default()
         }
@@ -124,7 +124,7 @@ fn test_compose_exclusive() {
     assert_eq!(
         get_composition(json1, json2),
         // No remaining access rights.
-        ResolvedConfig {
+        ResolvedPolicy {
             ..Default::default()
         }
     );
@@ -160,7 +160,7 @@ fn test_compose_complement1() {
 
     assert_eq!(
         get_composition(json1, json2),
-        ResolvedConfig {
+        ResolvedPolicy {
             handled_fs: AccessFs::ReadFile.into(),
             rules_path_beneath: [
                 (PathBuf::from("a"), AccessFs::ReadFile.into()),
@@ -202,7 +202,7 @@ fn test_compose_complement2() {
 
     assert_eq!(
         get_composition(json1, json2),
-        ResolvedConfig {
+        ResolvedPolicy {
             handled_fs: AccessFs::Execute.into(),
             rules_path_beneath: [(PathBuf::from("a"), AccessFs::Execute.into()),].into(),
             ..Default::default()
@@ -246,7 +246,7 @@ fn test_compose_standalone_variable() {
 
     assert_eq!(
         get_composition(json1, json2),
-        ResolvedConfig {
+        ResolvedPolicy {
             handled_fs: AccessFs::Execute.into(),
             rules_path_beneath: [
                 (PathBuf::from("a"), AccessFs::Execute.into()),
@@ -304,7 +304,7 @@ fn test_compose_shared_variable() {
 
     assert_eq!(
         get_composition(json1, json2),
-        ResolvedConfig {
+        ResolvedPolicy {
             handled_fs: AccessFs::Execute | AccessFs::ReadFile,
             rules_path_beneath: [
                 (PathBuf::from("a"), AccessFs::Execute | AccessFs::ReadFile),
@@ -361,7 +361,7 @@ fn test_compose_same_resolved_path() {
 
     assert_eq!(
         get_composition(json1, json2),
-        ResolvedConfig {
+        ResolvedPolicy {
             handled_fs: AccessFs::Execute | AccessFs::ReadFile,
             rules_path_beneath: [(PathBuf::from("a"), AccessFs::Execute | AccessFs::ReadFile)]
                 .into(),
@@ -371,7 +371,7 @@ fn test_compose_same_resolved_path() {
 }
 
 // Test with composition of two different ABIs (different than user variables,
-// see TryFrom<Config> for ResolvedConfig).
+// see TryFrom<Policy> for ResolvedPolicy).
 #[test]
 fn test_abi_compose_all() {
     // ruleset.scoped is tested by test_compose_most_fs_net().
@@ -420,7 +420,7 @@ fn test_abi_compose_all() {
 
     assert_eq!(
         get_composition(json1, json2),
-        ResolvedConfig {
+        ResolvedPolicy {
             handled_fs: AccessFs::from_all(ABI::V1),
             // No handled_net nor rules_net_port because not supported by ABI v1.
             rules_path_beneath: [(PathBuf::from("."), AccessFs::from_all(ABI::V1))].into(),
@@ -476,7 +476,7 @@ fn test_abi_compose_read_write_v1() {
 
     assert_eq!(
         get_composition(json1, json2),
-        ResolvedConfig {
+        ResolvedPolicy {
             handled_fs: AccessFs::from_all(ABI::V1)
                 & AccessFs::from_all(ABI::V2)
                 & !AccessFs::Execute,
@@ -539,7 +539,7 @@ fn test_abi_compose_read_write_v4() {
 
     assert_eq!(
         get_composition(json1, json2),
-        ResolvedConfig {
+        ResolvedPolicy {
             handled_fs: AccessFs::from_all(ABI::V4)
                 & AccessFs::from_all(ABI::V4)
                 & !AccessFs::Execute,

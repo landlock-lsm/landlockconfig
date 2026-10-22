@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use crate::nonempty::NonEmptyStruct;
-use crate::parser::{JsonConfig, TemplateString, TomlConfig};
+use crate::parser::{JsonPolicy, TemplateString, TomlPolicy};
 use crate::variable::{NameError, ResolveError, Variables, VecStringIterator};
 use landlock::{
     AccessFs, AccessNet, BitFlags, NetPort, PathBeneath, PathFd, PathFdError, Ruleset, RulesetAttr,
@@ -26,7 +26,7 @@ pub enum BuildRulesetError {
 
 #[cfg_attr(test, derive(Default))]
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Config {
+pub struct Policy {
     /// This ABI is the configured local variable, which might be different than
     /// the ABI required to support all listed access rights.
     pub(crate) abi: Option<ABI>,
@@ -40,72 +40,72 @@ pub struct Config {
 
 #[cfg_attr(test, derive(Default))]
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ResolvedConfig {
+pub struct ResolvedPolicy {
     pub(crate) handled_fs: BitFlags<AccessFs>,
     pub(crate) handled_net: BitFlags<AccessNet>,
     pub(crate) scoped: BitFlags<Scope>,
     // Thanks to the BTreeMap:
     // * the paths are unique, which guarantee that allowed access are only set once for each path;
-    // * the paths are sorted (the longest path is the last one), which makes configurations deterministic and idempotent.
+    // * the paths are sorted (the longest path is the last one), which makes policies deterministic and idempotent.
     // Thanks to PathBuf, paths are normalized.
     pub(crate) rules_path_beneath: BTreeMap<PathBuf, BitFlags<AccessFs>>,
     pub(crate) rules_net_port: BTreeMap<u64, BitFlags<AccessNet>>,
 }
 
 #[derive(Debug, Error)]
-pub enum ConfigError {
+pub enum PolicyError {
     #[error(transparent)]
     Name(#[from] NameError),
     #[error(transparent)]
     Resolve(#[from] ResolveError),
 }
 
-impl TryFrom<NonEmptyStruct<JsonConfig>> for Config {
-    type Error = ConfigError;
+impl TryFrom<NonEmptyStruct<JsonPolicy>> for Policy {
+    type Error = PolicyError;
 
-    fn try_from(json: NonEmptyStruct<JsonConfig>) -> Result<Self, Self::Error> {
-        let mut config = Self::empty();
+    fn try_from(json: NonEmptyStruct<JsonPolicy>) -> Result<Self, Self::Error> {
+        let mut policy = Self::empty();
         let json = json.into_inner();
 
-        config.abi = json.abi.map(Into::into);
+        policy.abi = json.abi.map(Into::into);
 
         for variable in json.variable.unwrap_or_default() {
             let name = variable.name.parse()?;
             let literal = variable.literal.unwrap_or_default();
             // TODO: Check and warn if users tried to use variable in literal strings?
-            config.variables.extend(name, literal);
+            policy.variables.extend(name, literal);
         }
 
         for ruleset in json.ruleset.unwrap_or_default() {
             let ruleset = ruleset.into_inner();
-            config.handled_fs |= ruleset
+            policy.handled_fs |= ruleset
                 .handledAccessFs
-                .map(|access| access.resolve_bitflags(config.abi))
+                .map(|access| access.resolve_bitflags(policy.abi))
                 .transpose()?
                 .unwrap_or_default();
-            config.handled_net |= ruleset
+            policy.handled_net |= ruleset
                 .handledAccessNet
-                .map(|access| access.resolve_bitflags(config.abi))
+                .map(|access| access.resolve_bitflags(policy.abi))
                 .transpose()?
                 .unwrap_or_default();
-            config.scoped |= ruleset
+            policy.scoped |= ruleset
                 .scoped
-                .map(|scoped| scoped.resolve_bitflags(config.abi))
+                .map(|scoped| scoped.resolve_bitflags(policy.abi))
                 .transpose()?
                 .unwrap_or_default();
         }
 
         for path_beneath in json.pathBeneath.unwrap_or_default() {
-            let access = path_beneath.allowedAccess.resolve_bitflags(config.abi)?;
+            let access = path_beneath.allowedAccess.resolve_bitflags(policy.abi)?;
 
             // It is possible to have rules with empty access because of empty
             // access group resolution.
             if !access.is_empty() {
                 // Automatically augment and keep the ruleset consistent.
-                config.handled_fs |= access;
+                policy.handled_fs |= access;
 
                 for parent in path_beneath.parent {
-                    config
+                    policy
                         .rules_path_beneath
                         .entry(parent)
                         .and_modify(|a| *a |= access)
@@ -115,16 +115,16 @@ impl TryFrom<NonEmptyStruct<JsonConfig>> for Config {
         }
 
         for net_port in json.netPort.unwrap_or_default() {
-            let access = net_port.allowedAccess.resolve_bitflags(config.abi)?;
+            let access = net_port.allowedAccess.resolve_bitflags(policy.abi)?;
 
             // It is possible to have rules with empty access because of empty
             // access group resolution.
             if !access.is_empty() {
                 // Automatically augment and keep the ruleset consistent.
-                config.handled_net |= access;
+                policy.handled_net |= access;
 
                 for port in net_port.port {
-                    config
+                    policy
                         .rules_net_port
                         .entry(port)
                         .and_modify(|a| *a |= access)
@@ -133,7 +133,7 @@ impl TryFrom<NonEmptyStruct<JsonConfig>> for Config {
             }
         }
 
-        Ok(config)
+        Ok(policy)
     }
 }
 
@@ -147,7 +147,7 @@ pub enum RuleError {
 #[derive(Debug, Error)]
 pub enum ParseJsonError {
     #[error(transparent)]
-    Config(#[from] ConfigError),
+    Policy(#[from] PolicyError),
     #[error(transparent)]
     SerdeJson(#[from] serde_json::Error),
 }
@@ -156,7 +156,7 @@ pub enum ParseJsonError {
 #[derive(Debug, Error)]
 pub enum ParseTomlError {
     #[error(transparent)]
-    Config(#[from] ConfigError),
+    Policy(#[from] PolicyError),
     #[error(transparent)]
     SerdeToml(#[from] toml::de::Error),
 }
@@ -185,10 +185,10 @@ pub enum ParseDirectoryError {
     #[error(transparent)]
     Io(#[from] std::io::Error),
     // Use BTreeMap for deterministic errors.
-    #[error("failed to parse configuration file(s):\n\n{}", format_parse_files_error(.0))]
+    #[error("failed to parse policy file(s):\n\n{}", format_parse_files_error(.0))]
     ParseFiles(BTreeMap<PathBuf, ParseFileError>),
-    #[error("no configuration file found")]
-    NoConfigFile,
+    #[error("no policy file found")]
+    NoPolicyFile,
 }
 
 impl From<ParseDirectoryError> for std::io::Error {
@@ -198,32 +198,32 @@ impl From<ParseDirectoryError> for std::io::Error {
             ParseDirectoryError::ParseFiles(_) => {
                 std::io::Error::new(std::io::ErrorKind::InvalidData, err)
             }
-            ParseDirectoryError::NoConfigFile => {
+            ParseDirectoryError::NoPolicyFile => {
                 std::io::Error::new(std::io::ErrorKind::NotFound, err)
             }
         }
     }
 }
 
-pub enum ConfigFormat {
+pub enum PolicyFormat {
     Json,
     #[cfg(feature = "toml")]
     Toml,
 }
 
-impl ConfigFormat {
+impl PolicyFormat {
     fn extension(&self) -> &'static str {
         match self {
-            ConfigFormat::Json => "json",
+            PolicyFormat::Json => "json",
             #[cfg(feature = "toml")]
-            ConfigFormat::Toml => "toml",
+            PolicyFormat::Toml => "toml",
         }
     }
 }
 
-impl Config {
-    // Do not implement Default for Config because it would not be useful but
-    // misleading.  Indeed, the default configuration would allow everything and
+impl Policy {
+    // Do not implement Default for Policy because it would not be useful but
+    // misleading.  Indeed, the default policy would allow everything and
     // could not be updated with public methods (e.g. compose).
     fn empty() -> Self {
         Self {
@@ -237,28 +237,28 @@ impl Config {
         }
     }
 
-    /// Composes two configurations by merging `other` with `self` in a safe
+    /// Composes two policies by merging `other` with `self` in a safe
     /// best-effort way, which means the common handled access rights with all
     /// rules.
     ///
-    /// When composing configurations with different ABI versions (e.g., one
+    /// When composing policies with different ABI versions (e.g., one
     /// against ABI::V1 and another against ABI::V2), the composition will
     /// downgrade to the intersection of handled access rights, ensuring the
-    /// resulting configuration remains functional across both contexts.
+    /// resulting policy remains functional across both contexts.
     ///
     /// # Behavior
     ///
     /// - Handled access rights are combined using bitwise AND (intersection).
     /// - Rules are merged with access rights limited to commonly handled ones.
     /// - Paths with empty access rights after intersection are removed.
-    /// - Variables from both configurations are merged.
+    /// - Variables from both policies are merged.
     ///
     /// # Commutativity
     ///
     /// This operation is commutative: `a.compose(&b)` produces the same result
     /// as `b.compose(&a)`. The order of composition does not affect the final
-    /// configuration, ensuring predictable behavior regardless of the sequence
-    /// in which configurations are combined.
+    /// policy, ensuring predictable behavior regardless of the sequence
+    /// in which policies are combined.
     pub fn compose(&mut self, other: &Self) {
         let common_handled_fs = self.handled_fs & other.handled_fs;
         let common_handled_net = self.handled_net & other.handled_net;
@@ -318,7 +318,7 @@ impl Config {
     where
         R: std::io::Read,
     {
-        let json = serde_json::from_reader::<_, NonEmptyStruct<JsonConfig>>(reader)?;
+        let json = serde_json::from_reader::<_, NonEmptyStruct<JsonPolicy>>(reader)?;
         Ok(json.try_into()?)
     }
 
@@ -326,27 +326,27 @@ impl Config {
     pub fn parse_toml(data: &str) -> Result<Self, ParseTomlError> {
         // The TOML parser does not handle Read implementations,
         // see https://github.com/toml-rs/toml/issues/326
-        let json: NonEmptyStruct<JsonConfig> =
-            toml::from_str::<NonEmptyStruct<TomlConfig>>(data)?.convert();
+        let json: NonEmptyStruct<JsonPolicy> =
+            toml::from_str::<NonEmptyStruct<TomlPolicy>>(data)?.convert();
         Ok(json.try_into()?)
     }
 
-    /// Parse all configuration files in a directory with the specified format.
+    /// Parse all policy files in a directory with the specified format.
     ///
     /// This method reads all files in the given directory that match the specified
     /// format's file extension and are regular files (not directories or hidden files
-    /// starting with '.'). Each valid configuration file is parsed and composed into
-    /// a single configuration using the [`compose`](Config::compose) method.
+    /// starting with '.'). Each valid policy file is parsed and composed into
+    /// a single policy using the [`compose`](Policy::compose) method.
     ///
     /// # Returns
     ///
-    /// Returns a composed `Config` from all valid configuration files found in the
+    /// Returns a composed `Policy` from all valid policy files found in the
     /// directory, or ParseDirectoryError otherwise.
-    pub fn parse_directory<T>(path: T, format: ConfigFormat) -> Result<Self, ParseDirectoryError>
+    pub fn parse_directory<T>(path: T, format: PolicyFormat) -> Result<Self, ParseDirectoryError>
     where
         T: AsRef<Path>,
     {
-        let mut full_config = None;
+        let mut full_policy = None;
         let mut errors = BTreeMap::new();
 
         for entry in fs::read_dir(path)? {
@@ -368,9 +368,9 @@ impl Config {
             }
 
             match format {
-                ConfigFormat::Json => match File::open(&path) {
+                PolicyFormat::Json => match File::open(&path) {
                     Ok(file) => match Self::parse_json(file) {
-                        Ok(config) => full_config.compose(&config),
+                        Ok(policy) => full_policy.compose(&policy),
                         Err(e) => {
                             // Duplicated file names should be very rare when
                             // listing the content of a directory, and ignoring
@@ -386,9 +386,9 @@ impl Config {
                     }
                 },
                 #[cfg(feature = "toml")]
-                ConfigFormat::Toml => match std::fs::read_to_string(&path) {
+                PolicyFormat::Toml => match std::fs::read_to_string(&path) {
                     Ok(data) => match Self::parse_toml(data.as_str()) {
-                        Ok(config) => full_config.compose(&config),
+                        Ok(policy) => full_policy.compose(&policy),
                         Err(e) => {
                             errors.insert(path.clone(), e.into());
                         }
@@ -405,38 +405,38 @@ impl Config {
         if !errors.is_empty() {
             return Err(ParseDirectoryError::ParseFiles(errors));
         }
-        full_config.ok_or(ParseDirectoryError::NoConfigFile)
+        full_policy.ok_or(ParseDirectoryError::NoPolicyFile)
     }
 
-    pub fn resolve(self) -> Result<ResolvedConfig, ResolveError> {
+    pub fn resolve(self) -> Result<ResolvedPolicy, ResolveError> {
         self.try_into()
     }
 }
 
 #[test]
-fn test_config_default_empty() {
-    let config = Config::default();
-    assert_eq!(config.handled_fs, BitFlags::EMPTY);
-    assert_eq!(config.handled_net, BitFlags::EMPTY);
-    assert_eq!(config.scoped, BitFlags::EMPTY);
+fn test_policy_default_empty() {
+    let policy = Policy::default();
+    assert_eq!(policy.handled_fs, BitFlags::EMPTY);
+    assert_eq!(policy.handled_net, BitFlags::EMPTY);
+    assert_eq!(policy.scoped, BitFlags::EMPTY);
 
-    assert_eq!(config, Config::empty());
+    assert_eq!(policy, Policy::empty());
 }
 
-pub trait OptionalConfig {
-    fn compose(&mut self, other: &Config);
+pub trait OptionalPolicy {
+    fn compose(&mut self, other: &Policy);
 }
 
-impl OptionalConfig for Option<Config> {
-    fn compose(&mut self, other: &Config) {
+impl OptionalPolicy for Option<Policy> {
+    fn compose(&mut self, other: &Policy) {
         match self {
-            Some(config) => config.compose(other),
+            Some(policy) => policy.compose(other),
             None => *self = Some(other.clone()),
         }
     }
 }
 
-impl ResolvedConfig {
+impl ResolvedPolicy {
     pub fn build_ruleset(&self) -> Result<(RulesetCreated, Vec<RuleError>), BuildRulesetError> {
         let mut ruleset = Ruleset::default();
         let ruleset_ref = &mut ruleset;
@@ -468,7 +468,7 @@ impl ResolvedConfig {
 
         for (port, allowed_access) in &self.rules_net_port {
             ruleset_created_ref.add_rule(
-                // TODO: Check integer conversion in parse_json(), which would require changing the type of config and specifying where the error is.
+                // TODO: Check integer conversion in parse_json(), which would require changing the type of policy and specifying where the error is.
                 NetPort::new((*port).try_into()?, *allowed_access),
             )?;
         }
@@ -477,14 +477,14 @@ impl ResolvedConfig {
     }
 }
 
-impl TryFrom<Config> for ResolvedConfig {
+impl TryFrom<Policy> for ResolvedPolicy {
     type Error = ResolveError;
 
     /// Resolve all (composed) variables but not local (synthetic) variables such as `abi.*`.
-    fn try_from(config: Config) -> Result<Self, Self::Error> {
+    fn try_from(policy: Policy) -> Result<Self, Self::Error> {
         let mut rules_path_beneath: BTreeMap<PathBuf, BitFlags<AccessFs>> = Default::default();
-        for (path_beneath, access) in config.rules_path_beneath {
-            let set = config.variables.resolve(&path_beneath)?;
+        for (path_beneath, access) in policy.rules_path_beneath {
+            let set = policy.variables.resolve(&path_beneath)?;
             for path in VecStringIterator::new(&set) {
                 rules_path_beneath
                     .entry(PathBuf::from(path))
@@ -494,11 +494,11 @@ impl TryFrom<Config> for ResolvedConfig {
         }
 
         Ok(Self {
-            handled_fs: config.handled_fs,
-            handled_net: config.handled_net,
-            scoped: config.scoped,
+            handled_fs: policy.handled_fs,
+            handled_net: policy.handled_net,
+            scoped: policy.scoped,
             rules_path_beneath,
-            rules_net_port: config.rules_net_port,
+            rules_net_port: policy.rules_net_port,
         })
     }
 }
@@ -510,7 +510,7 @@ mod tests_compose {
 
     #[test]
     fn test_empty_ruleset() {
-        let mut c1 = Config {
+        let mut c1 = Policy {
             handled_fs: AccessFs::Execute.into(),
             ..Default::default()
         };
@@ -521,15 +521,15 @@ mod tests_compose {
 
     #[test]
     fn test_different_ruleset() {
-        let mut c1 = Config {
+        let mut c1 = Policy {
             handled_fs: AccessFs::Execute.into(),
             ..Default::default()
         };
-        let c2 = Config {
+        let c2 = Policy {
             handled_net: AccessNet::BindTcp.into(),
             ..Default::default()
         };
-        let expect = Config {
+        let expect = Policy {
             ..Default::default()
         };
         c1.compose(&c2);
@@ -539,7 +539,7 @@ mod tests_compose {
     #[test]
     fn test_compose_v1_v2_without_one_right() {
         let c1_access = AccessFs::from_all(ABI::V1);
-        let mut c1 = Config {
+        let mut c1 = Policy {
             handled_fs: c1_access,
             rules_path_beneath: [
                 (TemplateString::from_text("/common"), c1_access),
@@ -551,7 +551,7 @@ mod tests_compose {
 
         assert!(c1_access.contains(AccessFs::WriteFile));
         let c2_access = AccessFs::from_all(ABI::V2) & !AccessFs::WriteFile;
-        let c2 = Config {
+        let c2 = Policy {
             handled_fs: c2_access,
             rules_path_beneath: [
                 (TemplateString::from_text("/common"), c2_access),
@@ -564,7 +564,7 @@ mod tests_compose {
         c1.compose(&c2);
         assert_eq!(
             c1,
-            Config {
+            Policy {
                 handled_fs: c1_access & c2_access,
                 rules_path_beneath: [
                     (TemplateString::from_text("/common"), c1_access & c2_access),
@@ -579,12 +579,12 @@ mod tests_compose {
 
     #[test]
     fn test_abi_none_none() {
-        let c1 = Config {
+        let c1 = Policy {
             abi: None,
             ..Default::default()
         };
         let mut c1_mut = c1.clone();
-        let mut c2_mut = Config {
+        let mut c2_mut = Policy {
             abi: None,
             ..Default::default()
         };
@@ -599,12 +599,12 @@ mod tests_compose {
 
     #[test]
     fn test_abi_some_none() {
-        let c1 = Config {
+        let c1 = Policy {
             abi: Some(ABI::V2),
             ..Default::default()
         };
         let mut c1_mut = c1.clone();
-        let mut c2_mut = Config {
+        let mut c2_mut = Policy {
             abi: None,
             ..Default::default()
         };
@@ -619,12 +619,12 @@ mod tests_compose {
 
     #[test]
     fn test_abi_some_some() {
-        let c1 = Config {
+        let c1 = Policy {
             abi: Some(ABI::V1),
             ..Default::default()
         };
         let mut c1_mut = c1.clone();
-        let mut c2_mut = Config {
+        let mut c2_mut = Policy {
             abi: Some(ABI::V2),
             ..Default::default()
         };

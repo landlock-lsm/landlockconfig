@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use landlock::Errno;
-use landlock_policy::{Config, ConfigFormat};
+use landlock_policy::{Policy, PolicyFormat};
 use libc::c_char;
 use std::ffi::{c_int, CStr};
 use std::fs::File;
@@ -33,9 +33,9 @@ fn io_error_to_errno(err: Error) -> Errno {
     }
 }
 
-fn parse_file<F>(config_fd: RawFd, flags: u32, parser: F) -> Result<*mut Config, Errno>
+fn parse_file<F>(config_fd: RawFd, flags: u32, parser: F) -> Result<*mut Policy, Errno>
 where
-    F: FnOnce(File) -> Result<Config, Error>,
+    F: FnOnce(File) -> Result<Policy, Error>,
 {
     if flags != 0 {
         return Err(Errno::new(libc::EINVAL));
@@ -66,11 +66,11 @@ where
 ///   with landlockconfig_free().
 /// * -errno on error.
 #[no_mangle]
-pub extern "C" fn landlockconfig_parse_json_file(config_fd: RawFd, flags: u32) -> *mut Config {
+pub extern "C" fn landlockconfig_parse_json_file(config_fd: RawFd, flags: u32) -> *mut Policy {
     parse_file(config_fd, flags, |file| {
-        Config::parse_json(file).map_err(|e| Error::new(ErrorKind::InvalidData, e))
+        Policy::parse_json(file).map_err(|e| Error::new(ErrorKind::InvalidData, e))
     })
-    .unwrap_or_else(|e| unwrap_errno(e) as *mut Config)
+    .unwrap_or_else(|e| unwrap_errno(e) as *mut Policy)
 }
 
 /// Parses a TOML configuration file
@@ -86,13 +86,13 @@ pub extern "C" fn landlockconfig_parse_json_file(config_fd: RawFd, flags: u32) -
 ///   with landlockconfig_free().
 /// * -errno on error.
 #[no_mangle]
-pub extern "C" fn landlockconfig_parse_toml_file(config_fd: RawFd, flags: u32) -> *mut Config {
+pub extern "C" fn landlockconfig_parse_toml_file(config_fd: RawFd, flags: u32) -> *mut Policy {
     parse_file(config_fd, flags, |mut file| {
         let mut buffer = String::new();
         std::io::Read::read_to_string(&mut file, &mut buffer)?;
-        Config::parse_toml(&buffer).map_err(|e| Error::new(ErrorKind::InvalidData, e))
+        Policy::parse_toml(&buffer).map_err(|e| Error::new(ErrorKind::InvalidData, e))
     })
-    .unwrap_or_else(|e| unwrap_errno(e) as *mut Config)
+    .unwrap_or_else(|e| unwrap_errno(e) as *mut Policy)
 }
 
 fn parse_buffer<F>(
@@ -100,9 +100,9 @@ fn parse_buffer<F>(
     buffer_size: usize,
     flags: u32,
     parser: F,
-) -> Result<*mut Config, Errno>
+) -> Result<*mut Policy, Errno>
 where
-    F: FnOnce(&[u8]) -> Result<Config, Error>,
+    F: FnOnce(&[u8]) -> Result<Policy, Error>,
 {
     if flags != 0 {
         return Err(Errno::new(libc::EINVAL));
@@ -142,12 +142,12 @@ pub extern "C" fn landlockconfig_parse_json_buffer(
     buffer_ptr: *const u8,
     buffer_size: usize,
     flags: u32,
-) -> *mut Config {
+) -> *mut Policy {
     parse_buffer(buffer_ptr, buffer_size, flags, |buffer| {
-        Config::parse_json(std::io::Cursor::new(buffer))
+        Policy::parse_json(std::io::Cursor::new(buffer))
             .map_err(|e| Error::new(ErrorKind::InvalidData, e))
     })
-    .unwrap_or_else(|e| unwrap_errno(e) as *mut Config)
+    .unwrap_or_else(|e| unwrap_errno(e) as *mut Policy)
 }
 
 /// Parses a TOML configuration from a memory buffer
@@ -168,20 +168,20 @@ pub extern "C" fn landlockconfig_parse_toml_buffer(
     buffer_ptr: *const u8,
     buffer_size: usize,
     flags: u32,
-) -> *mut Config {
+) -> *mut Policy {
     parse_buffer(buffer_ptr, buffer_size, flags, |buffer| {
         let data =
             std::str::from_utf8(buffer).map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
-        Config::parse_toml(data).map_err(|e| Error::new(ErrorKind::InvalidData, e))
+        Policy::parse_toml(data).map_err(|e| Error::new(ErrorKind::InvalidData, e))
     })
-    .unwrap_or_else(|e| unwrap_errno(e) as *mut Config)
+    .unwrap_or_else(|e| unwrap_errno(e) as *mut Policy)
 }
 
 fn parse_directory(
     dir_path: *const c_char,
     flags: u32,
-    format: ConfigFormat,
-) -> Result<*mut Config, Errno> {
+    format: PolicyFormat,
+) -> Result<*mut Policy, Errno> {
     if flags != 0 {
         return Err(Errno::new(libc::EINVAL));
     }
@@ -192,7 +192,7 @@ fn parse_directory(
 
     let path = unsafe { CStr::from_ptr(dir_path) }.to_str()?;
     let config =
-        Config::parse_directory(path, format).map_err(|e| io_error_to_errno(Error::from(e)))?;
+        Policy::parse_directory(path, format).map_err(|e| io_error_to_errno(Error::from(e)))?;
     Ok(Box::into_raw(Box::new(config)))
 }
 
@@ -212,9 +212,9 @@ fn parse_directory(
 pub extern "C" fn landlockconfig_parse_json_directory(
     dir_path: *const c_char,
     flags: u32,
-) -> *mut Config {
-    parse_directory(dir_path, flags, ConfigFormat::Json)
-        .unwrap_or_else(|e| unwrap_errno(e) as *mut Config)
+) -> *mut Policy {
+    parse_directory(dir_path, flags, PolicyFormat::Json)
+        .unwrap_or_else(|e| unwrap_errno(e) as *mut Policy)
 }
 
 /// Parses all TOML configuration files in a directory
@@ -233,9 +233,9 @@ pub extern "C" fn landlockconfig_parse_json_directory(
 pub extern "C" fn landlockconfig_parse_toml_directory(
     dir_path: *const c_char,
     flags: u32,
-) -> *mut Config {
-    parse_directory(dir_path, flags, ConfigFormat::Toml)
-        .unwrap_or_else(|e| unwrap_errno(e) as *mut Config)
+) -> *mut Policy {
+    parse_directory(dir_path, flags, PolicyFormat::Toml)
+        .unwrap_or_else(|e| unwrap_errno(e) as *mut Policy)
 }
 
 /// Frees a landlockconfig object
@@ -244,7 +244,7 @@ pub extern "C" fn landlockconfig_parse_toml_directory(
 ///
 /// The pointer must have been returned by landlockconfig_parse_*().
 #[no_mangle]
-pub unsafe extern "C" fn landlockconfig_free(config: *mut Config) {
+pub unsafe extern "C" fn landlockconfig_free(config: *mut Policy) {
     if !config.is_null() {
         drop(Box::from_raw(config));
     }
@@ -269,7 +269,7 @@ pub unsafe extern "C" fn landlockconfig_free(config: *mut Config) {
 /// * The ruleset file descriptor on success.
 /// * -errno on error.
 #[no_mangle]
-pub unsafe extern "C" fn landlockconfig_build_ruleset(config: *const Config, flags: u32) -> RawFd {
+pub unsafe extern "C" fn landlockconfig_build_ruleset(config: *const Policy, flags: u32) -> RawFd {
     if flags != 0 {
         return unwrap_errno(Errno::new(libc::EINVAL));
     }
@@ -301,7 +301,7 @@ mod tests {
     fn test_parse_directory_enotdir() {
         let file_path =
             CString::new(std::env::current_exe().unwrap().as_path().to_str().unwrap()).unwrap();
-        let result = parse_directory(file_path.as_ptr(), 0, ConfigFormat::Json);
+        let result = parse_directory(file_path.as_ptr(), 0, PolicyFormat::Json);
 
         assert!(result.is_err());
         let err = result.unwrap_err();
@@ -310,7 +310,7 @@ mod tests {
 
     #[test]
     fn test_parse_directory_null_path() {
-        let result = parse_directory(std::ptr::null(), 0, ConfigFormat::Json);
+        let result = parse_directory(std::ptr::null(), 0, PolicyFormat::Json);
 
         assert!(result.is_err());
         let err = result.unwrap_err();
@@ -321,7 +321,7 @@ mod tests {
     fn test_parse_directory_invalid_flags() {
         let file_path =
             CString::new(std::env::current_exe().unwrap().as_path().to_str().unwrap()).unwrap();
-        let result = parse_directory(file_path.as_ptr(), 1, ConfigFormat::Json);
+        let result = parse_directory(file_path.as_ptr(), 1, PolicyFormat::Json);
 
         assert!(result.is_err());
         let err = result.unwrap_err();
@@ -332,7 +332,7 @@ mod tests {
     fn test_parse_directory_nonexistent() {
         let nonexistent_path = CString::new("/nonexistent/directory/").unwrap();
 
-        let result = parse_directory(nonexistent_path.as_ptr(), 0, ConfigFormat::Json);
+        let result = parse_directory(nonexistent_path.as_ptr(), 0, PolicyFormat::Json);
 
         assert!(result.is_err());
         let err = result.unwrap_err();

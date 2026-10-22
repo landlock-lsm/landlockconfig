@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use crate::{
-    config::ResolvedConfig,
     parser::{TemplateString, TemplateToken},
+    policy::ResolvedConfig,
     tests_helpers::{parse_json, parse_json_schema, parse_toml},
     variable::{Name, ResolveError, Variables},
     Config,

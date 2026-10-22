@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::config::ResolvedConfig;
+use crate::policy::ResolvedConfig;
 use crate::tests_helpers::{parse_json, parse_toml, validate_json, LATEST_ABI};
 use crate::Config;
 use landlock::{Access, AccessFs, AccessNet, Scope, ABI};

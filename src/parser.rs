@@ -755,7 +755,7 @@ type TomlVariable = JsonVariable;
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[allow(non_snake_case)]
-pub(crate) struct JsonConfig {
+pub(crate) struct JsonPolicy {
     pub(crate) abi: Option<JsonAbi>,
     pub(crate) variable: Option<NonEmptySet<JsonVariable>>,
     pub(crate) ruleset: Option<NonEmptySet<NonEmptyStruct<JsonRuleset>>>,
@@ -763,8 +763,8 @@ pub(crate) struct JsonConfig {
     pub(crate) netPort: Option<NonEmptySet<JsonNetPort>>,
 }
 
-impl NonEmptyStructInner for JsonConfig {
-    const ERROR_MESSAGE: &'static str = "empty configuration";
+impl NonEmptyStructInner for JsonPolicy {
+    const ERROR_MESSAGE: &'static str = "empty policy";
 
     fn is_empty(&self) -> bool {
         self.variable.as_ref().is_none_or(|set| set.is_empty())
@@ -777,7 +777,7 @@ impl NonEmptyStructInner for JsonConfig {
 // At least one of the fields must be set, which is guaranteed when wrapped with NonEmptyStruct.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct TomlConfig {
+pub(crate) struct TomlPolicy {
     abi: Option<JsonAbi>,
     variable: Option<NonEmptySet<TomlVariable>>,
     ruleset: Option<NonEmptySet<NonEmptyStruct<TomlRuleset>>>,
@@ -785,8 +785,8 @@ pub(crate) struct TomlConfig {
     net_port: Option<NonEmptySet<TomlNetPort>>,
 }
 
-impl NonEmptyStructInner for TomlConfig {
-    const ERROR_MESSAGE: &'static str = "empty configuration";
+impl NonEmptyStructInner for TomlPolicy {
+    const ERROR_MESSAGE: &'static str = "empty policy";
 
     fn is_empty(&self) -> bool {
         self.variable.as_ref().is_none_or(|set| set.is_empty())
@@ -796,8 +796,8 @@ impl NonEmptyStructInner for TomlConfig {
     }
 }
 
-impl From<TomlConfig> for JsonConfig {
-    fn from(toml: TomlConfig) -> Self {
+impl From<TomlPolicy> for JsonPolicy {
+    fn from(toml: TomlPolicy) -> Self {
         Self {
             abi: toml.abi,
             variable: toml.variable,

@@ -3,7 +3,7 @@
 use crate::{
     parser::TemplateString,
     tests_helpers::{parse_json, parse_json_schema, parse_toml, LATEST_ABI},
-    Config,
+    Policy,
 };
 use landlock::{Access, AccessFs, AccessNet, Scope, ABI};
 use serde_json::error::Category;
@@ -28,13 +28,13 @@ fn test_access_fs_with_value() {
         ]
     "#;
 
-    let config = Config {
+    let policy = Policy {
         abi: Some(ABI::V2),
         handled_fs: AccessFs::from_all(ABI::V2),
         ..Default::default()
     };
-    assert_eq!(parse_json(json).unwrap(), config);
-    assert_eq!(parse_toml(toml).unwrap(), config);
+    assert_eq!(parse_json(json).unwrap(), policy);
+    assert_eq!(parse_toml(toml).unwrap(), policy);
 }
 
 #[test]
@@ -90,13 +90,13 @@ fn test_format_ok() {
         ]
     "#;
 
-    let config = Config {
+    let policy = Policy {
         abi: Some(ABI::V1),
         handled_fs: AccessFs::Execute.into(),
         ..Default::default()
     };
-    assert_eq!(parse_json(json).unwrap(), config);
-    assert_eq!(parse_toml(toml).unwrap(), config);
+    assert_eq!(parse_json(json).unwrap(), policy);
+    assert_eq!(parse_toml(toml).unwrap(), policy);
 }
 
 #[test]
@@ -172,7 +172,7 @@ fn test_all_versions_abi_all() {
         );
 
         let abi = version.into();
-        let mut config = Config {
+        let mut policy = Policy {
             abi: Some(abi),
             handled_fs: AccessFs::from_all(abi),
             handled_net: AccessNet::from_all(abi),
@@ -182,11 +182,11 @@ fn test_all_versions_abi_all() {
         };
         if abi >= ABI::V4 {
             // Do not add rules with empty access right.
-            config.rules_net_port = [(1, AccessNet::from_all(abi))].into();
+            policy.rules_net_port = [(1, AccessNet::from_all(abi))].into();
         }
-        println!("Testing ABI {version} and expecting {config:?}");
-        assert_eq!(parse_json(&json).unwrap(), config);
-        assert_eq!(parse_toml(&toml).unwrap(), config);
+        println!("Testing ABI {version} and expecting {policy:?}");
+        assert_eq!(parse_json(&json).unwrap(), policy);
+        assert_eq!(parse_toml(&toml).unwrap(), policy);
     }
 }
 
@@ -226,15 +226,15 @@ fn test_all_versions_abi_read_execute() {
         let expected_access =
             AccessFs::from_read(abi) | (AccessFs::from_all(abi) & AccessFs::Refer);
 
-        let config = Config {
+        let policy = Policy {
             abi: Some(abi),
             handled_fs: expected_access,
             rules_path_beneath: [(TemplateString::from_text("."), expected_access)].into(),
             ..Default::default()
         };
-        println!("Testing ABI {version} read_execute and expecting {config:?}");
-        assert_eq!(parse_json(&json).unwrap(), config);
-        assert_eq!(parse_toml(&toml).unwrap(), config);
+        println!("Testing ABI {version} read_execute and expecting {policy:?}");
+        assert_eq!(parse_json(&json).unwrap(), policy);
+        assert_eq!(parse_toml(&toml).unwrap(), policy);
     }
 }
 
@@ -273,15 +273,15 @@ fn test_all_versions_abi_read_write() {
         let abi = version.into();
         let expected_access = AccessFs::from_all(abi) & !AccessFs::Execute;
 
-        let config = Config {
+        let policy = Policy {
             abi: Some(abi),
             handled_fs: expected_access,
             rules_path_beneath: [(TemplateString::from_text("."), expected_access)].into(),
             ..Default::default()
         };
-        println!("Testing ABI {version} read_write and expecting {config:?}");
-        assert_eq!(parse_json(&json).unwrap(), config);
-        assert_eq!(parse_toml(&toml).unwrap(), config);
+        println!("Testing ABI {version} read_write and expecting {policy:?}");
+        assert_eq!(parse_json(&json).unwrap(), policy);
+        assert_eq!(parse_toml(&toml).unwrap(), policy);
     }
 }
 
@@ -353,13 +353,13 @@ fn test_i32() {
     // only check that the returned ABI is greater than or equal to the
     // currently greatest ABI.
     assert!(abi >= LATEST_ABI);
-    let config = Config {
+    let policy = Policy {
         abi: Some(abi),
         handled_fs: AccessFs::from_all(abi),
         ..Default::default()
     };
-    assert_eq!(parse_json(json).unwrap(), config);
-    assert_eq!(parse_toml(toml).unwrap(), config);
+    assert_eq!(parse_json(json).unwrap(), policy);
+    assert_eq!(parse_toml(toml).unwrap(), policy);
 }
 
 #[test]

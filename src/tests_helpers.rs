@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use crate::policy::{ParseJsonError, ParseTomlError};
-use crate::Config;
+use crate::Policy;
 use landlock::ABI;
 use serde_json::error::Category;
 use serde_json::Value;
@@ -32,9 +32,9 @@ pub(crate) fn validate_json(json: &str) -> Result<(), ()> {
 }
 
 // TODO: Return ParseJsonError
-pub(crate) fn parse_json_schema(json: &str, with_schema: bool) -> Result<Config, Category> {
+pub(crate) fn parse_json_schema(json: &str, with_schema: bool) -> Result<Policy, Category> {
     let cursor = std::io::Cursor::new(json);
-    let parsing = Config::parse_json(cursor).map_err(|e| {
+    let parsing = Policy::parse_json(cursor).map_err(|e| {
         eprintln!("JSON parsing error: {e}");
         match e {
             ParseJsonError::SerdeJson(e) => e.classify(),
@@ -54,12 +54,12 @@ pub(crate) fn parse_json_schema(json: &str, with_schema: bool) -> Result<Config,
     parsing
 }
 
-pub(crate) fn parse_json(json: &str) -> Result<Config, Category> {
+pub(crate) fn parse_json(json: &str) -> Result<Policy, Category> {
     parse_json_schema(json, true)
 }
 
-pub(crate) fn parse_toml(toml: &str) -> Result<Config, ParseTomlError> {
-    Config::parse_toml(toml).map_err(|e| {
+pub(crate) fn parse_toml(toml: &str) -> Result<Policy, ParseTomlError> {
+    Policy::parse_toml(toml).map_err(|e| {
         eprintln!("TOML parsing error: {e}");
         e
     })

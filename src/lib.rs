@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 pub use policy::{
-    BuildRulesetError, Config, ConfigFormat, OptionalConfig, ParseDirectoryError, ResolvedConfig,
+    BuildRulesetError, OptionalPolicy, ParseDirectoryError, Policy, PolicyFormat, ResolvedPolicy,
     RuleError,
 };
 pub use variable::ResolveError;

@@ -18,16 +18,16 @@ docker:
 	docker build --file Dockerfile \
 		--build-arg "UID=$(shell id -u)" \
 		--build-arg "GID=$(shell id -g)" \
-		--tag landlockconfig-debian \
+		--tag landlock-policy-debian \
 		.
 	docker run --rm \
 		--volume "$(HOME)/.cargo/registry:/home/builder/.cargo/registry:ro" \
-		--volume "$(CURDIR)/../..:/landlockconfig" \
-		landlockconfig-debian
+		--volume "$(CURDIR)/../..:/landlock-policy" \
+		landlock-policy-debian
 
 clean:
 	$(RM) -f ../liblandlock-policy0_*.deb ../liblandlock-policy-dev_*.deb \
 		../landlock-exec_*.deb ../landlock-policy_*.deb \
 		../liblandlock-policy0-dbgsym_*.deb ../landlock-exec-dbgsym_*.deb \
-		../landlock-policy-dbgsym_*.deb ../landlockconfig_*.buildinfo \
-		../landlockconfig_*.changes
+		../landlock-policy-dbgsym_*.deb ../landlock-policy_*.buildinfo \
+		../landlock-policy_*.changes

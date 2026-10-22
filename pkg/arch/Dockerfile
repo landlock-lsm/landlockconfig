@@ -1,4 +1,4 @@
-# See docker-build.sh
+# See Makefile
 
 FROM archlinux
 
@@ -23,5 +23,5 @@ RUN pacman -Syu --noconfirm \
 
 USER builder
 RUN mkdir -p ~/.cargo/registry
-WORKDIR /landlockconfig
+WORKDIR /landlock-policy
 CMD ["make", "-C", "pkg/arch", "install"]

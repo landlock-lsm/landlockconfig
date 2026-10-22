@@ -5,7 +5,7 @@
 # TODO: Make it more generic while still efficient for development and CI (see
 # https://gitlab.archlinux.org/archlinux/packaging/packages/systemd/-/commit/16294a0b4415b15f48e07f9e939c49fdf069c506).
 
-pkgname=landlockconfig-git
+pkgname=landlock-policy-git
 pkgver=0
 pkgrel=1
 pkgdesc="Sandboxer library leveraging Landlock with JSON or TOML configuration (git version)"
@@ -14,14 +14,14 @@ url="https://landlock.io"
 license=('MIT' 'Apache-2.0')
 depends=('glibc' 'gcc-libs')
 makedepends=('cargo' 'cargo-c' 'git' 'rust')
-provides=('landlockconfig' 'liblandlock-policy.so')
-conflicts=('landlockconfig')
+provides=('landlock-policy' 'liblandlock-policy.so')
+conflicts=('landlock-policy')
 
 # Disable debug package creation to avoid debug symlink issues.
 options=('!debug')
 
 # Build directly from the current repository.
-# Change this to remote URL for distribution: git+https://github.com/landlock-lsm/landlockconfig.git
+# Change this to remote URL for distribution: git+https://github.com/landlock-lsm/landlock-policy.git
 source=()
 sha256sums=()
 

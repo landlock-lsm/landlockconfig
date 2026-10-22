@@ -26,5 +26,5 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && echo "builder ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
 USER builder
-WORKDIR /landlockconfig
+WORKDIR /landlock-policy
 CMD ["make", "-C", "pkg/debian", "install"]

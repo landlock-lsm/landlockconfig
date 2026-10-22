@@ -31,7 +31,7 @@ jobs:
       run: |
         echo "id0=$GITHUB_SHA" > $GITHUB_OUTPUT
         echo "List of tested commits:" > $GITHUB_STEP_SUMMARY
-        sed -n 's,^id[0-9]\+=\(.*\),- https://github.com/landlock-lsm/landlockconfig/commit/\1,p' -- $GITHUB_OUTPUT >> $GITHUB_STEP_SUMMARY
+        sed -n 's,^id[0-9]\+=\(.*\),- https://github.com/landlock-lsm/landlock-policy/commit/\1,p' -- $GITHUB_OUTPUT >> $GITHUB_STEP_SUMMARY
 
     - name: Get commit list (PR)
       id: get_commit_list_pr
@@ -42,7 +42,7 @@ jobs:
           awk '{ print "id" NR "=" $1 }' > $GITHUB_OUTPUT
         git diff --quiet ${{ github.event.pull_request.head.sha }} ${{ github.sha }} || echo "id0=$GITHUB_SHA" >> $GITHUB_OUTPUT
         echo "List of tested commits:" > $GITHUB_STEP_SUMMARY
-        sed -n 's,^id[0-9]\+=\(.*\),- https://github.com/landlock-lsm/landlockconfig/commit/\1,p' -- $GITHUB_OUTPUT >> $GITHUB_STEP_SUMMARY
+        sed -n 's,^id[0-9]\+=\(.*\),- https://github.com/landlock-lsm/landlock-policy/commit/\1,p' -- $GITHUB_OUTPUT >> $GITHUB_STEP_SUMMARY
 
     outputs:
       commits: ${{ toJSON(steps.*.outputs.*) }}
@@ -270,7 +270,7 @@ jobs:
         build-args: |
           UID=${{ steps.ids.outputs.uid }}
           GID=${{ steps.ids.outputs.gid }}
-        tags: landlockconfig-archlinux
+        tags: landlock-policy-archlinux
         cache-from: type=gha
         cache-to: type=gha,mode=min
         load: true
@@ -302,8 +302,8 @@ jobs:
         mkdir -p "$HOME/.cargo/registry"
         docker run --rm \
           --volume "$HOME/.cargo/registry:/home/builder/.cargo/registry" \
-          --volume "$PWD:/landlockconfig" \
-          landlockconfig-archlinux
+          --volume "$PWD:/landlock-policy" \
+          landlock-policy-archlinux
 
   debian_package:
     runs-on: ubuntu-24.04
@@ -329,7 +329,7 @@ jobs:
         build-args: |
           UID=${{ steps.ids.outputs.uid }}
           GID=${{ steps.ids.outputs.gid }}
-        tags: landlockconfig-debian
+        tags: landlock-policy-debian
         cache-from: type=gha
         cache-to: type=gha,mode=min
         load: true
@@ -352,8 +352,8 @@ jobs:
         mkdir -p "$HOME/.cargo/registry"
         docker run --rm \
           --volume "$HOME/.cargo/registry:/home/builder/.cargo/registry" \
-          --volume "$PWD:/landlockconfig" \
-          landlockconfig-debian
+          --volume "$PWD:/landlock-policy" \
+          landlock-policy-debian
 
     - name: Upload Debian packages
       uses: actions/upload-artifact@v7

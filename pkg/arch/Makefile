@@ -8,7 +8,7 @@ build:
 	sed -i -e 's/^pkgver=.*/pkgver=0/' PKGBUILD
 
 install: build
-	sudo pacman -U --noconfirm -- "$$(ls -1t landlockconfig-git-*.pkg.tar.zst | head -n 1)"
+	sudo pacman -U --noconfirm -- "$$(ls -1t landlock-policy-git-*.pkg.tar.zst | head -n 1)"
 
 # Build package using Docker container
 # Prerequisites: Install rustup and cargo-c (see .github/workflows/ci.yml)
@@ -16,12 +16,12 @@ docker:
 	docker buildx build --file Dockerfile \
 		--build-arg "UID=$(shell id -u)" \
 		--build-arg "GID=$(shell id -g)" \
-		--tag landlockconfig-archlinux \
+		--tag landlock-policy-archlinux \
 		.
 	docker run --rm \
 		--volume "$(HOME)/.cargo/registry:/home/builder/.cargo/registry:ro" \
-		--volume "$(CURDIR)/../..:/landlockconfig" \
-		landlockconfig-archlinux
+		--volume "$(CURDIR)/../..:/landlock-policy" \
+		landlock-policy-archlinux
 
 clean:
-	rm landlockconfig-git-*.pkg.tar.zst || :
+	rm landlock-policy-git-*.pkg.tar.zst || :

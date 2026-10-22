@@ -1,4 +1,4 @@
-landlockconfig (0.0.0) unstable; urgency=low
+landlock-policy (0.0.0) unstable; urgency=low
 
   * Initial Debian packaging.
 

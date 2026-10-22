@@ -1,4 +1,4 @@
-# Landlock Config
+# Landlock Policy
 
 > **Work in progress:**  The configuration specification is currently unstable.
 
@@ -6,7 +6,7 @@ See https://landlock.io
 
 ## Goal
 
-The goal of Landlock Config is to define a simple and flexible configuration
+The goal of Landlock Policy is to define a simple and flexible configuration
 specification for security policies using Landlock, and to provide a reference
 implementation that can parse both [JSON](https://json.org/) and
 [TOML](https://toml.io) formats.  These formats are designed to be easy to
@@ -123,8 +123,8 @@ operations for debugging, linting, formatting, updating, merging, and
 translating policy inputs:
 
 ```sh
-git clone https://github.com/landlock-lsm/landlockconfig
-cd landlockconfig
+git clone https://github.com/landlock-lsm/landlock-policy
+cd landlock-policy
 cargo install --path landlock-policy-cli
 landlock-policy schema
 ```
@@ -138,8 +138,8 @@ wrapper; end users looking for a full-featured sandboxing tool should use
 [Island](https://github.com/landlock-lsm/island) instead.
 
 ```sh
-git clone https://github.com/landlock-lsm/landlockconfig
-cd landlockconfig
+git clone https://github.com/landlock-lsm/landlock-policy
+cd landlock-policy
 cargo install --path landlock-exec
 landlock-exec --json examples/mini-write-tmp.json sh
 ```

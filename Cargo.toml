@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["ffi", "llconfig"]
+members = ["ffi", "landlock-policy-cli"]
 
 [workspace.package]
 edition = "2021"

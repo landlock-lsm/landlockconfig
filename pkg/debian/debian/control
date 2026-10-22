@@ -31,12 +31,12 @@ Description: Sandboxer library leveraging Landlock - development files
  This package contains the C header, pkg-config file, and development
  symlink for building against liblandlockconfig.
 
-Package: llconfig
+Package: landlock-policy
 Architecture: any
 Section: utils
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: Command-line sandboxer using Landlock with JSON/TOML configuration
- llconfig is a command-line tool that applies Landlock sandbox restrictions
+ landlock-policy is a command-line tool that applies Landlock sandbox restrictions
  defined in JSON or TOML configuration files, then executes a given command
  within the sandbox.
  .

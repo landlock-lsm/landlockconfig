@@ -21,14 +21,14 @@ override_dh_auto_test:
 
 override_dh_auto_build:
 	cargo cbuild --package=landlockconfig_ffi --release
-	cargo build --package=llconfig --release
+	cargo build --package=landlock-policy-cli --release
 
 override_dh_auto_install:
 	cargo cinstall --package=landlockconfig_ffi --release \
 		--prefix=/usr \
 		--libdir=/usr/lib/$(DEB_HOST_MULTIARCH) \
 		--destdir=debian/tmp
-	install -Dm755 $(CARGO_TARGET_DIR)/release/llconfig debian/tmp/usr/bin/llconfig
+	install -Dm755 $(CARGO_TARGET_DIR)/release/landlock-policy debian/tmp/usr/bin/landlock-policy
 
 override_dh_auto_clean:
 	-cargo clean

@@ -20,11 +20,11 @@ override_dh_auto_test:
 	cargo test
 
 override_dh_auto_build:
-	cargo cbuild --package=landlockconfig_ffi --release
+	cargo cbuild --package=landlock-policy-ffi --release
 	cargo build --package=landlock-policy-cli --release
 
 override_dh_auto_install:
-	cargo cinstall --package=landlockconfig_ffi --release \
+	cargo cinstall --package=landlock-policy-ffi --release \
 		--prefix=/usr \
 		--libdir=/usr/lib/$(DEB_HOST_MULTIARCH) \
 		--destdir=debian/tmp

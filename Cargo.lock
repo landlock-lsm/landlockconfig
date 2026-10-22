@@ -545,6 +545,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "landlock-policy-ffi"
+version = "0.0.0"
+dependencies = [
+ "cbindgen",
+ "landlock",
+ "landlockconfig",
+ "libc",
+]
+
+[[package]]
 name = "landlockconfig"
 version = "0.1.0"
 dependencies = [
@@ -555,16 +565,6 @@ dependencies = [
  "serde_json",
  "thiserror",
  "toml",
-]
-
-[[package]]
-name = "landlockconfig_ffi"
-version = "0.1.0"
-dependencies = [
- "cbindgen",
- "landlock",
- "landlockconfig",
- "libc",
 ]
 
 [[package]]

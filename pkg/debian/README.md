@@ -26,14 +26,14 @@ make build
 
 The build creates these packages:
 
-- `liblandlockconfig-dev_*.deb` -- development files
-- `liblandlockconfig0-dbgsym_*.deb` -- debug symbols for the shared library
-- `liblandlockconfig0_*.deb` -- shared library
+- `liblandlock-policy-dev_*.deb` -- development files
+- `liblandlock-policy0-dbgsym_*.deb` -- debug symbols for the shared library
+- `liblandlock-policy0_*.deb` -- shared library
 - `landlock-policy-dbgsym_*.deb` -- debug symbols for landlock-policy
 - `landlock-policy_*.deb` -- command-line sandboxer tool
 
 Install with:
 
 ```bash
-sudo dpkg -i ../liblandlockconfig0_*.deb ../landlock-policy_*.deb
+sudo dpkg -i ../liblandlock-policy0_*.deb ../landlock-policy_*.deb
 ```

@@ -14,7 +14,7 @@ url="https://landlock.io"
 license=('MIT' 'Apache-2.0')
 depends=('glibc' 'gcc-libs')
 makedepends=('cargo' 'cargo-c' 'git' 'rust')
-provides=('landlockconfig' 'liblandlockconfig.so')
+provides=('landlockconfig' 'liblandlock-policy.so')
 conflicts=('landlockconfig')
 
 # Disable debug package creation to avoid debug symlink issues.

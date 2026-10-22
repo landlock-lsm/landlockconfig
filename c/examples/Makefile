@@ -6,7 +6,7 @@ OBJECT = $(SOURCE:.c=.o)
 
 OUT_DIR = out
 
-PKG_NAME = landlockconfig
+PKG_NAME = landlock-policy
 # cargo cinstall may install into a multiarch libdir (e.g.
 # lib/x86_64-linux-gnu), so locate the generated pkg-config file and let
 # pkg-config provide the paths instead of assuming a fixed layout.

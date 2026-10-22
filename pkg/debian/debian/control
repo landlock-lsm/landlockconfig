@@ -8,7 +8,7 @@ Vcs-Browser: https://github.com/landlock-lsm/landlockconfig
 Vcs-Git: https://github.com/landlock-lsm/landlockconfig.git
 Rules-Requires-Root: no
 
-Package: liblandlockconfig0
+Package: liblandlock-policy0
 Architecture: any
 Section: libs
 Multi-Arch: same
@@ -19,17 +19,17 @@ Description: Sandboxer library leveraging Landlock - shared library
  .
  This package contains the shared library.
 
-Package: liblandlockconfig-dev
+Package: liblandlock-policy-dev
 Architecture: any
 Section: libdevel
 Multi-Arch: same
-Depends: liblandlockconfig0 (= ${binary:Version}), ${misc:Depends}
+Depends: liblandlock-policy0 (= ${binary:Version}), ${misc:Depends}
 Description: Sandboxer library leveraging Landlock - development files
  Landlockconfig provides a C shared library for sandboxing processes
  using Landlock with JSON or TOML configuration files.
  .
  This package contains the C header, pkg-config file, and development
- symlink for building against liblandlockconfig.
+ symlink for building against liblandlock-policy.
 
 Package: landlock-policy
 Architecture: any

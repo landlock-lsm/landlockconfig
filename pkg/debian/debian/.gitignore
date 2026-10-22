@@ -3,9 +3,9 @@
 !changelog
 !control
 !copyright
-!liblandlockconfig-dev
-!liblandlockconfig0.docs
-!liblandlockconfig0.install
+!liblandlock-policy-dev.install
+!liblandlock-policy0.docs
+!liblandlock-policy0.install
 !landlock-policy.docs
 !landlock-policy.install
 !rules

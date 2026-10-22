@@ -1,0 +1,4 @@
+usr/include/landlock-policy.h
+usr/lib/*/liblandlock-policy.so
+usr/lib/*/liblandlock-policy.a
+usr/lib/*/pkgconfig/landlock-policy.pc

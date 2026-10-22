@@ -89,7 +89,7 @@ To install this library, first install
 `cargo install cargo-c`, and then run these commands:
 
 ```sh
-cargo cinstall --package=landlockconfig_ffi --release --prefix=/usr/local --destdir=out
+cargo cinstall --package=landlock-policy-ffi --release --prefix=/usr/local --destdir=out
 sudo cp -dr out/usr/local/* /usr/local/
 ```
 

@@ -44,7 +44,7 @@ test: all
 		true
 
 $(OUT_DIR)/include/landlock-policy.h: FORCE
-	cargo cinstall --locked --package=landlockconfig_ffi --release --prefix=$(OUT_DIR)
+	cargo cinstall --locked --package=landlock-policy-ffi --release --prefix=$(OUT_DIR)
 
 %.o: %.c $(OUT_DIR)/include/landlock-policy.h
 	$(CC) $(CFLAGS) -c $< -o $@

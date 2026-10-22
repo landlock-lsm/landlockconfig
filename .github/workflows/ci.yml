@@ -135,7 +135,7 @@ jobs:
       run: rustup run ${{ env.RUST_TOOLCHAIN }} cargo build --locked --all --examples --verbose
 
     - name: Build FFI
-      run: rustup run ${{ env.RUST_TOOLCHAIN }} cargo cinstall --locked --package=landlockconfig_ffi --destdir=out
+      run: rustup run ${{ env.RUST_TOOLCHAIN }} cargo cinstall --locked --package=landlock-policy-ffi --destdir=out
 
   ubuntu_26_rust_stable:
     runs-on: ubuntu-26.04

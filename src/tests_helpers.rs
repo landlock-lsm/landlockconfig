@@ -16,7 +16,7 @@ lazy_static! {
             env::var("CARGO_MANIFEST_DIR")
                 .expect("The environment variable CARGO_MANIFEST_DIR is not set"),
         );
-        let schema_path = crate_dir.join("schema/landlockconfig.json");
+        let schema_path = crate_dir.join("schema/landlock-policy.json");
         let schema_str =
             fs::read_to_string(schema_path).expect("Failed to read the JSON schema file");
         let schema: Value = serde_json::from_str(&schema_str).expect("Invalid JSON");

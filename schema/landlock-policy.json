@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "description": "Landlock security policy configuration schema",
+  "description": "Landlock security policy schema",
   "type": "object",
   "definitions": {
     "uint64": {

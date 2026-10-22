@@ -113,9 +113,9 @@ can be used to test the library implementation against a set of valid and
 invalid samples. This could also be used to test Landlock libraries to make sure
 the execution traces are similar.
 
-## llconfig tool
+## landlock-policy tool
 
-The `llconfig` tool is a standalone binary for running commands in a Landlock
+The `landlock-policy` tool is a standalone binary for running commands in a Landlock
 sandbox using JSON or TOML configuration files. It is intentionally minimal:
 it only relies on the `landlockconfig` library, which makes it a convenient
 reference tool for developers experimenting with configurations.
@@ -123,12 +123,12 @@ reference tool for developers experimenting with configurations.
 End users looking for a full-featured sandboxing tool should use
 [Island](https://github.com/landlock-lsm/island) instead.
 
-Here are the steps to install and use the llconfig tool:
+Here are the steps to install and use the landlock-policy tool:
 ```sh
 git clone https://github.com/landlock-lsm/landlockconfig
 cd landlockconfig
-cargo install --path llconfig
-llconfig run --json examples/mini-write-tmp.json sh
+cargo install --path landlock-policy-cli
+landlock-policy run --json examples/mini-write-tmp.json sh
 ```
 
 We can compose configurations by specifying `--json` or `--toml` (and related
@@ -136,7 +136,7 @@ file paths) several times.
 
 To retrieve the JSON schema for Landlock configurations:
 ```sh
-llconfig schema
+landlock-policy schema
 ```
 
 ## TOML configuration example
@@ -173,5 +173,5 @@ parent = ["${tmp}", "${home}"]
 
 We can get a view of the created Landlock rules:
 ```sh
-llconfig run --toml examples/micro-var.toml --debug date
+landlock-policy run --toml examples/micro-var.toml --debug date
 ```

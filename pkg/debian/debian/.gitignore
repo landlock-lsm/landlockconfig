@@ -6,7 +6,7 @@
 !liblandlockconfig-dev
 !liblandlockconfig0.docs
 !liblandlockconfig0.install
-!llconfig.docs
-!llconfig.install
+!landlock-policy.docs
+!landlock-policy.install
 !rules
 !source/format

@@ -12,10 +12,10 @@ use std::process::Command;
 
 #[derive(Parser)]
 #[command(
-    name = "llconfig",
-    about = "Command-line tool for the Landlock Config format",
-    long_about = "llconfig is a simple command-line tool for the Landlock Config format. \
-        It reads Landlock configurations expressed as JSON or TOML and applies operations on them.",
+    name = "landlock-policy",
+    about = "Command-line tool for the Landlock Policy format",
+    long_about = "landlock-policy is a simple command-line tool for the Landlock Policy format. \
+        It reads Landlock policies expressed as JSON or TOML and applies operations on them.",
     version = concat!(env!("CARGO_PKG_VERSION"), " (", env!("GIT_COMMIT"), " ", env!("GIT_DATE"), ")")
 )]
 struct Cli {
@@ -67,7 +67,7 @@ enum Commands {
     },
 
     #[command(
-        about = "Print the JSON schema for Landlock configurations",
+        about = "Print the JSON schema for Landlock policies",
         long_about = "Output the versioned JSON schema that describes the structure and \
             validation rules for Landlock configuration files. The schema is printed to \
             stdout in JSON format."

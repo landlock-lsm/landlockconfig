@@ -29,11 +29,11 @@ The build creates these packages:
 - `liblandlockconfig-dev_*.deb` -- development files
 - `liblandlockconfig0-dbgsym_*.deb` -- debug symbols for the shared library
 - `liblandlockconfig0_*.deb` -- shared library
-- `llconfig-dbgsym_*.deb` -- debug symbols for llconfig
-- `llconfig_*.deb` -- command-line sandboxer tool
+- `landlock-policy-dbgsym_*.deb` -- debug symbols for landlock-policy
+- `landlock-policy_*.deb` -- command-line sandboxer tool
 
 Install with:
 
 ```bash
-sudo dpkg -i ../liblandlockconfig0_*.deb ../llconfig_*.deb
+sudo dpkg -i ../liblandlockconfig0_*.deb ../landlock-policy_*.deb
 ```

@@ -33,7 +33,7 @@ fn io_error_to_errno(err: Error) -> Errno {
     }
 }
 
-fn parse_file<F>(config_fd: RawFd, flags: u32, parser: F) -> Result<*mut Policy, Errno>
+fn parse_file<F>(policy_fd: RawFd, flags: u32, parser: F) -> Result<*mut Policy, Errno>
 where
     F: FnOnce(File) -> Result<Policy, Error>,
 {
@@ -41,7 +41,7 @@ where
         return Err(Errno::new(libc::EINVAL));
     }
 
-    let fd = unsafe { BorrowedFd::borrow_raw(config_fd) };
+    let fd = unsafe { BorrowedFd::borrow_raw(policy_fd) };
     // Checks if it is a valid file descriptor.
     let file = File::from(fd.try_clone_to_owned()?);
     Ok(Box::into_raw(Box::new(parser(file)?)))
@@ -53,41 +53,41 @@ where
 
 // TODO: Add a flag to accept unknown JSON entries (e.g. for OCI specification).
 
-/// Parses a JSON configuration file
+/// Parses a JSON policy file
 ///
 /// # Parameters
 ///
-/// * `config_fd`: A file descriptor referring to a JSON configuration file.
+/// * `policy_fd`: A file descriptor referring to a JSON policy file.
 /// * `flags`: Must be 0.
 ///
 /// # Return values
 ///
-/// * Pointer to a landlockconfig object on success. This object must be freed
-///   with landlockconfig_free().
+/// * Pointer to a landlock_policy object on success. This object must be freed
+///   with landlock_policy_free().
 /// * -errno on error.
 #[no_mangle]
-pub extern "C" fn landlockconfig_parse_json_file(config_fd: RawFd, flags: u32) -> *mut Policy {
-    parse_file(config_fd, flags, |file| {
+pub extern "C" fn landlock_policy_parse_json_file(policy_fd: RawFd, flags: u32) -> *mut Policy {
+    parse_file(policy_fd, flags, |file| {
         Policy::parse_json(file).map_err(|e| Error::new(ErrorKind::InvalidData, e))
     })
     .unwrap_or_else(|e| unwrap_errno(e) as *mut Policy)
 }
 
-/// Parses a TOML configuration file
+/// Parses a TOML policy file
 ///
 /// # Parameters
 ///
-/// * `config_fd`: A file descriptor referring to a TOML configuration file.
+/// * `policy_fd`: A file descriptor referring to a TOML policy file.
 /// * `flags`: Must be 0.
 ///
 /// # Return values
 ///
-/// * Pointer to a landlockconfig object on success. This object must be freed
-///   with landlockconfig_free().
+/// * Pointer to a landlock_policy object on success. This object must be freed
+///   with landlock_policy_free().
 /// * -errno on error.
 #[no_mangle]
-pub extern "C" fn landlockconfig_parse_toml_file(config_fd: RawFd, flags: u32) -> *mut Policy {
-    parse_file(config_fd, flags, |mut file| {
+pub extern "C" fn landlock_policy_parse_toml_file(policy_fd: RawFd, flags: u32) -> *mut Policy {
+    parse_file(policy_fd, flags, |mut file| {
         let mut buffer = String::new();
         std::io::Read::read_to_string(&mut file, &mut buffer)?;
         Policy::parse_toml(&buffer).map_err(|e| Error::new(ErrorKind::InvalidData, e))
@@ -120,11 +120,11 @@ where
         unsafe { std::slice::from_raw_parts(buffer_ptr, buffer_size) }
     };
 
-    let config = parser(buffer).map_err(Errno::from)?;
-    Ok(Box::into_raw(Box::new(config)))
+    let policy = parser(buffer).map_err(Errno::from)?;
+    Ok(Box::into_raw(Box::new(policy)))
 }
 
-/// Parses a JSON configuration from a memory buffer
+/// Parses a JSON policy from a memory buffer
 ///
 /// # Parameters
 ///
@@ -134,11 +134,11 @@ where
 ///
 /// # Return values
 ///
-/// * Pointer to a landlockconfig object on success. This object must be freed
-///   with landlockconfig_free().
+/// * Pointer to a landlock_policy object on success. This object must be freed
+///   with landlock_policy_free().
 /// * -errno on error.
 #[no_mangle]
-pub extern "C" fn landlockconfig_parse_json_buffer(
+pub extern "C" fn landlock_policy_parse_json_buffer(
     buffer_ptr: *const u8,
     buffer_size: usize,
     flags: u32,
@@ -150,7 +150,7 @@ pub extern "C" fn landlockconfig_parse_json_buffer(
     .unwrap_or_else(|e| unwrap_errno(e) as *mut Policy)
 }
 
-/// Parses a TOML configuration from a memory buffer
+/// Parses a TOML policy from a memory buffer
 ///
 /// # Parameters
 ///
@@ -160,11 +160,11 @@ pub extern "C" fn landlockconfig_parse_json_buffer(
 ///
 /// # Return values
 ///
-/// * Pointer to a landlockconfig object on success. This object must be freed
-///   with landlockconfig_free().
+/// * Pointer to a landlock_policy object on success. This object must be freed
+///   with landlock_policy_free().
 /// * -errno on error.
 #[no_mangle]
-pub extern "C" fn landlockconfig_parse_toml_buffer(
+pub extern "C" fn landlock_policy_parse_toml_buffer(
     buffer_ptr: *const u8,
     buffer_size: usize,
     flags: u32,
@@ -191,12 +191,12 @@ fn parse_directory(
     }
 
     let path = unsafe { CStr::from_ptr(dir_path) }.to_str()?;
-    let config =
+    let policy =
         Policy::parse_directory(path, format).map_err(|e| io_error_to_errno(Error::from(e)))?;
-    Ok(Box::into_raw(Box::new(config)))
+    Ok(Box::into_raw(Box::new(policy)))
 }
 
-/// Parses all JSON configuration files in a directory
+/// Parses all JSON policy files in a directory
 ///
 /// # Parameters
 ///
@@ -205,11 +205,11 @@ fn parse_directory(
 ///
 /// # Return values
 ///
-/// * Pointer to a landlockconfig object on success. This object must be freed
-///   with landlockconfig_free().
+/// * Pointer to a landlock_policy object on success. This object must be freed
+///   with landlock_policy_free().
 /// * -errno on error.
 #[no_mangle]
-pub extern "C" fn landlockconfig_parse_json_directory(
+pub extern "C" fn landlock_policy_parse_json_directory(
     dir_path: *const c_char,
     flags: u32,
 ) -> *mut Policy {
@@ -217,7 +217,7 @@ pub extern "C" fn landlockconfig_parse_json_directory(
         .unwrap_or_else(|e| unwrap_errno(e) as *mut Policy)
 }
 
-/// Parses all TOML configuration files in a directory
+/// Parses all TOML policy files in a directory
 ///
 /// # Parameters
 ///
@@ -226,11 +226,11 @@ pub extern "C" fn landlockconfig_parse_json_directory(
 ///
 /// # Return values
 ///
-/// * Pointer to a landlockconfig object on success. This object must be freed
-///   with landlockconfig_free().
+/// * Pointer to a landlock_policy object on success. This object must be freed
+///   with landlock_policy_free().
 /// * -errno on error.
 #[no_mangle]
-pub extern "C" fn landlockconfig_parse_toml_directory(
+pub extern "C" fn landlock_policy_parse_toml_directory(
     dir_path: *const c_char,
     flags: u32,
 ) -> *mut Policy {
@@ -238,48 +238,48 @@ pub extern "C" fn landlockconfig_parse_toml_directory(
         .unwrap_or_else(|e| unwrap_errno(e) as *mut Policy)
 }
 
-/// Frees a landlockconfig object
+/// Frees a landlock_policy object
 ///
 /// # Safety
 ///
-/// The pointer must have been returned by landlockconfig_parse_*().
+/// The pointer must have been returned by landlock_policy_parse_*().
 #[no_mangle]
-pub unsafe extern "C" fn landlockconfig_free(config: *mut Policy) {
-    if !config.is_null() {
-        drop(Box::from_raw(config));
+pub unsafe extern "C" fn landlock_policy_free(policy: *mut Policy) {
+    if !policy.is_null() {
+        drop(Box::from_raw(policy));
     }
 }
 
 // TODO: Also return RestrictionStatus
 
-/// Creates a ruleset from a landlockconfig object
+/// Creates a ruleset from a landlock_policy object
 ///
 /// # Parameters
 ///
-/// * `config`: A pointer to a landlockconfig object.
+/// * `policy`: A pointer to a landlock_policy object.
 /// * `flags`: Must be 0.
 ///
 /// # Safety
 ///
-/// `config` must have been returned by landlockconfig_parse_json() or
-/// landlockconfig_parse_toml().
+/// `policy` must have been returned by landlock_policy_parse_json() or
+/// landlock_policy_parse_toml().
 ///
 /// # Returns
 ///
 /// * The ruleset file descriptor on success.
 /// * -errno on error.
 #[no_mangle]
-pub unsafe extern "C" fn landlockconfig_build_ruleset(config: *const Policy, flags: u32) -> RawFd {
+pub unsafe extern "C" fn landlock_policy_build_ruleset(policy: *const Policy, flags: u32) -> RawFd {
     if flags != 0 {
         return unwrap_errno(Errno::new(libc::EINVAL));
     }
 
-    if config.is_null() {
+    if policy.is_null() {
         return unwrap_errno(Errno::new(libc::EFAULT));
     }
 
-    // TODO: Avoid cloning the config.
-    let resolved = match unsafe { &*config }.clone().resolve() {
+    // TODO: Avoid cloning the policy.
+    let resolved = match unsafe { &*policy }.clone().resolve() {
         Ok(resolved) => resolved,
         Err(e) => return unwrap_errno(e),
     };

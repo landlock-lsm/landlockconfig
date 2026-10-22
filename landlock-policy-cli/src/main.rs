@@ -3,7 +3,7 @@
 use anyhow::{bail, Context};
 use clap::{Parser, Subcommand};
 use landlock::RulesetStatus;
-use landlockconfig::{Config, ConfigFormat, OptionalConfig};
+use landlock_policy::{Config, ConfigFormat, OptionalConfig};
 use std::fs::File;
 use std::io::Read;
 use std::os::unix::process::CommandExt;

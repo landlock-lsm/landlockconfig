@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use landlock::Errno;
-use landlockconfig::{Config, ConfigFormat};
+use landlock_policy::{Config, ConfigFormat};
 use libc::c_char;
 use std::ffi::{c_int, CStr};
 use std::fs::File;

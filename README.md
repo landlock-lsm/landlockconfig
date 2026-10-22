@@ -117,7 +117,7 @@ the execution traces are similar.
 
 The `landlock-policy` tool is a standalone binary for running commands in a Landlock
 sandbox using JSON or TOML configuration files. It is intentionally minimal:
-it only relies on the `landlockconfig` library, which makes it a convenient
+it only relies on the `landlock-policy` library, which makes it a convenient
 reference tool for developers experimenting with configurations.
 
 End users looking for a full-featured sandboxing tool should use

@@ -535,28 +535,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "landlock-policy-cli"
+name = "landlock-policy"
 version = "0.0.0"
-dependencies = [
- "anyhow",
- "clap",
- "landlock",
- "landlockconfig",
-]
-
-[[package]]
-name = "landlock-policy-ffi"
-version = "0.0.0"
-dependencies = [
- "cbindgen",
- "landlock",
- "landlockconfig",
- "libc",
-]
-
-[[package]]
-name = "landlockconfig"
-version = "0.1.0"
 dependencies = [
  "jsonschema",
  "landlock",
@@ -565,6 +545,26 @@ dependencies = [
  "serde_json",
  "thiserror",
  "toml",
+]
+
+[[package]]
+name = "landlock-policy-cli"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "landlock",
+ "landlock-policy",
+]
+
+[[package]]
+name = "landlock-policy-ffi"
+version = "0.0.0"
+dependencies = [
+ "cbindgen",
+ "landlock",
+ "landlock-policy",
+ "libc",
 ]
 
 [[package]]

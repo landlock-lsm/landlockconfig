@@ -15,8 +15,9 @@ exclude = [".gitignore"]
 anyhow = "1.0.95"
 clap = { version = "4.5.28", features = ["derive"] }
 landlock.workspace = true
-landlockconfig = { path = "..", features = ["toml"] }
+landlock-policy = { path = "..", features = ["toml"] }
 
 [[bin]]
 name = "landlock-policy"
 path = "src/main.rs"
+doc = false

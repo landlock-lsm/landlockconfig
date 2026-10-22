@@ -15,7 +15,7 @@ style = "tag"
 
 [parse]
 parse_deps = true
-include = ["landlockconfig"]
+include = ["landlock-policy"]
 
 [export.rename]
 "Config" = "landlockconfig"

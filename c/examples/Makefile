@@ -43,10 +43,10 @@ test: all
 		../../tests/composition/source/ \
 		true
 
-$(OUT_DIR)/include/landlockconfig.h: FORCE
+$(OUT_DIR)/include/landlock-policy.h: FORCE
 	cargo cinstall --locked --package=landlockconfig_ffi --release --prefix=$(OUT_DIR)
 
-%.o: %.c $(OUT_DIR)/include/landlockconfig.h
+%.o: %.c $(OUT_DIR)/include/landlock-policy.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BINARY): $(OBJECT)

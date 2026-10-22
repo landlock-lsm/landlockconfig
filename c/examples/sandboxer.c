@@ -8,7 +8,7 @@
 #include <syscall.h>
 #include <unistd.h>
 
-#include <landlockconfig.h>
+#include <landlock-policy.h>
 
 #ifndef landlock_restrict_self
 static inline int landlock_restrict_self(const int ruleset_fd, const int flags)

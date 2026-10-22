@@ -12,8 +12,8 @@ description = "Sandboxer library leveraging Landlock with JSON or TOML configura
 landlock = "0.4.3"
 
 [package]
-name = "landlockconfig"
-version = "0.1.0"
+name = "landlock-policy"
+version = "0.0.0"
 edition.workspace = true
 rust-version.workspace = true
 description.workspace = true

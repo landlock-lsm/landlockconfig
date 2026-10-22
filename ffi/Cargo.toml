@@ -13,7 +13,7 @@ doc = false
 
 [dependencies]
 landlock.workspace = true
-landlockconfig = { path = ".." }
+landlock-policy = { path = ".." }
 libc = "0.2.171"
 
 [build-dependencies]

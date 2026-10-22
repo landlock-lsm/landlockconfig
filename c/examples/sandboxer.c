@@ -19,46 +19,46 @@ static inline int landlock_restrict_self(const int ruleset_fd, const int flags)
 
 int main(int argc, char *argv[], char *envp[])
 {
-	int config_fd, ruleset_fd;
-	struct landlockconfig *config;
-	const char *config_file;
+	int policy_fd, ruleset_fd;
+	struct landlock_policy *policy;
+	const char *policy_file;
 	struct stat st;
 
 	if (argc <= 2) {
-		fprintf(stderr, "Error: Missing config file or command.\n\n");
-		fprintf(stderr, "usage: %s <config_file> <command> [args...]\n", argv[0]);
+		fprintf(stderr, "Error: Missing policy file or command.\n\n");
+		fprintf(stderr, "usage: %s <policy_file> <command> [args...]\n", argv[0]);
 		return 1;
 	}
 
-	config_file = argv[1];
+	policy_file = argv[1];
 
-	config_fd = open(config_file, O_RDONLY | O_CLOEXEC);
-	if (config_fd < 0) {
-		perror("Failed to open configuration file");
+	policy_fd = open(policy_file, O_RDONLY | O_CLOEXEC);
+	if (policy_fd < 0) {
+		perror("Failed to open policy file");
 		return 1;
 	}
 
-	if (fstat(config_fd, &st) < 0) {
-		perror("Failed to stat configuration file");
-		close(config_fd);
+	if (fstat(policy_fd, &st) < 0) {
+		perror("Failed to stat policy file");
+		close(policy_fd);
 		return 1;
 	}
 	if (S_ISDIR(st.st_mode)) {
-		close(config_fd);
-		config = landlockconfig_parse_toml_directory(config_file, 0);
+		close(policy_fd);
+		policy = landlock_policy_parse_toml_directory(policy_file, 0);
 	} else {
-		config = landlockconfig_parse_toml_file(config_fd, 0);
-		close(config_fd);
+		policy = landlock_policy_parse_toml_file(policy_fd, 0);
+		close(policy_fd);
 	}
 
-	if ((long)config <= 0) {
-		fprintf(stderr, "Failed to parse configuration in '%s': %s\n",
-			config_file, strerror(-(long)config));
+	if ((long)policy <= 0) {
+		fprintf(stderr, "Failed to parse policy in '%s': %s\n",
+			policy_file, strerror(-(long)policy));
 		return 1;
 	}
 
-	ruleset_fd = landlockconfig_build_ruleset(config, 0);
-	landlockconfig_free(config);
+	ruleset_fd = landlock_policy_build_ruleset(policy, 0);
+	landlock_policy_free(policy);
 	if (ruleset_fd < 0) {
 		fprintf(stderr, "Failed to build ruleset: %s\n",
 			strerror(-ruleset_fd));

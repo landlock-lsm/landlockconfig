@@ -8,8 +8,8 @@ build:
 
 install: build
 	sudo dpkg -i \
-		"$$(ls -1t ../liblandlockconfig0_*.deb | head -n 1)" \
-		"$$(ls -1t ../liblandlockconfig-dev_*.deb | head -n 1)" \
+		"$$(ls -1t ../liblandlock-policy0_*.deb | head -n 1)" \
+		"$$(ls -1t ../liblandlock-policy-dev_*.deb | head -n 1)" \
 		"$$(ls -1t ../landlock-policy_*.deb | head -n 1)"
 
 # Build packages using a Docker container.
@@ -25,7 +25,7 @@ docker:
 		landlockconfig-debian
 
 clean:
-	$(RM) -f ../liblandlockconfig0_*.deb ../liblandlockconfig-dev_*.deb \
+	$(RM) -f ../liblandlock-policy0_*.deb ../liblandlock-policy-dev_*.deb \
 		../landlock-policy_*.deb \
-		../liblandlockconfig0-dbgsym_*.deb ../landlock-policy-dbgsym_*.deb \
+		../liblandlock-policy0-dbgsym_*.deb ../landlock-policy-dbgsym_*.deb \
 		../landlockconfig_*.buildinfo ../landlockconfig_*.changes

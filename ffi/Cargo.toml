@@ -8,7 +8,7 @@ license.workspace = true
 
 [lib]
 crate-type = ["cdylib", "staticlib"]
-name = "landlockconfig"
+name = "landlock_policy"
 doc = false
 
 [dependencies]
@@ -28,4 +28,9 @@ subdirectory = false
 generation = false
 
 [package.metadata.capi.library]
+name = "landlock-policy"
 version_suffix_components = 1
+
+[package.metadata.capi.pkg_config]
+name = "landlock-policy"
+filename = "landlock-policy"

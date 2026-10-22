@@ -93,7 +93,7 @@ cargo cinstall --package=landlock-policy-ffi --release --prefix=/usr/local --des
 sudo cp -dr out/usr/local/* /usr/local/
 ```
 
-The library is then usable via `pkg-config` as `landlockconfig`. See the [C
+The library is then usable via `pkg-config` as `landlock-policy`. See the [C
 example](c/examples/sandboxer.c) and its [Makefile](c/examples/Makefile).
 
 ### Resilient

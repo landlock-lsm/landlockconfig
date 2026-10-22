@@ -3,7 +3,7 @@ name = "landlock-policy-cli"
 version = "0.0.0"
 edition.workspace = true
 rust-version.workspace = true
-description = "Command-line tool for the Landlock Policy format"
+description = "Landlock policy development, inspection, and transformation tool"
 homepage = "https://landlock.io"
 repository = "https://github.com/landlock-lsm/landlockconfig"
 license.workspace = true
@@ -12,10 +12,7 @@ categories = ["command-line-utilities", "config", "os::linux-apis"]
 exclude = [".gitignore"]
 
 [dependencies]
-anyhow = "1.0.95"
 clap = { version = "4.5.28", features = ["derive"] }
-landlock.workspace = true
-landlock-policy = { path = "..", features = ["toml"] }
 
 [[bin]]
 name = "landlock-policy"

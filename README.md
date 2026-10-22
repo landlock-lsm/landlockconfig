@@ -113,31 +113,39 @@ can be used to test the library implementation against a set of valid and
 invalid samples. This could also be used to test Landlock libraries to make sure
 the execution traces are similar.
 
-## landlock-policy tool
+## Command-line tools
 
-The `landlock-policy` tool is a standalone binary for running commands in a Landlock
-sandbox using JSON or TOML configuration files. It is intentionally minimal:
-it only relies on the `landlock-policy` library, which makes it a convenient
-reference tool for developers experimenting with configurations.
+### landlock-policy
 
-End users looking for a full-featured sandboxing tool should use
-[Island](https://github.com/landlock-lsm/island) instead.
+`landlock-policy` is the policy development, inspection, and transformation
+tool. It currently prints the canonical JSON schema and is intended to grow
+operations for debugging, linting, formatting, updating, merging, and
+translating policy inputs:
 
-Here are the steps to install and use the landlock-policy tool:
 ```sh
 git clone https://github.com/landlock-lsm/landlockconfig
 cd landlockconfig
 cargo install --path landlock-policy-cli
-landlock-policy run --json examples/mini-write-tmp.json sh
-```
-
-We can compose configurations by specifying `--json` or `--toml` (and related
-file paths) several times.
-
-To retrieve the JSON schema for Landlock configurations:
-```sh
 landlock-policy schema
 ```
+
+### landlock-exec
+
+`landlock-exec` is the policy enforcement and execution wrapper. It applies
+one effective policy composed from JSON or TOML policy inputs and replaces
+itself with the confined command. It is an intentionally minimal reference
+wrapper; end users looking for a full-featured sandboxing tool should use
+[Island](https://github.com/landlock-lsm/island) instead.
+
+```sh
+git clone https://github.com/landlock-lsm/landlockconfig
+cd landlockconfig
+cargo install --path landlock-exec
+landlock-exec --json examples/mini-write-tmp.json sh
+```
+
+Policy inputs can be composed by specifying `--json` or `--toml` (and related
+file or directory paths) several times.
 
 ## TOML configuration example
 
@@ -173,5 +181,5 @@ parent = ["${tmp}", "${home}"]
 
 We can get a view of the created Landlock rules:
 ```sh
-landlock-policy run --toml examples/micro-var.toml --debug date
+landlock-exec --toml examples/micro-var.toml --debug date
 ```

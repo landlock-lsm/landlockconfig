@@ -535,6 +535,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "landlock-exec"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "landlock",
+ "landlock-policy",
+]
+
+[[package]]
 name = "landlock-policy"
 version = "0.0.0"
 dependencies = [
@@ -551,10 +561,7 @@ dependencies = [
 name = "landlock-policy-cli"
 version = "0.0.0"
 dependencies = [
- "anyhow",
  "clap",
- "landlock",
- "landlock-policy",
 ]
 
 [[package]]

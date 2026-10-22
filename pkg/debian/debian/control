@@ -35,10 +35,18 @@ Package: landlock-policy
 Architecture: any
 Section: utils
 Depends: ${shlibs:Depends}, ${misc:Depends}
-Description: Command-line sandboxer using Landlock with JSON/TOML configuration
- landlock-policy is a command-line tool that applies Landlock sandbox restrictions
- defined in JSON or TOML configuration files, then executes a given command
- within the sandbox.
+Description: Landlock policy development and inspection tool
+ landlock-policy develops, inspects, and transforms Landlock policies.
  .
- It composes multiple configuration files and supports reading from files,
- directories, or standard input.
+ This package contains the schema inspection tool.
+
+Package: landlock-exec
+Architecture: any
+Section: utils
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Landlock policy enforcement and execution wrapper
+ landlock-exec is a focused reference wrapper that applies Landlock restrictions
+ defined in JSON or TOML policy files, then executes a given command.
+ .
+ It composes multiple policy files and supports reading from files, directories,
+ or standard input.

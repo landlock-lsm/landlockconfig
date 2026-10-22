@@ -6,6 +6,8 @@
 !liblandlock-policy-dev.install
 !liblandlock-policy0.docs
 !liblandlock-policy0.install
+!landlock-exec.docs
+!landlock-exec.install
 !landlock-policy.docs
 !landlock-policy.install
 !rules

@@ -15,7 +15,7 @@ fn main() {
     let config =
         cbindgen::Config::from_file(&cbindgen_file).expect("Failed to parse {cbindgen_file}");
     let output_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
-    let header_file = "landlockconfig.h";
+    let header_file = "landlock-policy.h";
     let header_path = output_dir.join(header_file);
 
     cbindgen::Builder::new()

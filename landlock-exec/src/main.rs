@@ -16,7 +16,8 @@ use std::process::Command;
     about = "Apply Landlock policies and execute a command",
     long_about = "Apply Landlock restrictions from JSON or TOML policy files, then replace \
         landlock-exec with the requested command. Multiple policy files can be provided \
-        and will be composed together."
+        and will be composed together.",
+    version = concat!(env!("CARGO_PKG_VERSION"), " (", env!("GIT_COMMIT"), " ", env!("GIT_DATE"), ")")
 )]
 struct Cli {
     #[arg(

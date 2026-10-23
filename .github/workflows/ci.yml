@@ -179,6 +179,9 @@ jobs:
         rustup component add rustfmt clippy
         rustup update
 
+    - name: Check tool version build scripts match
+      run: cmp landlock-policy-cli/build.rs landlock-exec/build.rs
+
     - name: Build
       run: rustup run stable cargo build --locked --all --verbose
 
@@ -191,8 +194,14 @@ jobs:
     - name: Run tests
       run: rustup run stable cargo test --locked --all --verbose
 
-    - name: Run the landlock-policy tool with --version
-      run: rustup run stable cargo run --locked --package landlock-policy-cli -- --version | grep -Eq '^landlock-policy [0-9]+\.[0-9]+\.[0-9]+[^ ]* \([0-9a-f]{12} [0-9]{4}-[0-9]{2}-[0-9]{2}\)$'
+    - name: Check tool versions match
+      run: |
+        version_regex='[0-9]+\.[0-9]+\.[0-9]+[^ ]* \([0-9a-f]{12} [0-9]{4}-[0-9]{2}-[0-9]{2}\)'
+        policy_version="$(rustup run stable cargo run --locked --quiet --package landlock-policy-cli -- --version)"
+        exec_version="$(rustup run stable cargo run --locked --quiet --package landlock-exec -- --version)"
+        grep -Eq "^landlock-policy $version_regex$" <<<"$policy_version"
+        grep -Eq "^landlock-exec $version_regex$" <<<"$exec_version"
+        test "${policy_version#landlock-policy }" = "${exec_version#landlock-exec }"
 
     - name: Run landlock-exec with JSON
       run: rustup run stable cargo run --locked --package landlock-exec -- --json examples/mini-write-tmp.json true

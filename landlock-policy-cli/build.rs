@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+// Keep the landlock-policy-cli and landlock-exec build scripts byte-for-byte
+// identical. CI checks both copies because each Cargo package must stand alone.
+
 use std::process::Command;
 
 fn run_git(args: &[&str]) -> String {

@@ -13,6 +13,7 @@ exclude = [".gitignore"]
 
 [dependencies]
 clap = { version = "4.5.28", features = ["derive"] }
+landlock-policy = { path = ".." }
 
 [[bin]]
 name = "landlock-policy"

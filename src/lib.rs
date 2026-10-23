@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+/// Canonical JSON schema for the Landlock policy specification.
+pub const JSON_SCHEMA: &str = include_str!("../schema/landlock-policy.json");
+
 pub use policy::{
     BuildRulesetError, OptionalPolicy, ParseDirectoryError, Policy, PolicyFormat, ResolvedPolicy,
     RuleError,

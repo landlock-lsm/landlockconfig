@@ -16,6 +16,15 @@ fn test_json_schema() {
     validate_json(test_json).expect_err("JSON schema validator should return a type error")
 }
 
+#[test]
+fn test_embedded_json_schema() {
+    let schema_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("schema/landlock-policy.json");
+    assert_eq!(
+        crate::JSON_SCHEMA,
+        std::fs::read_to_string(schema_path).unwrap()
+    );
+}
+
 /* Test "empty policy" error. */
 
 #[test]

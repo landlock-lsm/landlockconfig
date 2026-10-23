@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use clap::{Parser, Subcommand};
+use landlock_policy::JSON_SCHEMA;
 
 #[derive(Parser)]
 #[command(
@@ -27,13 +28,7 @@ enum Commands {
 }
 
 fn schema() {
-    print!(
-        "{}",
-        include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../schema/landlock-policy.json"
-        ))
-    );
+    print!("{JSON_SCHEMA}");
 }
 
 fn main() {

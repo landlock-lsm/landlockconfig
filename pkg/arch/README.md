@@ -29,4 +29,8 @@ make build
 The build creates a library-only package file:
 `landlock-policy-git-*.pkg.tar.zst`
 
+Development versions use
+`<Cargo version>.r<revision count>.<12-character commit hash>-<package release>`.
+Generating this version requires a clean Git checkout with complete history.
+
 Install with: `sudo pacman -U landlock-policy-git-*.pkg.tar.zst`

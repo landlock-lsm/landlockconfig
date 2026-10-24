@@ -28,14 +28,17 @@ sha256sums=()
 pkgver() {
     cd "$startdir/../.."
 
-    local crate_version rev_count short_hash
+    local crate_version rev_count full_hash short_hash
 
-    crate_version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml) || return 1
+    crate_version=$(sed -n '/^version = / { s/^version = "\(.*\)"/\1/p; q; }' Cargo.toml) || return 1
     [[ -n "$crate_version" ]] || return 1
+    [[ $(git rev-parse --is-shallow-repository) == false ]] || return 1
+    git diff --quiet HEAD -- || return 1
     rev_count=$(git rev-list --count HEAD) || return 1
-    [[ -n "$rev_count" ]] || return 1
-    short_hash=$(git rev-parse --short HEAD) || return 1
-    [[ -n "$short_hash" ]] || return 1
+    [[ "$rev_count" =~ ^[0-9]+$ ]] || return 1
+    full_hash=$(git rev-parse HEAD) || return 1
+    short_hash=${full_hash:0:12}
+    [[ "$short_hash" =~ ^[0-9a-f]{12}$ ]] || return 1
     printf "%s.r%s.%s" "$crate_version" "$rev_count" "$short_hash"
 }
 

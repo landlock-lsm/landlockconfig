@@ -295,6 +295,7 @@ jobs:
 
     - uses: actions/checkout@v7
       with:
+        fetch-depth: 0
         ref: ${{ matrix.commit }}
 
     - name: Cache Cargo registry

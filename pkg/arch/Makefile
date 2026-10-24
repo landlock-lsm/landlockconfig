@@ -18,9 +18,18 @@ docker:
 		--build-arg "GID=$(shell id -g)" \
 		--tag landlock-policy-archlinux \
 		.
+	# Preserve Git-less builds; mount existing worktree metadata read-only.
+	if git_common_dir="$$(cd ../.. && \
+		git_dir="$$(git rev-parse --git-common-dir)" && \
+		cd "$$git_dir" && pwd)" 2>/dev/null; then \
+		set -- --volume "$$git_common_dir:$$git_common_dir:ro"; \
+	else \
+		set --; \
+	fi; \
 	docker run --rm \
 		--volume "$(HOME)/.cargo/registry:/home/builder/.cargo/registry:ro" \
 		--volume "$(CURDIR)/../..:/landlock-policy" \
+		"$$@" \
 		landlock-policy-archlinux
 
 clean:

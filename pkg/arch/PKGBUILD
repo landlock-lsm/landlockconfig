@@ -28,9 +28,14 @@ sha256sums=()
 pkgver() {
     cd "$startdir/../.."
 
-    local crate_version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml)
-    local rev_count=$(git rev-list --count HEAD)
-    local short_hash=$(git rev-parse --short HEAD)
+    local crate_version rev_count short_hash
+
+    crate_version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml) || return 1
+    [[ -n "$crate_version" ]] || return 1
+    rev_count=$(git rev-list --count HEAD) || return 1
+    [[ -n "$rev_count" ]] || return 1
+    short_hash=$(git rev-parse --short HEAD) || return 1
+    [[ -n "$short_hash" ]] || return 1
     printf "%s.r%s.%s" "$crate_version" "$rev_count" "$short_hash"
 }
 

@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
 
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
       with:
         fetch-depth: 0
 
@@ -56,7 +56,7 @@ jobs:
         commit: ${{ fromJSON(needs.commit_list.outputs.commits) }}
     steps:
 
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
       with:
         ref: ${{ matrix.commit }}
 
@@ -91,18 +91,18 @@ jobs:
       run: sudo apt install cargo-c
 
     - name: Cache Cargo registry
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: |
           ~/.cargo/registry
         key: cargo-registry
 
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
       with:
         ref: ${{ matrix.commit }}
 
     - name: Cache MSRV build
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: |
           target
@@ -150,18 +150,18 @@ jobs:
       run: sudo apt install cargo-c
 
     - name: Cache Cargo registry
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: |
           ~/.cargo/registry
         key: cargo-registry
 
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
       with:
         ref: ${{ matrix.commit }}
 
     - name: Cache stable build
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: |
           target
@@ -264,7 +264,7 @@ jobs:
         echo "gid=$(id -g)" >> $GITHUB_OUTPUT
 
     - name: Build Arch Linux container
-      uses: docker/build-push-action@v5
+      uses: docker/build-push-action@v7
       with:
         file: pkg/arch/Dockerfile
         build-args: |
@@ -276,18 +276,18 @@ jobs:
         load: true
 
     - name: Cache Cargo registry
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: |
           ~/.cargo/registry
         key: cargo-registry
 
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
       with:
         ref: ${{ matrix.commit }}
 
     - name: Cache build for Arch Linux
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: |
           target
@@ -314,7 +314,7 @@ jobs:
         commit: ${{ fromJSON(needs.commit_list.outputs.commits) }}
     steps:
 
-    - uses: docker/setup-buildx-action@v3
+    - uses: docker/setup-buildx-action@v4
 
     - name: Get user IDs
       id: ids
@@ -323,7 +323,7 @@ jobs:
         echo "gid=$(id -g)" >> $GITHUB_OUTPUT
 
     - name: Build Debian container
-      uses: docker/build-push-action@v5
+      uses: docker/build-push-action@v7
       with:
         file: pkg/debian/Dockerfile
         build-args: |
@@ -335,13 +335,13 @@ jobs:
         load: true
 
     - name: Cache Cargo registry
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: |
           ~/.cargo/registry
         key: cargo-registry
 
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
       with:
         ref: ${{ matrix.commit }}
 
@@ -356,7 +356,7 @@ jobs:
           landlockconfig-debian
 
     - name: Upload Debian packages
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       if: ${{ matrix.commit == (github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha) }}
       with:
         name: debian-packages-${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}

@@ -168,6 +168,50 @@ A directly parsed policy whose final three masks are empty is rejected.
 Composition remains infallible and can later intersect every mask to empty; in
 that case, building the composed policy fails because there is no handled access.
 
+### Compatibility exceptions
+
+A handled or scoped array may subtract a concrete right from an explicitly
+present positive ABI group. This records a tested compatibility requirement
+while keeping new rights handled as the group expands. For example:
+
+```json
+{
+  "abi": 5,
+  "ruleset": [{
+    "handledAccessFs": ["abi.all", "-ioctl_dev"],
+    "handledAccessNet": [],
+    "scoped": []
+  }],
+  "pathBeneath": [{
+    "allowedAccess": ["abi.read_write"],
+    "parent": ["/tmp"]
+  }]
+}
+```
+
+```toml
+abi = 5
+
+[[ruleset]]
+handled_access_fs = ["abi.all", "-ioctl_dev"]
+handled_access_net = []
+scoped = []
+
+[[path_beneath]]
+allowed_access = ["abi.read_write"]
+parent = ["/tmp"]
+```
+
+The exception must be contained in a positive `abi.*` group in the same source
+and category. A concrete right cannot appear with both signs. Resource-rule ABI
+groups are masked by the exception before they augment handled rights; a rule
+that explicitly lists the excepted concrete right is an error. Negative groups
+and negative resource-rule allowances are invalid.
+
+Changing a policy ABI, handled or scoped expression, exception, variable, or
+allowance changes its compatibility contract. The component owner must retest
+the component after any such change.
+
 ## Reference implementation
 
 ### Shared Library

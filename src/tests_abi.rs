@@ -59,6 +59,94 @@ fn assert_access_abi_error(
     );
 }
 
+fn assert_uncovered_exception(
+    json: &str,
+    toml: &str,
+    category: &'static str,
+    name: &'static str,
+    policy_abi: ABI,
+) {
+    let json_error = Policy::parse_json(std::io::Cursor::new(json)).unwrap_err();
+    assert!(matches!(
+        &json_error,
+        ParseJsonError::Policy(PolicyError::AccessExceptionUncovered {
+            category: actual_category,
+            name: actual_name,
+            policy_abi: actual_policy_abi,
+        }) if *actual_category == category
+            && *actual_name == name
+            && *actual_policy_abi == policy_abi
+    ));
+    assert!(json_error
+        .to_string()
+        .contains("requires an explicit positive ABI group"));
+    assert_eq!(parse_json_schema(json, false), Err(Category::Data));
+
+    let toml_error = Policy::parse_toml(toml).unwrap_err();
+    assert!(matches!(
+        &toml_error,
+        ParseTomlError::Policy(PolicyError::AccessExceptionUncovered {
+            category: actual_category,
+            name: actual_name,
+            policy_abi: actual_policy_abi,
+        }) if *actual_category == category
+            && *actual_name == name
+            && *actual_policy_abi == policy_abi
+    ));
+    assert!(toml_error
+        .to_string()
+        .contains("requires an explicit positive ABI group"));
+}
+
+fn assert_access_contradiction(json: &str, toml: &str, category: &'static str, name: &'static str) {
+    let json_error = Policy::parse_json(std::io::Cursor::new(json)).unwrap_err();
+    assert!(matches!(
+        &json_error,
+        ParseJsonError::Policy(PolicyError::AccessContradiction {
+            category: actual_category,
+            name: actual_name,
+        }) if *actual_category == category && *actual_name == name
+    ));
+    assert!(json_error
+        .to_string()
+        .contains("both included and excluded"));
+    assert_eq!(parse_json_schema(json, false), Err(Category::Data));
+
+    let toml_error = Policy::parse_toml(toml).unwrap_err();
+    assert!(matches!(
+        &toml_error,
+        ParseTomlError::Policy(PolicyError::AccessContradiction {
+            category: actual_category,
+            name: actual_name,
+        }) if *actual_category == category && *actual_name == name
+    ));
+    assert!(toml_error
+        .to_string()
+        .contains("both included and excluded"));
+}
+
+fn assert_rule_access_conflict(json: &str, toml: &str, category: &'static str, name: &'static str) {
+    let json_error = Policy::parse_json(std::io::Cursor::new(json)).unwrap_err();
+    assert!(matches!(
+        &json_error,
+        ParseJsonError::Policy(PolicyError::RuleAccessConflict {
+            category: actual_category,
+            name: actual_name,
+        }) if *actual_category == category && *actual_name == name
+    ));
+    assert!(json_error.to_string().contains("use an ABI group"));
+    assert_eq!(parse_json_schema(json, false), Err(Category::Data));
+
+    let toml_error = Policy::parse_toml(toml).unwrap_err();
+    assert!(matches!(
+        &toml_error,
+        ParseTomlError::Policy(PolicyError::RuleAccessConflict {
+            category: actual_category,
+            name: actual_name,
+        }) if *actual_category == category && *actual_name == name
+    ));
+}
+
 #[test]
 fn test_access_fs_with_value() {
     let json = r#"{
@@ -367,6 +455,398 @@ fn test_port_allowance_abi_boundary() {
     assert_eq!(
         parse_toml(&toml).unwrap().rules_net_port.get(&80),
         Some(&AccessNet::ConnectTcp.into())
+    );
+}
+
+#[test]
+fn test_exception_abi_boundary() {
+    let json = r#"{
+        "abi": 4,
+        "ruleset": [{
+            "handledAccessFs": ["abi.all", "-ioctl_dev"],
+            "handledAccessNet": [],
+            "scoped": []
+        }]
+    }"#;
+    let toml = r#"
+        abi = 4
+        [[ruleset]]
+        handled_access_fs = ["abi.all", "-ioctl_dev"]
+        handled_access_net = []
+        scoped = []
+    "#;
+    assert_access_abi_error(
+        json,
+        toml,
+        "filesystem access right",
+        "ioctl_dev",
+        ABI::V4,
+        ABI::V5,
+    );
+
+    let json = json.replace("\"abi\": 4", "\"abi\": 5");
+    let toml = toml.replace("abi = 4", "abi = 5");
+    let policy = Policy {
+        abi: Some(ABI::V5),
+        handled_fs: AccessFs::from_all(ABI::V5) & !AccessFs::IoctlDev,
+        ..Default::default()
+    };
+    assert_eq!(parse_json(&json).unwrap(), policy);
+    assert_eq!(parse_toml(&toml).unwrap(), policy);
+}
+
+#[test]
+fn test_exception_coverage() {
+    let json = r#"{
+        "abi": 5,
+        "ruleset": [{ "handledAccessFs": ["-ioctl_dev"] }]
+    }"#;
+    let toml = r#"
+        abi = 5
+        [[ruleset]]
+        handled_access_fs = ["-ioctl_dev"]
+    "#;
+    assert_uncovered_exception(json, toml, "filesystem access right", "ioctl_dev", ABI::V5);
+
+    let json = r#"{
+        "abi": 5,
+        "ruleset": [{
+            "handledAccessFs": ["abi.read_execute", "-ioctl_dev"]
+        }]
+    }"#;
+    let toml = r#"
+        abi = 5
+        [[ruleset]]
+        handled_access_fs = ["abi.read_execute", "-ioctl_dev"]
+    "#;
+    assert_uncovered_exception(json, toml, "filesystem access right", "ioctl_dev", ABI::V5);
+}
+
+#[test]
+fn test_exception_contradiction() {
+    let json = r#"{
+        "abi": 5,
+        "ruleset": [{
+            "handledAccessFs": ["abi.all", "ioctl_dev", "-ioctl_dev"]
+        }]
+    }"#;
+    let toml = r#"
+        abi = 5
+        [[ruleset]]
+        handled_access_fs = ["abi.all", "ioctl_dev", "-ioctl_dev"]
+    "#;
+    assert_access_contradiction(json, toml, "filesystem access right", "ioctl_dev");
+
+    let json = r#"{
+        "abi": 5,
+        "ruleset": [
+            { "handledAccessFs": ["abi.all"] },
+            { "handledAccessFs": ["ioctl_dev"] },
+            { "handledAccessFs": ["-ioctl_dev"] }
+        ]
+    }"#;
+    let toml = r#"
+        abi = 5
+        [[ruleset]]
+        handled_access_fs = ["abi.all"]
+        [[ruleset]]
+        handled_access_fs = ["ioctl_dev"]
+        [[ruleset]]
+        handled_access_fs = ["-ioctl_dev"]
+    "#;
+    assert_access_contradiction(json, toml, "filesystem access right", "ioctl_dev");
+
+    let json = r#"{
+        "abi": 4,
+        "ruleset": [{
+            "handledAccessNet": ["abi.all", "bind_tcp", "-bind_tcp"]
+        }]
+    }"#;
+    let toml = r#"
+        abi = 4
+        [[ruleset]]
+        handled_access_net = ["abi.all", "bind_tcp", "-bind_tcp"]
+    "#;
+    assert_access_contradiction(json, toml, "network access right", "bind_tcp");
+
+    let json = r#"{
+        "abi": 6,
+        "ruleset": [{
+            "scoped": ["abi.all", "signal", "-signal"]
+        }]
+    }"#;
+    let toml = r#"
+        abi = 6
+        [[ruleset]]
+        scoped = ["abi.all", "signal", "-signal"]
+    "#;
+    assert_access_contradiction(json, toml, "scope", "signal");
+}
+
+#[test]
+fn test_repeated_exception_coverage() {
+    let json = r#"{
+        "abi": 5,
+        "ruleset": [
+            { "handledAccessFs": ["-ioctl_dev"] },
+            { "handledAccessFs": ["abi.all"] },
+            { "handledAccessNet": [], "scoped": [] }
+        ]
+    }"#;
+    let toml = r#"
+        abi = 5
+        [[ruleset]]
+        handled_access_fs = ["-ioctl_dev"]
+        [[ruleset]]
+        handled_access_fs = ["abi.all"]
+        [[ruleset]]
+        handled_access_net = []
+        scoped = []
+    "#;
+    let expected = AccessFs::from_all(ABI::V5) & !AccessFs::IoctlDev;
+    assert_eq!(parse_json(json).unwrap().handled_fs, expected);
+    assert_eq!(parse_toml(toml).unwrap().handled_fs, expected);
+
+    let reversed = json.replace(
+        r#"{ "handledAccessFs": ["-ioctl_dev"] },
+            { "handledAccessFs": ["abi.all"] }"#,
+        r#"{ "handledAccessFs": ["abi.all"] },
+            { "handledAccessFs": ["-ioctl_dev"] }"#,
+    );
+    assert_ne!(reversed, json);
+    assert_eq!(parse_json(&reversed).unwrap().handled_fs, expected);
+}
+
+#[test]
+fn test_rule_group_masking() {
+    let json = r#"{
+        "abi": 5,
+        "ruleset": [{
+            "handledAccessFs": ["abi.all", "-ioctl_dev"],
+            "handledAccessNet": [],
+            "scoped": []
+        }],
+        "pathBeneath": [{
+            "allowedAccess": ["abi.all"],
+            "parent": ["."]
+        }]
+    }"#;
+    let toml = r#"
+        abi = 5
+        [[ruleset]]
+        handled_access_fs = ["abi.all", "-ioctl_dev"]
+        handled_access_net = []
+        scoped = []
+        [[path_beneath]]
+        allowed_access = ["abi.all"]
+        parent = ["."]
+    "#;
+    let expected = AccessFs::from_all(ABI::V5) & !AccessFs::IoctlDev;
+    let json_policy = parse_json(json).unwrap();
+    assert_eq!(json_policy.handled_fs, expected);
+    assert_eq!(
+        json_policy
+            .rules_path_beneath
+            .get(&TemplateString::from_text(".")),
+        Some(&expected)
+    );
+    let toml_policy = parse_toml(toml).unwrap();
+    assert_eq!(toml_policy.handled_fs, expected);
+    assert_eq!(
+        toml_policy
+            .rules_path_beneath
+            .get(&TemplateString::from_text(".")),
+        Some(&expected)
+    );
+
+    let json = r#"{
+        "abi": 4,
+        "ruleset": [{
+            "handledAccessFs": [],
+            "handledAccessNet": ["abi.all", "-bind_tcp"],
+            "scoped": []
+        }],
+        "netPort": [{
+            "allowedAccess": ["abi.all"],
+            "port": [80]
+        }]
+    }"#;
+    let toml = r#"
+        abi = 4
+        [[ruleset]]
+        handled_access_fs = []
+        handled_access_net = ["abi.all", "-bind_tcp"]
+        scoped = []
+        [[net_port]]
+        allowed_access = ["abi.all"]
+        port = [80]
+    "#;
+    let policy = Policy {
+        abi: Some(ABI::V4),
+        handled_net: AccessNet::ConnectTcp.into(),
+        rules_net_port: [(80, AccessNet::ConnectTcp.into())].into(),
+        ..Default::default()
+    };
+    assert_eq!(parse_json(json).unwrap(), policy);
+    assert_eq!(parse_toml(toml).unwrap(), policy);
+}
+
+#[test]
+fn test_explicit_rule_conflict() {
+    for allowed_access in [r#"["ioctl_dev"]"#, r#"["abi.all", "ioctl_dev"]"#] {
+        let json = format!(
+            r#"{{
+                "abi": 5,
+                "ruleset": [{{
+                    "handledAccessFs": ["abi.all", "-ioctl_dev"]
+                }}],
+                "pathBeneath": [{{
+                    "allowedAccess": {allowed_access},
+                    "parent": ["."]
+                }}]
+            }}"#
+        );
+        let toml = format!(
+            r#"
+                abi = 5
+                [[ruleset]]
+                handled_access_fs = ["abi.all", "-ioctl_dev"]
+                [[path_beneath]]
+                allowed_access = {allowed_access}
+                parent = ["."]
+            "#
+        );
+        assert_rule_access_conflict(&json, &toml, "filesystem access right", "ioctl_dev");
+    }
+
+    let json = r#"{
+        "abi": 4,
+        "ruleset": [{
+            "handledAccessFs": [],
+            "handledAccessNet": ["abi.all", "-bind_tcp"],
+            "scoped": []
+        }],
+        "netPort": [{
+            "allowedAccess": ["bind_tcp"],
+            "port": [80]
+        }]
+    }"#;
+    let toml = r#"
+        abi = 4
+        [[ruleset]]
+        handled_access_fs = []
+        handled_access_net = ["abi.all", "-bind_tcp"]
+        scoped = []
+        [[net_port]]
+        allowed_access = ["bind_tcp"]
+        port = [80]
+    "#;
+    assert_rule_access_conflict(json, toml, "network access right", "bind_tcp");
+}
+
+#[test]
+fn test_fully_masked_group_rule() {
+    let json = r#"{
+        "abi": 4,
+        "ruleset": [{
+            "handledAccessFs": ["execute"],
+            "handledAccessNet": ["abi.all", "-bind_tcp", "-connect_tcp"],
+            "scoped": []
+        }],
+        "netPort": [{
+            "allowedAccess": ["abi.all"],
+            "port": [80]
+        }]
+    }"#;
+    let toml = r#"
+        abi = 4
+        [[ruleset]]
+        handled_access_fs = ["execute"]
+        handled_access_net = ["abi.all", "-bind_tcp", "-connect_tcp"]
+        scoped = []
+        [[net_port]]
+        allowed_access = ["abi.all"]
+        port = [80]
+    "#;
+    let policy = Policy {
+        abi: Some(ABI::V4),
+        handled_fs: AccessFs::Execute.into(),
+        ..Default::default()
+    };
+    assert_eq!(parse_json(json).unwrap(), policy);
+    assert_eq!(parse_toml(toml).unwrap(), policy);
+}
+
+#[test]
+fn test_exceptions_empty_all_categories() {
+    let json = r#"{
+        "abi": 4,
+        "ruleset": [{
+            "handledAccessFs": [],
+            "handledAccessNet": ["abi.all", "-bind_tcp", "-connect_tcp"],
+            "scoped": []
+        }]
+    }"#;
+    let toml = r#"
+        abi = 4
+        [[ruleset]]
+        handled_access_fs = []
+        handled_access_net = ["abi.all", "-bind_tcp", "-connect_tcp"]
+        scoped = []
+    "#;
+    assert!(matches!(
+        Policy::parse_json(std::io::Cursor::new(json)),
+        Err(ParseJsonError::Policy(PolicyError::EmptyRuleset))
+    ));
+    assert_eq!(parse_json_schema(json, false), Err(Category::Data));
+    assert!(matches!(
+        Policy::parse_toml(toml),
+        Err(ParseTomlError::Policy(PolicyError::EmptyRuleset))
+    ));
+}
+
+#[test]
+fn test_scope_exception_coverage() {
+    let json = r#"{
+        "abi": 5,
+        "ruleset": [{ "scoped": ["abi.all", "-signal"] }]
+    }"#;
+    let toml = r#"
+        abi = 5
+        [[ruleset]]
+        scoped = ["abi.all", "-signal"]
+    "#;
+    assert_access_abi_error(json, toml, "scope", "signal", ABI::V5, ABI::V6);
+
+    let json = r#"{
+        "abi": 6,
+        "ruleset": [{
+            "scoped": ["abstract_unix_socket", "-signal"]
+        }]
+    }"#;
+    let toml = r#"
+        abi = 6
+        [[ruleset]]
+        scoped = ["abstract_unix_socket", "-signal"]
+    "#;
+    assert_uncovered_exception(json, toml, "scope", "signal", ABI::V6);
+
+    let json = r#"{
+        "abi": 6,
+        "ruleset": [{ "scoped": ["abi.all", "-signal"] }]
+    }"#;
+    let toml = r#"
+        abi = 6
+        [[ruleset]]
+        scoped = ["abi.all", "-signal"]
+    "#;
+    assert_eq!(
+        parse_json(json).unwrap().scoped,
+        Scope::from_all(ABI::V6) & !Scope::Signal
+    );
+    assert_eq!(
+        parse_toml(toml).unwrap().scoped,
+        Scope::from_all(ABI::V6) & !Scope::Signal
     );
 }
 
@@ -746,6 +1226,47 @@ fn test_kernel_abi_downgrade() {
             }
         }
     }
+}
+
+#[test]
+fn test_exception_kernel_abi_downgrade() {
+    let Ok(kernel_abi) = std::env::var("LANDLOCK_CRATE_TEST_ABI") else {
+        eprintln!(
+            "Skipping test_exception_kernel_abi_downgrade: LANDLOCK_CRATE_TEST_ABI is not set"
+        );
+        return;
+    };
+    let kernel_abi = kernel_abi.parse::<i32>().unwrap();
+
+    let status = std::thread::spawn(|| {
+        let json = r#"{
+            "abi": 5,
+            "ruleset": [{
+                "handledAccessFs": ["abi.all", "-ioctl_dev"],
+                "handledAccessNet": [],
+                "scoped": []
+            }]
+        }"#;
+        let policy = Policy::parse_json(json.as_bytes()).unwrap();
+        assert_eq!(
+            policy.handled_fs,
+            AccessFs::from_all(ABI::V5) & !AccessFs::IoctlDev
+        );
+        let resolved = policy.resolve().unwrap();
+        let (ruleset, rule_errors) = resolved.build_ruleset().unwrap();
+        assert!(rule_errors.is_empty());
+        ruleset.restrict_self().unwrap()
+    })
+    .join()
+    .unwrap();
+
+    let expected = match kernel_abi {
+        0 => RulesetStatus::NotEnforced,
+        1 | 2 => RulesetStatus::PartiallyEnforced,
+        _ => RulesetStatus::FullyEnforced,
+    };
+    assert_eq!(status.ruleset, expected);
+    assert!(status.no_new_privs);
 }
 
 #[test]

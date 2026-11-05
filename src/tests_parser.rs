@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::parser::LATEST_ABI;
+use crate::parser::{
+    JsonFsAccessItem, JsonNetAccessItem, JsonScopeItem, PolicyAccessItem, LATEST_ABI,
+};
+use crate::policy::{ParseJsonError, ParseTomlError};
 use crate::tests_helpers::{
     parse_json, parse_json_schema, parse_toml, policy_with_abi_defaults,
     resolved_policy_with_abi_defaults, validate_json,
@@ -8,6 +11,7 @@ use crate::tests_helpers::{
 use crate::{Policy, ResolvedPolicy};
 use landlock::{Access, AccessFs, AccessNet, BitFlags, Scope, ABI};
 use serde_json::error::Category;
+use std::collections::BTreeSet;
 use std::path::PathBuf;
 
 #[test]
@@ -57,6 +61,179 @@ fn test_examples() {
     ] {
         parse_toml(toml).unwrap();
     }
+}
+
+fn schema_negative_names(definition: &str) -> BTreeSet<String> {
+    let schema: serde_json::Value = serde_json::from_str(crate::JSON_SCHEMA).unwrap();
+    schema["definitions"][definition]["anyOf"][1]["enum"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|name| name.as_str().unwrap().to_owned())
+        .collect()
+}
+
+#[test]
+fn test_negative_schema_names() {
+    let fs = JsonFsAccessItem::NEGATIVE_NAMES
+        .iter()
+        .map(|name| (*name).to_owned())
+        .collect();
+    let net = JsonNetAccessItem::NEGATIVE_NAMES
+        .iter()
+        .map(|name| (*name).to_owned())
+        .collect();
+    let scope = JsonScopeItem::NEGATIVE_NAMES
+        .iter()
+        .map(|name| (*name).to_owned())
+        .collect();
+
+    assert_eq!(schema_negative_names("handledAccessFs"), fs);
+    assert_eq!(schema_negative_names("handledAccessNet"), net);
+    assert_eq!(schema_negative_names("handledScope"), scope);
+}
+
+#[test]
+fn test_all_negative_access_names() {
+    let fs_negative = JsonFsAccessItem::NEGATIVE_NAMES.join("\", \"");
+    let json = format!(
+        r#"{{
+            "abi": 6,
+            "ruleset": [{{
+                "handledAccessFs": ["abi.all", "{fs_negative}"]
+            }}]
+        }}"#
+    );
+    let toml = format!(
+        r#"
+            abi = 6
+            [[ruleset]]
+            handled_access_fs = ["abi.all", "{fs_negative}"]
+        "#
+    );
+    assert!(parse_json(&json).unwrap().handled_fs.is_empty());
+    assert!(parse_toml(&toml).unwrap().handled_fs.is_empty());
+
+    let net_negative = JsonNetAccessItem::NEGATIVE_NAMES.join("\", \"");
+    let json = format!(
+        r#"{{
+            "abi": 6,
+            "ruleset": [{{
+                "handledAccessNet": ["abi.all", "{net_negative}"]
+            }}]
+        }}"#
+    );
+    let toml = format!(
+        r#"
+            abi = 6
+            [[ruleset]]
+            handled_access_net = ["abi.all", "{net_negative}"]
+        "#
+    );
+    assert!(parse_json(&json).unwrap().handled_net.is_empty());
+    assert!(parse_toml(&toml).unwrap().handled_net.is_empty());
+
+    let scope_negative = JsonScopeItem::NEGATIVE_NAMES.join("\", \"");
+    let json = format!(
+        r#"{{
+            "abi": 6,
+            "ruleset": [{{
+                "scoped": ["abi.all", "{scope_negative}"]
+            }}]
+        }}"#
+    );
+    let toml = format!(
+        r#"
+            abi = 6
+            [[ruleset]]
+            scoped = ["abi.all", "{scope_negative}"]
+        "#
+    );
+    assert!(parse_json(&json).unwrap().scoped.is_empty());
+    assert!(parse_toml(&toml).unwrap().scoped.is_empty());
+}
+
+fn assert_structural_negative_error(json: &str, toml: &str, token: &str) {
+    let json_error = Policy::parse_json(std::io::Cursor::new(json)).unwrap_err();
+    assert!(matches!(&json_error, ParseJsonError::SerdeJson(_)));
+    assert!(json_error.to_string().contains(token));
+    assert_eq!(parse_json(json), Err(Category::Data));
+
+    let toml_error = Policy::parse_toml(toml).unwrap_err();
+    assert!(matches!(&toml_error, ParseTomlError::SerdeToml(_)));
+    assert!(toml_error.to_string().contains(token));
+}
+
+#[test]
+fn test_invalid_negative_access_syntax() {
+    for token in ["-abi.all", "!execute", "-", "--execute", "-future"] {
+        let json = format!(
+            r#"{{
+                "abi": 6,
+                "ruleset": [{{ "handledAccessFs": ["abi.all", "{token}"] }}]
+            }}"#
+        );
+        let toml = format!(
+            r#"
+                abi = 6
+                [[ruleset]]
+                handled_access_fs = ["abi.all", "{token}"]
+            "#
+        );
+        assert_structural_negative_error(&json, &toml, token);
+    }
+
+    for (json_field, toml_field) in [
+        ("handledAccessNet", "handled_access_net"),
+        ("scoped", "scoped"),
+    ] {
+        let json = format!(
+            r#"{{
+                "abi": 6,
+                "ruleset": [{{ "{json_field}": ["abi.all", "-future"] }}]
+            }}"#
+        );
+        let toml = format!(
+            r#"
+                abi = 6
+                [[ruleset]]
+                {toml_field} = ["abi.all", "-future"]
+            "#
+        );
+        assert_structural_negative_error(&json, &toml, "-future");
+    }
+}
+
+#[test]
+fn test_non_string_handled_access() {
+    let json = r#"{
+        "abi": 6,
+        "ruleset": [{ "handledAccessFs": [1] }]
+    }"#;
+    let toml = r#"
+        abi = 6
+        [[ruleset]]
+        handled_access_fs = [1]
+    "#;
+    assert_structural_negative_error(json, toml, "an access right");
+}
+
+#[test]
+fn test_negative_allowance_syntax() {
+    let json = r#"{
+        "abi": 6,
+        "pathBeneath": [{
+            "allowedAccess": ["-execute"],
+            "parent": ["."]
+        }]
+    }"#;
+    let toml = r#"
+        abi = 6
+        [[path_beneath]]
+        allowed_access = ["-execute"]
+        parent = ["."]
+    "#;
+    assert_structural_negative_error(json, toml, "-execute");
 }
 
 /* Test "empty policy" error. */

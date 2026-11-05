@@ -56,6 +56,65 @@
         "abstract_unix_socket",
         "signal"
       ]
+    },
+    "handledAccessFs": {
+      "description": "A positive filesystem access expression or concrete compatibility exception. Every negative item must be covered by an explicitly present positive ABI group in this source and cannot also be explicitly positive. These source-wide semantic constraints are enforced by the parser.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/accessFs"
+        },
+        {
+          "type": "string",
+          "enum": [
+            "-execute",
+            "-write_file",
+            "-read_file",
+            "-read_dir",
+            "-remove_dir",
+            "-remove_file",
+            "-make_char",
+            "-make_dir",
+            "-make_reg",
+            "-make_sock",
+            "-make_fifo",
+            "-make_block",
+            "-make_sym",
+            "-refer",
+            "-truncate",
+            "-ioctl_dev"
+          ]
+        }
+      ]
+    },
+    "handledAccessNet": {
+      "description": "A positive network access expression or concrete compatibility exception. Every negative item must be covered by an explicitly present positive ABI group in this source and cannot also be explicitly positive. These source-wide semantic constraints are enforced by the parser.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/accessNet"
+        },
+        {
+          "type": "string",
+          "enum": [
+            "-bind_tcp",
+            "-connect_tcp"
+          ]
+        }
+      ]
+    },
+    "handledScope": {
+      "description": "A positive scope expression or concrete compatibility exception. Every negative item must be covered by an explicitly present positive ABI group in this source and cannot also be explicitly positive. These source-wide semantic constraints are enforced by the parser.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/scope"
+        },
+        {
+          "type": "string",
+          "enum": [
+            "-abstract_unix_socket",
+            "-signal"
+          ]
+        }
+      ]
     }
   },
   "properties": {
@@ -101,21 +160,21 @@
             "description": "Handled filesystem rights. If absent from every ruleset entry, all rights supported by the effective policy ABI are handled. Present arrays are unioned, and an empty array suppresses the ABI-derived base. Filesystem rules augment the resulting rights.",
             "type": "array",
             "items": {
-              "$ref": "#/definitions/accessFs"
+              "$ref": "#/definitions/handledAccessFs"
             }
           },
           "handledAccessNet": {
             "description": "Handled network rights. If absent from every ruleset entry, all rights supported by the effective policy ABI are handled. Present arrays are unioned, and an empty array suppresses the ABI-derived base. Network rules augment the resulting rights.",
             "type": "array",
             "items": {
-              "$ref": "#/definitions/accessNet"
+              "$ref": "#/definitions/handledAccessNet"
             }
           },
           "scoped": {
             "description": "Scoped rights. If absent from every ruleset entry, all scopes supported by the effective policy ABI are enabled. Present arrays are unioned, and an empty array suppresses the ABI-derived base. Rules do not augment scopes.",
             "type": "array",
             "items": {
-              "$ref": "#/definitions/scope"
+              "$ref": "#/definitions/handledScope"
             }
           }
         },

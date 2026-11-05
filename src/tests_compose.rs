@@ -709,3 +709,35 @@ fn test_abi_compose_read_write_v4() {
         }
     );
 }
+
+#[test]
+fn test_compose_exception_masks_sibling_allowance() {
+    let json1 = r#"{
+        "abi": 5,
+        "ruleset": [{
+            "handledAccessFs": ["abi.all", "-ioctl_dev"],
+            "handledAccessNet": [],
+            "scoped": []
+        }]
+    }"#;
+    let json2 = r#"{
+        "abi": 5,
+        "ruleset": [{
+            "handledAccessFs": ["abi.all"],
+            "handledAccessNet": [],
+            "scoped": []
+        }],
+        "pathBeneath": [{
+            "allowedAccess": ["ioctl_dev"],
+            "parent": ["."]
+        }]
+    }"#;
+
+    assert_eq!(
+        get_composition(json1, json2),
+        ResolvedPolicy {
+            handled_fs: AccessFs::from_all(ABI::V5) & !AccessFs::IoctlDev,
+            ..Default::default()
+        }
+    );
+}

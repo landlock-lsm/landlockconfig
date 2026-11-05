@@ -5,9 +5,9 @@ use crate::{
     variable::{Name, ResolveError},
 };
 use landlock::{Access, AccessFs, AccessNet, BitFlags, Scope, ABI};
-use serde::de::{Unexpected, Visitor};
+use serde::de::{value::StrDeserializer, DeserializeOwned, Unexpected, Visitor};
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
-use std::{collections::BTreeSet, ops::Deref, str::FromStr};
+use std::{collections::BTreeSet, marker::PhantomData, ops::Deref, str::FromStr};
 
 /// A policy property that may be omitted but not set to JSON null.
 ///
@@ -348,6 +348,171 @@ pub(crate) struct ConcreteAccess {
     pub(crate) required_abi: ABI,
 }
 
+pub(crate) trait PolicyAccessItem: DeserializeOwned + Ord {
+    type Access: Access;
+
+    const NEGATIVE_NAMES: &'static [&'static str];
+
+    fn from_negative(name: &str) -> Option<Self>;
+    fn concrete(&self) -> Option<ConcreteAccess>;
+    fn resolve(&self, abi: ABI) -> Result<BitFlags<Self::Access>, ResolveError>;
+}
+
+#[derive(Debug, Ord, Eq, PartialOrd, PartialEq)]
+pub(crate) enum HandledAccessItem<T: Ord> {
+    Include(T),
+    Exclude(T),
+}
+
+struct HandledAccessItemVisitor<T>(PhantomData<T>);
+
+impl<T> Visitor<'_> for HandledAccessItemVisitor<T>
+where
+    T: PolicyAccessItem,
+{
+    type Value = HandledAccessItem<T>;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str("an access right, ABI group, or concrete negative access right")
+    }
+
+    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        if value.starts_with('-') {
+            T::from_negative(value)
+                .map(HandledAccessItem::Exclude)
+                .ok_or_else(|| E::unknown_variant(value, T::NEGATIVE_NAMES))
+        } else {
+            T::deserialize(StrDeserializer::<E>::new(value)).map(HandledAccessItem::Include)
+        }
+    }
+}
+
+impl<'de, T> Deserialize<'de> for HandledAccessItem<T>
+where
+    T: PolicyAccessItem,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_str(HandledAccessItemVisitor(PhantomData))
+    }
+}
+
+impl<T> HandledAccessItem<T>
+where
+    T: PolicyAccessItem,
+{
+    pub(crate) fn concrete(&self) -> Option<ConcreteAccess> {
+        match self {
+            Self::Include(item) | Self::Exclude(item) => item.concrete(),
+        }
+    }
+}
+
+pub(crate) struct ResolvedAccessExpression<A>
+where
+    A: Access,
+{
+    pub(crate) positive: BitFlags<A>,
+    pub(crate) positive_concrete: BitFlags<A>,
+    pub(crate) groups: BitFlags<A>,
+    pub(crate) negatives: Vec<(ConcreteAccess, BitFlags<A>)>,
+}
+
+impl<A> Default for ResolvedAccessExpression<A>
+where
+    A: Access,
+{
+    fn default() -> Self {
+        Self {
+            positive: BitFlags::EMPTY,
+            positive_concrete: BitFlags::EMPTY,
+            groups: BitFlags::EMPTY,
+            negatives: Vec::new(),
+        }
+    }
+}
+
+impl<A> ResolvedAccessExpression<A>
+where
+    A: Access,
+{
+    pub(crate) fn merge(&mut self, other: Self) {
+        self.positive |= other.positive;
+        self.positive_concrete |= other.positive_concrete;
+        self.groups |= other.groups;
+        self.negatives.extend(other.negatives);
+    }
+}
+
+impl<T> AccessSet<HandledAccessItem<T>>
+where
+    T: PolicyAccessItem,
+{
+    pub(crate) fn resolve_expression(
+        &self,
+        abi: ABI,
+    ) -> Result<ResolvedAccessExpression<T::Access>, ResolveError> {
+        let mut expression = ResolvedAccessExpression::default();
+        for item in self.iter() {
+            match item {
+                HandledAccessItem::Include(item) => {
+                    let access = item.resolve(abi)?;
+                    expression.positive |= access;
+                    if item.concrete().is_some() {
+                        expression.positive_concrete |= access;
+                    } else {
+                        expression.groups |= access;
+                    }
+                }
+                HandledAccessItem::Exclude(item) => {
+                    let concrete = item
+                        .concrete()
+                        .expect("negative access items are always concrete");
+                    expression.negatives.push((concrete, item.resolve(abi)?));
+                }
+            }
+        }
+        Ok(expression)
+    }
+}
+
+pub(crate) struct ResolvedAllowance<A>
+where
+    A: Access,
+{
+    pub(crate) concrete: BitFlags<A>,
+    pub(crate) groups: BitFlags<A>,
+}
+
+impl<T> NonEmptySet<T>
+where
+    T: PolicyAccessItem,
+{
+    pub(crate) fn resolve_allowance(
+        &self,
+        abi: ABI,
+    ) -> Result<ResolvedAllowance<T::Access>, ResolveError> {
+        let mut allowance = ResolvedAllowance {
+            concrete: BitFlags::EMPTY,
+            groups: BitFlags::EMPTY,
+        };
+        for item in self.iter() {
+            let access = item.resolve(abi)?;
+            if item.concrete().is_some() {
+                allowance.concrete |= access;
+            } else {
+                allowance.groups |= access;
+            }
+        }
+        Ok(allowance)
+    }
+}
+
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub(crate) enum JsonFsAccessItem {
@@ -397,6 +562,59 @@ impl JsonFsAccessItem {
             Self::IoctlDev => ("ioctl_dev", ABI::V5),
         };
         Some(ConcreteAccess { name, required_abi })
+    }
+}
+
+impl PolicyAccessItem for JsonFsAccessItem {
+    type Access = AccessFs;
+
+    const NEGATIVE_NAMES: &'static [&'static str] = &[
+        "-execute",
+        "-write_file",
+        "-read_file",
+        "-read_dir",
+        "-remove_dir",
+        "-remove_file",
+        "-make_char",
+        "-make_dir",
+        "-make_reg",
+        "-make_sock",
+        "-make_fifo",
+        "-make_block",
+        "-make_sym",
+        "-refer",
+        "-truncate",
+        "-ioctl_dev",
+    ];
+
+    fn from_negative(name: &str) -> Option<Self> {
+        match name {
+            "-execute" => Some(Self::Execute),
+            "-write_file" => Some(Self::WriteFile),
+            "-read_file" => Some(Self::ReadFile),
+            "-read_dir" => Some(Self::ReadDir),
+            "-remove_dir" => Some(Self::RemoveDir),
+            "-remove_file" => Some(Self::RemoveFile),
+            "-make_char" => Some(Self::MakeChar),
+            "-make_dir" => Some(Self::MakeDir),
+            "-make_reg" => Some(Self::MakeReg),
+            "-make_sock" => Some(Self::MakeSock),
+            "-make_fifo" => Some(Self::MakeFifo),
+            "-make_block" => Some(Self::MakeBlock),
+            "-make_sym" => Some(Self::MakeSym),
+            "-refer" => Some(Self::Refer),
+            "-truncate" => Some(Self::Truncate),
+            "-ioctl_dev" => Some(Self::IoctlDev),
+            _ => None,
+        }
+    }
+
+    fn concrete(&self) -> Option<ConcreteAccess> {
+        JsonFsAccessItem::concrete(self)
+    }
+
+    fn resolve(&self, abi: ABI) -> Result<BitFlags<Self::Access>, ResolveError> {
+        ValueAccessFs::resolve_bitflags(self, abi)
     }
 }
 
@@ -542,24 +760,6 @@ fn test_v2_read_write() {
     assert!(rw.contains(AccessFs::Refer));
 }
 
-impl NonEmptySet<JsonFsAccessItem> {
-    pub fn resolve_bitflags(&self, abi: ABI) -> Result<BitFlags<AccessFs>, ResolveError> {
-        self.iter().try_fold(BitFlags::EMPTY, |flags, item| {
-            let access = ValueAccessFs::resolve_bitflags(item, abi)?;
-            Ok(flags | access)
-        })
-    }
-}
-
-impl AccessSet<JsonFsAccessItem> {
-    pub fn resolve_bitflags(&self, abi: ABI) -> Result<BitFlags<AccessFs>, ResolveError> {
-        self.iter().try_fold(BitFlags::EMPTY, |flags, item| {
-            let access = ValueAccessFs::resolve_bitflags(item, abi)?;
-            Ok(flags | access)
-        })
-    }
-}
-
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub(crate) enum JsonNetAccessItem {
@@ -577,6 +777,28 @@ impl JsonNetAccessItem {
             Self::ConnectTcp => ("connect_tcp", ABI::V4),
         };
         Some(ConcreteAccess { name, required_abi })
+    }
+}
+
+impl PolicyAccessItem for JsonNetAccessItem {
+    type Access = AccessNet;
+
+    const NEGATIVE_NAMES: &'static [&'static str] = &["-bind_tcp", "-connect_tcp"];
+
+    fn from_negative(name: &str) -> Option<Self> {
+        match name {
+            "-bind_tcp" => Some(Self::BindTcp),
+            "-connect_tcp" => Some(Self::ConnectTcp),
+            _ => None,
+        }
+    }
+
+    fn concrete(&self) -> Option<ConcreteAccess> {
+        JsonNetAccessItem::concrete(self)
+    }
+
+    fn resolve(&self, abi: ABI) -> Result<BitFlags<Self::Access>, ResolveError> {
+        ValueAccessNet::resolve_bitflags(self, abi)
     }
 }
 
@@ -604,24 +826,6 @@ impl From<&JsonNetAccessItem> for ValueAccessNet {
     }
 }
 
-impl NonEmptySet<JsonNetAccessItem> {
-    pub fn resolve_bitflags(&self, abi: ABI) -> Result<BitFlags<AccessNet>, ResolveError> {
-        self.iter().try_fold(BitFlags::EMPTY, |flags, item| {
-            let access = ValueAccessNet::resolve_bitflags(item, abi)?;
-            Ok(flags | access)
-        })
-    }
-}
-
-impl AccessSet<JsonNetAccessItem> {
-    pub fn resolve_bitflags(&self, abi: ABI) -> Result<BitFlags<AccessNet>, ResolveError> {
-        self.iter().try_fold(BitFlags::EMPTY, |flags, item| {
-            let access = ValueAccessNet::resolve_bitflags(item, abi)?;
-            Ok(flags | access)
-        })
-    }
-}
-
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub(crate) enum JsonScopeItem {
@@ -639,6 +843,28 @@ impl JsonScopeItem {
             Self::Signal => ("signal", ABI::V6),
         };
         Some(ConcreteAccess { name, required_abi })
+    }
+}
+
+impl PolicyAccessItem for JsonScopeItem {
+    type Access = Scope;
+
+    const NEGATIVE_NAMES: &'static [&'static str] = &["-abstract_unix_socket", "-signal"];
+
+    fn from_negative(name: &str) -> Option<Self> {
+        match name {
+            "-abstract_unix_socket" => Some(Self::AbstractUnixSocket),
+            "-signal" => Some(Self::Signal),
+            _ => None,
+        }
+    }
+
+    fn concrete(&self) -> Option<ConcreteAccess> {
+        JsonScopeItem::concrete(self)
+    }
+
+    fn resolve(&self, abi: ABI) -> Result<BitFlags<Self::Access>, ResolveError> {
+        ValueScope::resolve_bitflags(self, abi)
     }
 }
 
@@ -666,26 +892,17 @@ impl From<&JsonScopeItem> for ValueScope {
     }
 }
 
-impl AccessSet<JsonScopeItem> {
-    pub fn resolve_bitflags(&self, abi: ABI) -> Result<BitFlags<Scope>, ResolveError> {
-        self.iter().try_fold(BitFlags::EMPTY, |flags, item| {
-            let access = ValueScope::resolve_bitflags(item, abi)?;
-            Ok(flags | access)
-        })
-    }
-}
-
 // At least one of the fields must be set, which is guaranteed when wrapped with NonEmptyStruct.
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
 #[serde(deny_unknown_fields)]
 #[allow(non_snake_case)]
 pub(crate) struct JsonRuleset {
     #[serde(default)]
-    pub(crate) handledAccessFs: OptionalProperty<AccessSet<JsonFsAccessItem>>,
+    pub(crate) handledAccessFs: OptionalProperty<AccessSet<HandledAccessItem<JsonFsAccessItem>>>,
     #[serde(default)]
-    pub(crate) handledAccessNet: OptionalProperty<AccessSet<JsonNetAccessItem>>,
+    pub(crate) handledAccessNet: OptionalProperty<AccessSet<HandledAccessItem<JsonNetAccessItem>>>,
     #[serde(default)]
-    pub(crate) scoped: OptionalProperty<AccessSet<JsonScopeItem>>,
+    pub(crate) scoped: OptionalProperty<AccessSet<HandledAccessItem<JsonScopeItem>>>,
 }
 
 impl NonEmptyStructInner for JsonRuleset {
@@ -703,11 +920,11 @@ impl NonEmptyStructInner for JsonRuleset {
 #[serde(deny_unknown_fields)]
 struct TomlRuleset {
     #[serde(default)]
-    handled_access_fs: OptionalProperty<AccessSet<JsonFsAccessItem>>,
+    handled_access_fs: OptionalProperty<AccessSet<HandledAccessItem<JsonFsAccessItem>>>,
     #[serde(default)]
-    handled_access_net: OptionalProperty<AccessSet<JsonNetAccessItem>>,
+    handled_access_net: OptionalProperty<AccessSet<HandledAccessItem<JsonNetAccessItem>>>,
     #[serde(default)]
-    scoped: OptionalProperty<AccessSet<JsonScopeItem>>,
+    scoped: OptionalProperty<AccessSet<HandledAccessItem<JsonScopeItem>>>,
 }
 
 impl NonEmptyStructInner for TomlRuleset {

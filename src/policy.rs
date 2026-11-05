@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use crate::nonempty::NonEmptyStruct;
-use crate::parser::{JsonPolicy, OptionalProperty, TemplateString, TomlPolicy};
+use crate::parser::{ConcreteAccess, JsonPolicy, OptionalProperty, TemplateString, TomlPolicy};
 use crate::variable::{NameError, ResolveError, Variables, VecStringIterator};
 use landlock::{
     AccessFs, AccessNet, BitFlags, NetPort, PathBeneath, PathFd, PathFdError, Ruleset, RulesetAttr,
@@ -27,8 +27,7 @@ pub enum BuildRulesetError {
 #[cfg_attr(test, derive(Default))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Policy {
-    /// This ABI is the configured local variable, which might be different than
-    /// the ABI required to support all listed access rights.
+    /// Effective ABI used to interpret every listed access right.
     pub(crate) abi: Option<ABI>,
     pub(crate) variables: Variables,
     pub(crate) handled_fs: BitFlags<AccessFs>,
@@ -53,11 +52,42 @@ pub struct ResolvedPolicy {
 }
 
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum PolicyError {
     #[error(transparent)]
     Name(#[from] NameError),
     #[error(transparent)]
     Resolve(#[from] ResolveError),
+    #[error(
+        "{category} '{name}' requires ABI {required_abi}, but the policy uses ABI {policy_abi}"
+    )]
+    AccessRightAbi {
+        category: &'static str,
+        name: &'static str,
+        policy_abi: ABI,
+        required_abi: ABI,
+    },
+}
+
+fn validate_access_abi<I>(
+    category: &'static str,
+    policy_abi: ABI,
+    accesses: I,
+) -> Result<(), PolicyError>
+where
+    I: IntoIterator<Item = ConcreteAccess>,
+{
+    for ConcreteAccess { name, required_abi } in accesses {
+        if required_abi > policy_abi {
+            return Err(PolicyError::AccessRightAbi {
+                category,
+                name,
+                policy_abi,
+                required_abi,
+            });
+        }
+    }
+    Ok(())
 }
 
 impl TryFrom<NonEmptyStruct<JsonPolicy>> for Policy {
@@ -86,12 +116,27 @@ impl TryFrom<NonEmptyStruct<JsonPolicy>> for Policy {
             for ruleset in rulesets {
                 let ruleset = ruleset.into_inner();
                 if let OptionalProperty::Present(access) = ruleset.handledAccessFs {
+                    validate_access_abi(
+                        "filesystem access right",
+                        abi,
+                        access.iter().filter_map(|item| item.concrete()),
+                    )?;
                     policy.handled_fs |= access.resolve_bitflags(abi)?;
                 }
                 if let OptionalProperty::Present(access) = ruleset.handledAccessNet {
+                    validate_access_abi(
+                        "network access right",
+                        abi,
+                        access.iter().filter_map(|item| item.concrete()),
+                    )?;
                     policy.handled_net |= access.resolve_bitflags(abi)?;
                 }
                 if let OptionalProperty::Present(scoped) = ruleset.scoped {
+                    validate_access_abi(
+                        "scope",
+                        abi,
+                        scoped.iter().filter_map(|item| item.concrete()),
+                    )?;
                     policy.scoped |= scoped.resolve_bitflags(abi)?;
                 }
             }
@@ -99,6 +144,14 @@ impl TryFrom<NonEmptyStruct<JsonPolicy>> for Policy {
 
         if let OptionalProperty::Present(path_beneath_rules) = json.pathBeneath {
             for path_beneath in path_beneath_rules {
+                validate_access_abi(
+                    "filesystem access right",
+                    abi,
+                    path_beneath
+                        .allowedAccess
+                        .iter()
+                        .filter_map(|item| item.concrete()),
+                )?;
                 let access = path_beneath.allowedAccess.resolve_bitflags(abi)?;
 
                 // It is possible to have rules with empty access because of empty
@@ -120,6 +173,14 @@ impl TryFrom<NonEmptyStruct<JsonPolicy>> for Policy {
 
         if let OptionalProperty::Present(net_port_rules) = json.netPort {
             for net_port in net_port_rules {
+                validate_access_abi(
+                    "network access right",
+                    abi,
+                    net_port
+                        .allowedAccess
+                        .iter()
+                        .filter_map(|item| item.concrete()),
+                )?;
                 let access = net_port.allowedAccess.resolve_bitflags(abi)?;
 
                 // It is possible to have rules with empty access because of empty

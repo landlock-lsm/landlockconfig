@@ -15,6 +15,7 @@
       "maximum": 2147483647
     },
     "accessFs": {
+      "description": "A filesystem access right or ABI-relative group. Each concrete right must be supported by the effective policy ABI; groups remain valid at every ABI and resolve to its supported subset. This semantic constraint is enforced by the parser because Draft 7 cannot derive it from the root ABI.",
       "type": "string",
       "enum": [
         "abi.all",
@@ -39,6 +40,7 @@
       ]
     },
     "accessNet": {
+      "description": "A network access right or ABI-relative group. Each concrete right must be supported by the effective policy ABI; groups remain valid at every ABI and may resolve empty before network support. This semantic constraint is enforced by the parser because Draft 7 cannot derive it from the root ABI.",
       "type": "string",
       "enum": [
         "abi.all",
@@ -47,6 +49,7 @@
       ]
     },
     "scope": {
+      "description": "A scope or ABI-relative group. Each concrete scope must be supported by the effective policy ABI; groups remain valid at every ABI and may resolve empty before scope support. This semantic constraint is enforced by the parser because Draft 7 cannot derive it from the root ABI.",
       "type": "string",
       "enum": [
         "abi.all",

@@ -2,11 +2,62 @@
 
 use crate::{
     parser::{TemplateString, LATEST_ABI},
+    policy::{ParseJsonError, ParseTomlError, PolicyError},
     tests_helpers::{parse_json, parse_json_schema, parse_toml},
     Policy,
 };
 use landlock::{Access, AccessFs, AccessNet, Scope, ABI};
 use serde_json::error::Category;
+
+fn assert_access_abi_error(
+    json: &str,
+    toml: &str,
+    category: &'static str,
+    name: &'static str,
+    policy_abi: ABI,
+    required_abi: ABI,
+) {
+    let json_error = Policy::parse_json(std::io::Cursor::new(json)).unwrap_err();
+    assert!(matches!(
+        &json_error,
+        ParseJsonError::Policy(PolicyError::AccessRightAbi {
+            category: actual_category,
+            name: actual_name,
+            policy_abi: actual_policy_abi,
+            required_abi: actual_required_abi,
+        }) if *actual_category == category
+            && *actual_name == name
+            && *actual_policy_abi == policy_abi
+            && *actual_required_abi == required_abi
+    ));
+    assert_eq!(
+        json_error.to_string(),
+        format!(
+            "{category} '{name}' requires ABI {required_abi}, but the policy uses ABI {policy_abi}"
+        )
+    );
+    assert_eq!(parse_json_schema(json, false), Err(Category::Data));
+
+    let toml_error = Policy::parse_toml(toml).unwrap_err();
+    assert!(matches!(
+        &toml_error,
+        ParseTomlError::Policy(PolicyError::AccessRightAbi {
+            category: actual_category,
+            name: actual_name,
+            policy_abi: actual_policy_abi,
+            required_abi: actual_required_abi,
+        }) if *actual_category == category
+            && *actual_name == name
+            && *actual_policy_abi == policy_abi
+            && *actual_required_abi == required_abi
+    ));
+    assert_eq!(
+        toml_error.to_string(),
+        format!(
+            "{category} '{name}' requires ABI {required_abi}, but the policy uses ABI {policy_abi}"
+        )
+    );
+}
 
 #[test]
 fn test_access_fs_with_value() {
@@ -35,6 +86,251 @@ fn test_access_fs_with_value() {
     };
     assert_eq!(parse_json(json).unwrap(), policy);
     assert_eq!(parse_toml(toml).unwrap(), policy);
+}
+
+#[test]
+fn test_filesystem_access_abi_boundaries() {
+    for (policy_abi, required_abi, name, access) in [
+        (ABI::V1, ABI::V2, "refer", AccessFs::Refer),
+        (ABI::V2, ABI::V3, "truncate", AccessFs::Truncate),
+        (ABI::V4, ABI::V5, "ioctl_dev", AccessFs::IoctlDev),
+    ] {
+        let json = format!(
+            r#"{{
+                "abi": {},
+                "ruleset": [{{ "handledAccessFs": ["{name}"] }}]
+            }}"#,
+            policy_abi as u32
+        );
+        let toml = format!(
+            r#"
+                abi = {}
+                [[ruleset]]
+                handled_access_fs = ["{name}"]
+            "#,
+            policy_abi as u32
+        );
+        assert_access_abi_error(
+            &json,
+            &toml,
+            "filesystem access right",
+            name,
+            policy_abi,
+            required_abi,
+        );
+
+        let json = json.replace(
+            &format!("\"abi\": {}", policy_abi as u32),
+            &format!("\"abi\": {}", required_abi as u32),
+        );
+        let toml = toml.replace(
+            &format!("abi = {}", policy_abi as u32),
+            &format!("abi = {}", required_abi as u32),
+        );
+        assert!(parse_json(&json).unwrap().handled_fs.contains(access));
+        assert!(parse_toml(&toml).unwrap().handled_fs.contains(access));
+    }
+}
+
+#[test]
+fn test_network_access_abi_boundaries() {
+    for (name, access) in [
+        ("bind_tcp", AccessNet::BindTcp),
+        ("connect_tcp", AccessNet::ConnectTcp),
+    ] {
+        let json = format!(
+            r#"{{
+                "abi": 3,
+                "ruleset": [{{ "handledAccessNet": ["{name}"] }}]
+            }}"#
+        );
+        let toml = format!(
+            r#"
+                abi = 3
+                [[ruleset]]
+                handled_access_net = ["{name}"]
+            "#
+        );
+        assert_access_abi_error(&json, &toml, "network access right", name, ABI::V3, ABI::V4);
+
+        let json = json.replace("\"abi\": 3", "\"abi\": 4");
+        let toml = toml.replace("abi = 3", "abi = 4");
+        assert!(parse_json(&json).unwrap().handled_net.contains(access));
+        assert!(parse_toml(&toml).unwrap().handled_net.contains(access));
+    }
+}
+
+#[test]
+fn test_scope_abi_boundaries() {
+    for (name, scope) in [
+        ("abstract_unix_socket", Scope::AbstractUnixSocket),
+        ("signal", Scope::Signal),
+    ] {
+        let json = format!(
+            r#"{{
+                "abi": 5,
+                "ruleset": [{{ "scoped": ["{name}"] }}]
+            }}"#
+        );
+        let toml = format!(
+            r#"
+                abi = 5
+                [[ruleset]]
+                scoped = ["{name}"]
+            "#
+        );
+        assert_access_abi_error(&json, &toml, "scope", name, ABI::V5, ABI::V6);
+
+        let json = json.replace("\"abi\": 5", "\"abi\": 6");
+        let toml = toml.replace("abi = 5", "abi = 6");
+        assert!(parse_json(&json).unwrap().scoped.contains(scope));
+        assert!(parse_toml(&toml).unwrap().scoped.contains(scope));
+    }
+}
+
+#[test]
+fn test_future_abi_concrete_access() {
+    let json = format!(
+        r#"{{
+            "abi": {},
+            "ruleset": [{{
+                "handledAccessFs": ["execute"],
+                "handledAccessNet": ["bind_tcp"],
+                "scoped": ["signal"]
+            }}]
+        }}"#,
+        i32::MAX
+    );
+    let toml = format!(
+        r#"
+            abi = {}
+            [[ruleset]]
+            handled_access_fs = ["execute"]
+            handled_access_net = ["bind_tcp"]
+            scoped = ["signal"]
+        "#,
+        i32::MAX
+    );
+    let policy = Policy {
+        abi: Some(LATEST_ABI),
+        handled_fs: AccessFs::Execute.into(),
+        handled_net: AccessNet::BindTcp.into(),
+        scoped: Scope::Signal.into(),
+        ..Default::default()
+    };
+    assert_eq!(parse_json(&json).unwrap(), policy);
+    assert_eq!(parse_toml(&toml).unwrap(), policy);
+}
+
+#[test]
+fn test_group_only_no_op() {
+    let json = r#"{
+        "abi": 3,
+        "ruleset": [{
+            "handledAccessFs": ["execute"],
+            "handledAccessNet": ["abi.all"],
+            "scoped": ["abi.all"]
+        }],
+        "netPort": [{
+            "allowedAccess": ["abi.all"],
+            "port": [80]
+        }]
+    }"#;
+    let toml = r#"
+        abi = 3
+        [[ruleset]]
+        handled_access_fs = ["execute"]
+        handled_access_net = ["abi.all"]
+        scoped = ["abi.all"]
+        [[net_port]]
+        allowed_access = ["abi.all"]
+        port = [80]
+    "#;
+    let policy = Policy {
+        abi: Some(ABI::V3),
+        handled_fs: AccessFs::Execute.into(),
+        ..Default::default()
+    };
+    assert_eq!(parse_json(json).unwrap(), policy);
+    assert_eq!(parse_toml(toml).unwrap(), policy);
+}
+
+#[test]
+fn test_path_allowance_abi_boundary() {
+    let json = r#"{
+        "abi": 1,
+        "pathBeneath": [{
+            "allowedAccess": ["refer"],
+            "parent": ["."]
+        }]
+    }"#;
+    let toml = r#"
+        abi = 1
+        [[path_beneath]]
+        allowed_access = ["refer"]
+        parent = ["."]
+    "#;
+    assert_access_abi_error(
+        json,
+        toml,
+        "filesystem access right",
+        "refer",
+        ABI::V1,
+        ABI::V2,
+    );
+
+    let json = json.replace("\"abi\": 1", "\"abi\": 2");
+    let toml = toml.replace("abi = 1", "abi = 2");
+    assert_eq!(
+        parse_json(&json)
+            .unwrap()
+            .rules_path_beneath
+            .get(&TemplateString::from_text(".")),
+        Some(&AccessFs::Refer.into())
+    );
+    assert_eq!(
+        parse_toml(&toml)
+            .unwrap()
+            .rules_path_beneath
+            .get(&TemplateString::from_text(".")),
+        Some(&AccessFs::Refer.into())
+    );
+}
+
+#[test]
+fn test_port_allowance_abi_boundary() {
+    let json = r#"{
+        "abi": 3,
+        "netPort": [{
+            "allowedAccess": ["connect_tcp"],
+            "port": [80]
+        }]
+    }"#;
+    let toml = r#"
+        abi = 3
+        [[net_port]]
+        allowed_access = ["connect_tcp"]
+        port = [80]
+    "#;
+    assert_access_abi_error(
+        json,
+        toml,
+        "network access right",
+        "connect_tcp",
+        ABI::V3,
+        ABI::V4,
+    );
+
+    let json = json.replace("\"abi\": 3", "\"abi\": 4");
+    let toml = toml.replace("abi = 3", "abi = 4");
+    assert_eq!(
+        parse_json(&json).unwrap().rules_net_port.get(&80),
+        Some(&AccessNet::ConnectTcp.into())
+    );
+    assert_eq!(
+        parse_toml(&toml).unwrap().rules_net_port.get(&80),
+        Some(&AccessNet::ConnectTcp.into())
+    );
 }
 
 #[test]

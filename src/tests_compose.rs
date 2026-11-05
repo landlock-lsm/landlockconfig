@@ -466,7 +466,7 @@ fn test_abi_compose_read_write_v1() {
         ]
     }"#;
     let json2 = r#"{
-        "abi": 2,
+        "abi": 4,
         "ruleset": [
             {
                 "handledAccessFs": [ "abi.read_write" ],
@@ -491,7 +491,7 @@ fn test_abi_compose_read_write_v1() {
         get_composition(json1, json2),
         ResolvedPolicy {
             handled_fs: AccessFs::from_all(ABI::V1)
-                & AccessFs::from_all(ABI::V2)
+                & AccessFs::from_all(ABI::V4)
                 & !AccessFs::Execute,
             // No handled_net nor rules_net_port because not supported by ABI v1.
             rules_path_beneath: [(

@@ -124,6 +124,10 @@ latest supported ABI to interpret the policy. This preserves the known subset
 of a future policy, but it does not make unknown access names, properties, or
 rule types valid; unknown syntax remains an error.
 
+Concrete access and scope names must be supported by the effective policy ABI.
+Known fields and positive `abi.*` groups remain valid at every ABI; each group
+resolves only to rights supported by that ABI and may resolve to an empty set.
+
 **TODO:**
 In the case of an older user space and a newer kernel, it should be possible for
 users to still leverage a subset of the newer kernel features.  This means that
@@ -303,3 +307,6 @@ Policies accepted by earlier versions may require these updates:
 - Every policy must declare the Landlock ABI against which it was tested.
   Choose the tested compatibility contract rather than blindly selecting the
   newest ABI.
+- A concrete access or scope right must be supported by the effective policy ABI.
+  Remove an unsupported right or raise the ABI after reviewing and testing the
+  additional Landlock features.

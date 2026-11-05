@@ -329,6 +329,12 @@ impl<'de> Deserialize<'de> for TemplateString {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct ConcreteAccess {
+    pub(crate) name: &'static str,
+    pub(crate) required_abi: ABI,
+}
+
 #[derive(Debug, Deserialize, Ord, Eq, PartialOrd, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub(crate) enum JsonFsAccessItem {
@@ -354,6 +360,31 @@ pub(crate) enum JsonFsAccessItem {
     Refer,
     Truncate,
     IoctlDev,
+}
+
+impl JsonFsAccessItem {
+    pub(crate) fn concrete(&self) -> Option<ConcreteAccess> {
+        let (name, required_abi) = match self {
+            Self::AbiAll | Self::AbiReadExecute | Self::AbiReadWrite => return None,
+            Self::Execute => ("execute", ABI::V1),
+            Self::WriteFile => ("write_file", ABI::V1),
+            Self::ReadFile => ("read_file", ABI::V1),
+            Self::ReadDir => ("read_dir", ABI::V1),
+            Self::RemoveDir => ("remove_dir", ABI::V1),
+            Self::RemoveFile => ("remove_file", ABI::V1),
+            Self::MakeChar => ("make_char", ABI::V1),
+            Self::MakeDir => ("make_dir", ABI::V1),
+            Self::MakeReg => ("make_reg", ABI::V1),
+            Self::MakeSock => ("make_sock", ABI::V1),
+            Self::MakeFifo => ("make_fifo", ABI::V1),
+            Self::MakeBlock => ("make_block", ABI::V1),
+            Self::MakeSym => ("make_sym", ABI::V1),
+            Self::Refer => ("refer", ABI::V2),
+            Self::Truncate => ("truncate", ABI::V3),
+            Self::IoctlDev => ("ioctl_dev", ABI::V5),
+        };
+        Some(ConcreteAccess { name, required_abi })
+    }
 }
 
 trait AbiGroup<A>
@@ -516,6 +547,17 @@ pub(crate) enum JsonNetAccessItem {
     ConnectTcp,
 }
 
+impl JsonNetAccessItem {
+    pub(crate) fn concrete(&self) -> Option<ConcreteAccess> {
+        let (name, required_abi) = match self {
+            Self::AbiAll => return None,
+            Self::BindTcp => ("bind_tcp", ABI::V4),
+            Self::ConnectTcp => ("connect_tcp", ABI::V4),
+        };
+        Some(ConcreteAccess { name, required_abi })
+    }
+}
+
 enum AbiGroupNet {
     All,
 }
@@ -556,6 +598,17 @@ pub(crate) enum JsonScopeItem {
     AbiAll,
     AbstractUnixSocket,
     Signal,
+}
+
+impl JsonScopeItem {
+    pub(crate) fn concrete(&self) -> Option<ConcreteAccess> {
+        let (name, required_abi) = match self {
+            Self::AbiAll => return None,
+            Self::AbstractUnixSocket => ("abstract_unix_socket", ABI::V6),
+            Self::Signal => ("signal", ABI::V6),
+        };
+        Some(ConcreteAccess { name, required_abi })
+    }
 }
 
 enum AbiGroupScope {

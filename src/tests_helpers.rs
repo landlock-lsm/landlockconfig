@@ -5,6 +5,8 @@ use crate::Policy;
 use landlock::ABI;
 use serde_json::error::Category;
 use serde_json::Value;
+use std::io::Write;
+use std::process::{Command, Output, Stdio};
 
 pub(crate) const LATEST_ABI: ABI = ABI::V6;
 
@@ -15,11 +17,86 @@ lazy_static! {
     };
 }
 
+// check-jsonschema is not available in every package build environment.
+const CHECK_JSONSCHEMA_ENV: &str = "LANDLOCK_POLICY_TEST_JSON_SCHEMA";
+
+fn format_process_output(output: &Output) -> String {
+    let quote = |output: &[u8]| {
+        String::from_utf8_lossy(output)
+            .lines()
+            .map(|line| format!("  {line}"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+
+    format!(
+        "status: {:?}\nstdout:\n{}\nstderr:\n{}",
+        output.status.code(),
+        quote(&output.stdout),
+        quote(&output.stderr)
+    )
+}
+
+fn validate_json_external(json: &str, expected: bool) {
+    match std::env::var(CHECK_JSONSCHEMA_ENV).as_deref() {
+        Err(std::env::VarError::NotPresent) | Ok("0") => return,
+        Ok("1") => {}
+        _ => panic!("Invalid {CHECK_JSONSCHEMA_ENV} value; expected 0 or 1"),
+    }
+
+    let mut child = Command::new("check-jsonschema")
+        .arg("--schemafile")
+        .arg(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/schema/landlock-policy.json"
+        ))
+        .args(["--force-filetype", "json", "-"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap_or_else(|error| {
+            panic!(
+                "Failed to run check-jsonschema: {error}. Install check-jsonschema to run \
+                 the external JSON validation"
+            )
+        });
+
+    let mut stdin = child.stdin.take().expect("Missing check-jsonschema stdin");
+    let (output, write_result) = std::thread::scope(|scope| {
+        let writer = scope.spawn(move || stdin.write_all(json.as_bytes()));
+        let output = child
+            .wait_with_output()
+            .expect("Failed to wait for check-jsonschema");
+        let write_result = writer
+            .join()
+            .expect("Failed to join check-jsonschema writer");
+        (output, write_result)
+    });
+
+    if let Err(error) = write_result {
+        panic!(
+            "Failed to write JSON to check-jsonschema: {error}\n{}",
+            format_process_output(&output)
+        );
+    }
+
+    let expected_status = if expected { 0 } else { 1 };
+    if output.status.code() != Some(expected_status) || (!expected && !output.stderr.is_empty()) {
+        panic!(
+            "Unexpected check-jsonschema result for expected validity {expected}\n{}",
+            format_process_output(&output)
+        );
+    }
+}
+
 pub(crate) fn validate_json(json: &str) -> Result<(), ()> {
-    let json = serde_json::from_str::<Value>(json).expect("Invalid JSON");
-    JSON_VALIDATOR.validate(&json).map(|_| ()).map_err(|e| {
+    let value = serde_json::from_str::<Value>(json).expect("Invalid JSON");
+    let validation = JSON_VALIDATOR.validate(&value).map(|_| ()).map_err(|e| {
         eprintln!("JSON schema validation error: {e}");
-    })
+    });
+    validate_json_external(json, validation.is_ok());
+    validation
 }
 
 // TODO: Return ParseJsonError

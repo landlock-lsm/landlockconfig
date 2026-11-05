@@ -113,6 +113,16 @@ can be used to test the library implementation against a set of valid and
 invalid samples. This could also be used to test Landlock libraries to make sure
 the execution traces are similar.
 
+The test suite uses an in-process JSON schema validator by default.  To also
+validate every inline JSON snippet with `check-jsonschema`, install it and run:
+
+```sh
+LANDLOCK_POLICY_TEST_JSON_SCHEMA=1 cargo test --locked --all
+```
+
+When set, `LANDLOCK_POLICY_TEST_JSON_SCHEMA` accepts `0` or `1`.  Enabling it
+requires the `check-jsonschema` executable to be available in `PATH`.
+
 ## Command-line tools
 
 ### landlock-policy

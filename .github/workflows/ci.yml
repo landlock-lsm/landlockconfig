@@ -156,6 +156,9 @@ jobs:
     - name: Install cargo-c
       run: sudo apt install cargo-c
 
+    - name: Install check-jsonschema
+      run: pipx install check-jsonschema
+
     - uses: actions/checkout@v7
       with:
         ref: ${{ matrix.commit }}
@@ -201,6 +204,8 @@ jobs:
       run: s="$(set -o pipefail; git status --porcelain=1 | tee >(cat >&2))" && [[ -z "$s" ]]
 
     - name: Run tests
+      env:
+        LANDLOCK_POLICY_TEST_JSON_SCHEMA: "1"
       run: rustup run stable cargo test --locked --all --verbose
 
     - name: Check tool versions match

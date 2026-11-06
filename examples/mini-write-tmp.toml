@@ -1,8 +1,6 @@
 abi = 5
 
-[[ruleset]]
-handled_access_fs = ["abi.all"]
-handled_access_net = ["bind_tcp"]
+# The omitted ruleset defaults to all rights supported by ABI 5.
 
 # Main system directories can be read.
 [[path_beneath]]
@@ -14,7 +12,7 @@ parent = [".", "/bin", "/lib", "/usr", "/dev", "/etc", "/proc",]
 allowed_access = ["abi.read_write"]
 parent = ["/tmp"]
 
-# Only web ports are allowed.
+# Only binding web ports is allowed.
 [[net_port]]
 allowed_access = ["bind_tcp"]
 port = [80, 443,]

@@ -1,15 +1,5 @@
 {
   "abi": 5,
-  "ruleset": [
-    {
-      "handledAccessFs": [
-        "abi.all"
-      ],
-      "handledAccessNet": [
-        "bind_tcp"
-      ]
-    }
-  ],
   "pathBeneath": [
     {
       "allowedAccess": [

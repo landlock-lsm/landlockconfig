@@ -1,5 +1,6 @@
 abi = 5
 
+# The omitted ruleset defaults to all rights supported by ABI 5.
 [[variable]]
 name = "tmp"
 literal = ["/tmp", "/var/tmp"]

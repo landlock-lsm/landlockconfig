@@ -1,14 +1,31 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use crate::policy::{ParseJsonError, ParseTomlError};
-use crate::Policy;
-use landlock::ABI;
+use crate::{Policy, ResolvedPolicy};
+use landlock::{Access, AccessFs, AccessNet, Scope, ABI};
 use serde_json::error::Category;
 use serde_json::Value;
 use std::io::Write;
 use std::process::{Command, Output, Stdio};
 
-pub(crate) const LATEST_ABI: ABI = ABI::V6;
+pub(crate) fn policy_with_abi_defaults(abi: ABI) -> Policy {
+    Policy {
+        abi: Some(abi),
+        handled_fs: AccessFs::from_all(abi),
+        handled_net: AccessNet::from_all(abi),
+        scoped: Scope::from_all(abi),
+        ..Default::default()
+    }
+}
+
+pub(crate) fn resolved_policy_with_abi_defaults(abi: ABI) -> ResolvedPolicy {
+    ResolvedPolicy {
+        handled_fs: AccessFs::from_all(abi),
+        handled_net: AccessNet::from_all(abi),
+        scoped: Scope::from_all(abi),
+        ..Default::default()
+    }
+}
 
 lazy_static! {
     static ref JSON_VALIDATOR: jsonschema::Validator = {

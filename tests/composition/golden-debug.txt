@@ -4,7 +4,8 @@ ResolvedPolicy {
         flags: Execute | WriteFile | ReadFile | ReadDir | RemoveDir | RemoveFile | MakeChar | MakeDir | MakeReg | MakeSock | MakeFifo | MakeBlock | MakeSym | Refer | Truncate,
     },
     handled_net: BitFlags<AccessNet> {
-        bits: 0b0,
+        bits: 0b11,
+        flags: BindTcp | ConnectTcp,
     },
     scoped: BitFlags<Scope> {
         bits: 0b0,

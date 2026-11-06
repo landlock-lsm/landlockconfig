@@ -2,18 +2,21 @@
 
 use crate::{
     parser::{TemplateString, TemplateToken},
-    policy::ResolvedPolicy,
-    tests_helpers::{parse_json, parse_json_schema, parse_toml},
+    tests_helpers::{
+        parse_json, parse_json_schema, parse_toml, policy_with_abi_defaults,
+        resolved_policy_with_abi_defaults,
+    },
     variable::{Name, ResolveError, Variables},
-    Policy,
+    Policy, ResolvedPolicy,
 };
-use landlock::AccessFs;
+use landlock::{Access, AccessFs, ABI};
 use serde_json::error::Category;
 use std::{path::PathBuf, str::FromStr};
 
 #[test]
 fn test_empty_variable() {
     let json = r#"{
+        "abi": 6,
         "variable": [ ]
     }"#;
     assert_eq!(parse_json(json), Err(Category::Data));
@@ -22,6 +25,7 @@ fn test_empty_variable() {
 #[test]
 fn test_empty_variable_item() {
     let json = r#"{
+        "abi": 6,
         "variable": [
             {}
         ]
@@ -32,6 +36,7 @@ fn test_empty_variable_item() {
 #[test]
 fn test_empty_variable_name() {
     let json = r#"{
+        "abi": 6,
         "variable": [
             {
                 "literal": [ "foo" ]
@@ -44,6 +49,7 @@ fn test_empty_variable_name() {
 #[test]
 fn test_without_value() {
     let json = r#"{
+        "abi": 6,
         "variable": [
             {
                 "name": "bar"
@@ -54,8 +60,9 @@ fn test_without_value() {
     assert_eq!(
         parse_json(json),
         Ok(Policy {
+            abi: Some(ABI::V6),
             variables: Variables::try_from([("bar", empty)]).unwrap(),
-            ..Default::default()
+            ..policy_with_abi_defaults(ABI::V6)
         })
     );
 }
@@ -63,6 +70,7 @@ fn test_without_value() {
 #[test]
 fn test_one_variable_json() {
     let json = r#"{
+        "abi": 6,
         "variable": [
             {
                 "name": "bar",
@@ -73,8 +81,9 @@ fn test_one_variable_json() {
     assert_eq!(
         parse_json(json),
         Ok(Policy {
+            abi: Some(ABI::V6),
             variables: Variables::try_from([("bar", ["foo"])]).unwrap(),
-            ..Default::default()
+            ..policy_with_abi_defaults(ABI::V6)
         })
     );
 }
@@ -82,6 +91,7 @@ fn test_one_variable_json() {
 #[test]
 fn test_one_variable_toml() {
     let toml = r#"
+        abi = 6
         [[variable]]
         name = "bar"
         literal = [
@@ -91,8 +101,9 @@ fn test_one_variable_toml() {
     assert_eq!(
         parse_toml(toml).unwrap(),
         Policy {
+            abi: Some(ABI::V6),
             variables: Variables::try_from([("bar", ["foo"])]).unwrap(),
-            ..Default::default()
+            ..policy_with_abi_defaults(ABI::V6)
         }
     );
 }
@@ -100,6 +111,7 @@ fn test_one_variable_toml() {
 #[test]
 fn test_one_variable_simple_1() {
     let json = r#"{
+        "abi": 6,
         "variable": [
             {
                 "name": "foo",
@@ -110,8 +122,9 @@ fn test_one_variable_simple_1() {
     assert_eq!(
         parse_json(json),
         Ok(Policy {
+            abi: Some(ABI::V6),
             variables: Variables::try_from([("foo", vec!["a", "b"])]).unwrap(),
-            ..Default::default()
+            ..policy_with_abi_defaults(ABI::V6)
         })
     );
 }
@@ -119,6 +132,7 @@ fn test_one_variable_simple_1() {
 fn json_var_declaration(name: &str) -> String {
     format!(
         r#"{{
+            "abi": 6,
             "variable": [
                 {{
                     "name": "{}",
@@ -133,6 +147,7 @@ fn json_var_declaration(name: &str) -> String {
 fn json_var_use(name: &str) -> String {
     format!(
         r#"{{
+            "abi": 6,
             "pathBeneath": [
                 {{
                     "allowedAccess": [ "execute" ],
@@ -192,8 +207,9 @@ fn assert_valid_var_name(name: &str) {
     assert_eq!(
         parse_json(&json_var_declaration(name)),
         Ok(Policy {
+            abi: Some(ABI::V6),
             variables: Variables::try_from([(name, ["value"])]).unwrap(),
-            ..Default::default()
+            ..policy_with_abi_defaults(ABI::V6)
         })
     );
 }
@@ -233,8 +249,9 @@ fn test_variable_name_valid_single_letter() {
     assert_eq!(
         parse_json(&json_var_declaration("a")),
         Ok(Policy {
+            abi: Some(ABI::V6),
             variables: Variables::try_from([("a", ["value"])]).unwrap(),
-            ..Default::default()
+            ..policy_with_abi_defaults(ABI::V6)
         })
     );
 }
@@ -242,6 +259,7 @@ fn test_variable_name_valid_single_letter() {
 #[test]
 fn test_one_variable_template_error_1() {
     let json = r#"{
+        "abi": 6,
         "variable": [
             {
                 "name": "foo",
@@ -261,6 +279,7 @@ fn test_one_variable_template_error_1() {
 #[test]
 fn test_one_variable_template_missing() {
     let json = r#"{
+        "abi": 6,
         "variable": [
             {
                 "name": "foo",
@@ -285,6 +304,7 @@ fn test_one_variable_template_missing() {
 #[test]
 fn test_one_variable_json_toml_template() {
     let json = r#"{
+        "abi": 6,
         "variable": [
             {
                 "name": "foo",
@@ -302,6 +322,7 @@ fn test_one_variable_json_toml_template() {
         ]
     }"#;
     let json_reverse = r#"{
+        "abi": 6,
         "pathBeneath": [
             {
                 "allowedAccess": [ "execute" ],
@@ -320,6 +341,7 @@ fn test_one_variable_json_toml_template() {
     }"#;
 
     let toml = r#"
+        abi = 6
         [[variable]]
         name = "foo"
         literal = [
@@ -332,6 +354,7 @@ fn test_one_variable_json_toml_template() {
         parent = [ "${foo}" ]
     "#;
     let toml_reverse = r#"
+        abi = 6
         [[path_beneath]]
         allowed_access = [ "execute" ]
         parent = [ "${foo}" ]
@@ -345,23 +368,24 @@ fn test_one_variable_json_toml_template() {
     "#;
 
     let policy = Policy {
+        abi: Some(ABI::V6),
         variables: Variables::try_from([("foo", vec!["a", "b"])]).unwrap(),
-        handled_fs: AccessFs::Execute.into(),
+        handled_fs: AccessFs::from_all(ABI::V6),
         rules_path_beneath: [(
             TemplateString(vec![TemplateToken::Var(Name::from_str("foo").unwrap())]),
             AccessFs::Execute.into(),
         )]
         .into(),
-        ..Default::default()
+        ..policy_with_abi_defaults(ABI::V6)
     };
     let resolved = ResolvedPolicy {
-        handled_fs: AccessFs::Execute.into(),
+        handled_fs: AccessFs::from_all(ABI::V6),
         rules_path_beneath: [
             (PathBuf::from("a"), AccessFs::Execute.into()),
             (PathBuf::from("b"), AccessFs::Execute.into()),
         ]
         .into(),
-        ..Default::default()
+        ..resolved_policy_with_abi_defaults(ABI::V6)
     };
 
     let out_json = parse_json(json).unwrap();
@@ -384,6 +408,7 @@ fn test_one_variable_json_toml_template() {
 #[test]
 fn test_two_variable_template() {
     let json = r#"{
+        "abi": 6,
         "variable": [
             {
                 "name": "foo",
@@ -405,9 +430,10 @@ fn test_two_variable_template() {
     assert_eq!(
         policy,
         Policy {
+            abi: Some(ABI::V6),
             variables: Variables::try_from([("foo", vec!["a", "b"]), ("bar", vec!["X", "Y", "Z"])])
                 .unwrap(),
-            handled_fs: AccessFs::Execute.into(),
+            handled_fs: AccessFs::from_all(ABI::V6),
             rules_path_beneath: [(
                 TemplateString(vec![
                     TemplateToken::Text("before/".into()),
@@ -419,13 +445,13 @@ fn test_two_variable_template() {
                 AccessFs::Execute.into()
             )]
             .into(),
-            ..Default::default()
+            ..policy_with_abi_defaults(ABI::V6)
         }
     );
     assert_eq!(
         policy.resolve(),
         Ok(ResolvedPolicy {
-            handled_fs: AccessFs::Execute.into(),
+            handled_fs: AccessFs::from_all(ABI::V6),
             rules_path_beneath: [
                 (PathBuf::from("before/a/X/after"), AccessFs::Execute.into()),
                 (PathBuf::from("before/a/Y/after"), AccessFs::Execute.into()),
@@ -435,7 +461,7 @@ fn test_two_variable_template() {
                 (PathBuf::from("before/b/Z/after"), AccessFs::Execute.into()),
             ]
             .into(),
-            ..Default::default()
+            ..resolved_policy_with_abi_defaults(ABI::V6)
         }),
     );
 }
@@ -443,6 +469,7 @@ fn test_two_variable_template() {
 #[test]
 fn test_special_characters() {
     let json = r#"{
+        "abi": 6,
         "variable": [
             {
                 "name": "foo",
@@ -464,7 +491,7 @@ fn test_special_characters() {
     assert_eq!(
         parse_json(json).unwrap().resolve(),
         Ok(ResolvedPolicy {
-            handled_fs: AccessFs::Execute.into(),
+            handled_fs: AccessFs::from_all(ABI::V6),
             rules_path_beneath: [
                 (PathBuf::from("$"), AccessFs::Execute.into()),
                 (PathBuf::from("${foo}"), AccessFs::Execute.into()),
@@ -472,7 +499,7 @@ fn test_special_characters() {
                 (PathBuf::from("{bar"), AccessFs::Execute.into()),
             ]
             .into(),
-            ..Default::default()
+            ..resolved_policy_with_abi_defaults(ABI::V6)
         })
     );
 }

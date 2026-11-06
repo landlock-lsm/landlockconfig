@@ -2,12 +2,8 @@
   "abi": 6,
   "ruleset": [
     {
-      "handledAccessNet": [
-        "abi.all"
-      ],
-      "scoped": [
-        "abi.all"
-      ]
+      "handledAccessFs": [],
+      "handledAccessNet": []
     }
   ]
 }

@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use crate::nonempty::NonEmptyStruct;
-use crate::parser::{JsonPolicy, TemplateString, TomlPolicy};
+use crate::parser::{
+    ConcreteAccess, JsonPolicy, OptionalProperty, ResolvedAccessExpression, ResolvedAllowance,
+    TemplateString, TomlPolicy,
+};
 use crate::variable::{NameError, ResolveError, Variables, VecStringIterator};
 use landlock::{
-    AccessFs, AccessNet, BitFlags, NetPort, PathBeneath, PathFd, PathFdError, Ruleset, RulesetAttr,
-    RulesetCreated, RulesetCreatedAttr, RulesetError, Scope, ABI,
+    Access, AccessFs, AccessNet, BitFlags, NetPort, PathBeneath, PathFd, PathFdError, Ruleset,
+    RulesetAttr, RulesetCreated, RulesetCreatedAttr, RulesetError, Scope, ABI,
 };
 use std::collections::BTreeMap;
 use std::fs::{self, File};
@@ -27,8 +30,7 @@ pub enum BuildRulesetError {
 #[cfg_attr(test, derive(Default))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Policy {
-    /// This ABI is the configured local variable, which might be different than
-    /// the ABI required to support all listed access rights.
+    /// Effective ABI used to interpret every listed access right.
     pub(crate) abi: Option<ABI>,
     pub(crate) variables: Variables,
     pub(crate) handled_fs: BitFlags<AccessFs>,
@@ -53,11 +55,120 @@ pub struct ResolvedPolicy {
 }
 
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum PolicyError {
     #[error(transparent)]
     Name(#[from] NameError),
     #[error(transparent)]
     Resolve(#[from] ResolveError),
+    #[error(
+        "{category} '{name}' requires ABI {required_abi}, but the policy uses ABI {policy_abi}"
+    )]
+    AccessRightAbi {
+        category: &'static str,
+        name: &'static str,
+        policy_abi: ABI,
+        required_abi: ABI,
+    },
+    #[error("policy does not handle or scope any rights")]
+    EmptyRuleset,
+    #[error("{category} exception '-{name}' requires an explicit positive ABI group containing it at ABI {policy_abi}")]
+    AccessExceptionUncovered {
+        category: &'static str,
+        name: &'static str,
+        policy_abi: ABI,
+    },
+    #[error("{category} '{name}' cannot be both included and excluded")]
+    AccessContradiction {
+        category: &'static str,
+        name: &'static str,
+    },
+    #[error("{category} rule explicitly allows excepted right '{name}'; remove the concrete allowance or use an ABI group")]
+    RuleAccessConflict {
+        category: &'static str,
+        name: &'static str,
+    },
+}
+
+fn validate_access_abi<I>(
+    category: &'static str,
+    policy_abi: ABI,
+    accesses: I,
+) -> Result<(), PolicyError>
+where
+    I: IntoIterator<Item = ConcreteAccess>,
+{
+    for ConcreteAccess { name, required_abi } in accesses {
+        if required_abi > policy_abi {
+            return Err(PolicyError::AccessRightAbi {
+                category,
+                name,
+                policy_abi,
+                required_abi,
+            });
+        }
+    }
+    Ok(())
+}
+
+struct ValidatedAccess<A>
+where
+    A: Access,
+{
+    access: BitFlags<A>,
+    exceptions: Vec<(ConcreteAccess, BitFlags<A>)>,
+}
+
+fn validate_access_expression<A>(
+    category: &'static str,
+    policy_abi: ABI,
+    expression: ResolvedAccessExpression<A>,
+) -> Result<ValidatedAccess<A>, PolicyError>
+where
+    A: Access,
+{
+    let mut excluded = BitFlags::EMPTY;
+    for (concrete, access) in &expression.negatives {
+        if !(expression.positive_concrete & *access).is_empty() {
+            return Err(PolicyError::AccessContradiction {
+                category,
+                name: concrete.name,
+            });
+        }
+        if (expression.groups & *access).is_empty() {
+            return Err(PolicyError::AccessExceptionUncovered {
+                category,
+                name: concrete.name,
+                policy_abi,
+            });
+        }
+        excluded |= *access;
+    }
+    Ok(ValidatedAccess {
+        access: expression.positive & !excluded,
+        exceptions: expression.negatives,
+    })
+}
+
+fn resolve_allowance<A>(
+    category: &'static str,
+    allowance: ResolvedAllowance<A>,
+    exceptions: &[(ConcreteAccess, BitFlags<A>)],
+) -> Result<BitFlags<A>, PolicyError>
+where
+    A: Access,
+{
+    let mut excluded = BitFlags::EMPTY;
+    for (concrete, access) in exceptions {
+        if !(allowance.concrete & *access).is_empty() {
+            return Err(PolicyError::RuleAccessConflict {
+                category,
+                name: concrete.name,
+            });
+        }
+        excluded |= *access;
+    }
+    Ok(allowance.concrete | (allowance.groups & !excluded))
 }
 
 impl TryFrom<NonEmptyStruct<JsonPolicy>> for Policy {
@@ -67,70 +178,157 @@ impl TryFrom<NonEmptyStruct<JsonPolicy>> for Policy {
         let mut policy = Self::empty();
         let json = json.into_inner();
 
-        policy.abi = json.abi.map(Into::into);
+        let abi = json.abi.into();
+        policy.abi = Some(abi);
 
-        for variable in json.variable.unwrap_or_default() {
-            let name = variable.name.parse()?;
-            let literal = variable.literal.unwrap_or_default();
-            // TODO: Check and warn if users tried to use variable in literal strings?
-            policy.variables.extend(name, literal);
+        if let OptionalProperty::Present(variables) = json.variable {
+            for variable in variables {
+                let name = variable.name.parse()?;
+                let literal = match variable.literal {
+                    OptionalProperty::Missing => Default::default(),
+                    OptionalProperty::Present(literal) => literal,
+                };
+                // TODO: Check and warn if users tried to use variable in literal strings?
+                policy.variables.extend(name, literal);
+            }
         }
 
-        for ruleset in json.ruleset.unwrap_or_default() {
-            let ruleset = ruleset.into_inner();
-            policy.handled_fs |= ruleset
-                .handledAccessFs
-                .map(|access| access.resolve_bitflags(policy.abi))
-                .transpose()?
-                .unwrap_or_default();
-            policy.handled_net |= ruleset
-                .handledAccessNet
-                .map(|access| access.resolve_bitflags(policy.abi))
-                .transpose()?
-                .unwrap_or_default();
-            policy.scoped |= ruleset
-                .scoped
-                .map(|scoped| scoped.resolve_bitflags(policy.abi))
-                .transpose()?
-                .unwrap_or_default();
-        }
-
-        for path_beneath in json.pathBeneath.unwrap_or_default() {
-            let access = path_beneath.allowedAccess.resolve_bitflags(policy.abi)?;
-
-            // It is possible to have rules with empty access because of empty
-            // access group resolution.
-            if !access.is_empty() {
-                // Automatically augment and keep the ruleset consistent.
-                policy.handled_fs |= access;
-
-                for parent in path_beneath.parent {
-                    policy
-                        .rules_path_beneath
-                        .entry(parent)
-                        .and_modify(|a| *a |= access)
-                        .or_insert(access);
+        let mut has_handled_fs = false;
+        let mut has_handled_net = false;
+        let mut has_scoped = false;
+        let mut handled_fs = ResolvedAccessExpression::default();
+        let mut handled_net = ResolvedAccessExpression::default();
+        let mut scoped = ResolvedAccessExpression::default();
+        if let OptionalProperty::Present(rulesets) = json.ruleset {
+            for ruleset in rulesets {
+                let ruleset = ruleset.into_inner();
+                if let OptionalProperty::Present(access) = ruleset.handledAccessFs {
+                    validate_access_abi(
+                        "filesystem access right",
+                        abi,
+                        access.iter().filter_map(|item| item.concrete()),
+                    )?;
+                    has_handled_fs = true;
+                    handled_fs.merge(access.resolve_expression(abi)?);
+                }
+                if let OptionalProperty::Present(access) = ruleset.handledAccessNet {
+                    validate_access_abi(
+                        "network access right",
+                        abi,
+                        access.iter().filter_map(|item| item.concrete()),
+                    )?;
+                    has_handled_net = true;
+                    handled_net.merge(access.resolve_expression(abi)?);
+                }
+                if let OptionalProperty::Present(access) = ruleset.scoped {
+                    validate_access_abi(
+                        "scope",
+                        abi,
+                        access.iter().filter_map(|item| item.concrete()),
+                    )?;
+                    has_scoped = true;
+                    scoped.merge(access.resolve_expression(abi)?);
                 }
             }
         }
 
-        for net_port in json.netPort.unwrap_or_default() {
-            let access = net_port.allowedAccess.resolve_bitflags(policy.abi)?;
+        let handled_fs = if has_handled_fs {
+            validate_access_expression("filesystem access right", abi, handled_fs)?
+        } else {
+            ValidatedAccess {
+                access: AccessFs::from_all(abi),
+                exceptions: Vec::new(),
+            }
+        };
+        let handled_net = if has_handled_net {
+            validate_access_expression("network access right", abi, handled_net)?
+        } else {
+            ValidatedAccess {
+                access: AccessNet::from_all(abi),
+                exceptions: Vec::new(),
+            }
+        };
+        let scoped = if has_scoped {
+            validate_access_expression("scope", abi, scoped)?
+        } else {
+            ValidatedAccess {
+                access: Scope::from_all(abi),
+                exceptions: Vec::new(),
+            }
+        };
+        policy.handled_fs = handled_fs.access;
+        policy.handled_net = handled_net.access;
+        policy.scoped = scoped.access;
 
-            // It is possible to have rules with empty access because of empty
-            // access group resolution.
-            if !access.is_empty() {
-                // Automatically augment and keep the ruleset consistent.
-                policy.handled_net |= access;
+        if let OptionalProperty::Present(path_beneath_rules) = json.pathBeneath {
+            for path_beneath in path_beneath_rules {
+                validate_access_abi(
+                    "filesystem access right",
+                    abi,
+                    path_beneath
+                        .allowedAccess
+                        .iter()
+                        .filter_map(|item| item.concrete()),
+                )?;
+                let access = resolve_allowance(
+                    "filesystem access right",
+                    path_beneath.allowedAccess.resolve_allowance(abi)?,
+                    &handled_fs.exceptions,
+                )?;
 
-                for port in net_port.port {
-                    policy
-                        .rules_net_port
-                        .entry(port)
-                        .and_modify(|a| *a |= access)
-                        .or_insert(access);
+                // It is possible to have rules with empty access because of empty
+                // access group resolution or exception masking.
+                if !access.is_empty() {
+                    // Automatically augment and keep the ruleset consistent.
+                    policy.handled_fs |= access;
+
+                    for parent in path_beneath.parent {
+                        policy
+                            .rules_path_beneath
+                            .entry(parent)
+                            .and_modify(|a| *a |= access)
+                            .or_insert(access);
+                    }
                 }
             }
+        }
+
+        if let OptionalProperty::Present(net_port_rules) = json.netPort {
+            for net_port in net_port_rules {
+                validate_access_abi(
+                    "network access right",
+                    abi,
+                    net_port
+                        .allowedAccess
+                        .iter()
+                        .filter_map(|item| item.concrete()),
+                )?;
+                let access = resolve_allowance(
+                    "network access right",
+                    net_port.allowedAccess.resolve_allowance(abi)?,
+                    &handled_net.exceptions,
+                )?;
+
+                // It is possible to have rules with empty access because of empty
+                // access group resolution or exception masking.
+                if !access.is_empty() {
+                    // Automatically augment and keep the ruleset consistent.
+                    policy.handled_net |= access;
+
+                    for port in net_port.port {
+                        policy
+                            .rules_net_port
+                            .entry(port)
+                            .and_modify(|a| *a |= access)
+                            .or_insert(access);
+                    }
+                }
+            }
+        }
+
+        if policy.handled_fs.is_empty() && policy.handled_net.is_empty() && policy.scoped.is_empty()
+        {
+            return Err(PolicyError::EmptyRuleset);
         }
 
         Ok(policy)

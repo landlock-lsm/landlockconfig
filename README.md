@@ -26,6 +26,73 @@ guarantees.
 
 ## Policy principles
 
+### Policy composition and authority
+
+A Landlock policy can be assembled by composing component compatibility policies
+stored in separate files. Keeping these compatibility declarations separate
+lets callers share and reuse them as policy snippets. It also lets ownership and
+maintenance of a component's declarations be delegated to the party responsible
+for that component, such as an application or library maintainer or a
+distribution packager. Each policy describes the restrictions and resource
+allowances under which its component is expected to work. Each owner is
+responsible for maintaining and testing its component with the declarations in
+that policy, and for retesting it after changing them.
+
+For example, an application may depend on several libraries or plugins, each
+delivered by a separate package and maintained by a different party. Each party
+can own and maintain the compatibility policy for its component. A caller that
+trusts all of these parties can compose their policies into one policy while
+leaving each component owner responsible for its declarations.
+
+Composing policies computes one policy intended to preserve the declared
+compatibility requirements of every represented component. It does not combine
+independent security requirements. Composition:
+
+- uses the minimum effective policy ABI;
+- intersects handled filesystem and network rights;
+- intersects scoped rights;
+- unions literal values declared for the same variable name; and
+- unions path and port allowances, then limits them to the commonly handled
+  rights.
+
+Variable names share one composition-wide namespace. When multiple component
+policies declare the same name, templates using that name expand over the union
+of their literal values. Component owners must therefore coordinate shared names
+or account for every resulting expansion in their compatibility tests.
+
+This is intentionally compatibility-oriented. For ordinary access rights, the
+composed policy only enforces a restriction if every selected policy declares
+that its component tolerates that restriction. When every component handles a
+right, the composed policy retains the resource allowances requested by all of
+them.
+
+A policy can therefore weaken the resulting confinement by leaving rights out
+of an explicit handled array or requesting broad allowances. The caller must
+trust every selected policy to state its component's compatibility requirements
+accurately. Composition provides confinement only to the extent implied by the
+selected compatibility declarations. It is not a security boundary between
+mutually distrusting policy authors. It cannot prove that a component was tested
+correctly.
+
+When restrictions come from independent security authorities and must not be
+weakened by a component policy, apply separate Landlock ruleset layers instead
+of composing the policies. Landlock makes denials from stacked layers
+cumulative: for rights restricted by multiple layers, an operation must satisfy
+every relevant layer, and an allowance in one layer cannot override another
+layer's denial. For example, an application and its libraries may compose their
+compatibility policies, while a service manager or system administrator applies
+another layer containing mandatory site restrictions.
+
+In short:
+
+```text
+policy composition          = preserve declared component compatibility by
+                              enforcing only common handled restrictions and
+                              retaining requested allowances for commonly
+                              handled rights
+stacked Landlock rulesets   = enforce every independent authority's restrictions
+```
+
 ### JSON specification
 
 The JSON format is used to define a Landlock security policy as specified by the
@@ -42,10 +109,29 @@ service managers, container runtimes) might be newer or older than the running
 kernel.
 
 In the case of an older kernel and a newer user space, an up-to-date Landlock
-policy should be still compatible as much as possible with older kernels.
-The default behavior should then be to following a best-effort approach to
-protect users as much as possible.  See the "compatibility" modes in [the
-specification](schema/landlock-policy.json).
+policy should remain as compatible as possible with older kernels. The default
+behavior therefore follows a best-effort approach that protects users with the
+supported functionality.
+
+Every policy must declare a Landlock ABI version from 1 through 2^31 - 1, the
+positive `i32` range. Declaring the ABI makes the policy's tested compatibility
+contract explicit and keeps its meaning stable across library upgrades. It is
+not inferred from the library version or the running kernel.
+
+If an in-range requested ABI is newer than the library supports, the library
+uses its latest supported ABI to interpret the policy. The resulting ruleset
+then follows rust-landlock's compatibility handling for the running kernel,
+which may further reduce the rights handled and enforced. This preserves the
+known subset of a future policy, but it does not make unknown access names,
+properties, or rule types valid; unknown syntax remains an error.
+
+Concrete access and scope names must be supported by the effective policy ABI.
+Known fields and positive `abi.*` groups remain valid at every ABI; each group
+resolves only to rights supported by that ABI and may resolve to an empty set.
+
+Changing a component policy's ABI or any handled, scoped, exception, variable,
+or allowance declaration changes its compatibility contract. The component
+owner must retest the component after any such change.
 
 **TODO:**
 In the case of an older user space and a newer kernel, it should be possible for
@@ -75,6 +161,64 @@ version](https://landlock.io/rust-landlock/landlock/enum.ABI.html).
 The parser should limit error cases as much as possible. One way to achieve that
 is to automatically complete the known properties (e.g., handled access rights
 are automatically completed according to all used access rights).
+
+For each filesystem, network, and scoped category omitted from every ruleset
+entry, the policy handles or scopes all rights supported by its effective
+ABI. Present arrays override that category's base and are unioned across repeated
+ruleset entries; an empty array suppresses the ABI-derived base. Path and port
+rules continue to add their rights to the corresponding handled category, while
+rules do not augment scoped rights. Only omission selects a default; explicit
+JSON `null` is invalid. Because explicit arrays can reduce handled rights, they
+should describe tested component compatibility requirements.
+
+A policy containing only an ABI is valid and selects these defaults
+without adding resource allowances.
+
+A directly parsed policy whose final three masks are empty is rejected.
+Composition remains infallible and can later intersect every mask to empty; in
+that case, building the composed policy fails because there is no handled access.
+
+### Compatibility exceptions
+
+A handled or scoped array may subtract a concrete right from an explicitly
+present positive ABI group. This records a tested compatibility requirement
+while keeping new rights handled as the group expands. For example:
+
+```json
+{
+  "abi": 5,
+  "ruleset": [{
+    "handledAccessFs": ["abi.all", "-ioctl_dev"],
+    "handledAccessNet": [],
+    "scoped": []
+  }],
+  "pathBeneath": [{
+    "allowedAccess": ["abi.read_write"],
+    "parent": ["/tmp"]
+  }]
+}
+```
+
+```toml
+abi = 5
+
+[[ruleset]]
+handled_access_fs = ["abi.all", "-ioctl_dev"]
+handled_access_net = []
+scoped = []
+
+[[path_beneath]]
+allowed_access = ["abi.read_write"]
+parent = ["/tmp"]
+```
+
+The exception must be contained in a positive `abi.*` group in the same source
+and category. A concrete right cannot appear with both signs. Resource-rule ABI
+groups are masked by the exception before they augment handled rights; a rule
+that explicitly lists the excepted concrete right is an error. Negative groups
+and negative resource-rule allowances are invalid.
+
+Each exception is therefore a tested component compatibility decision.
 
 ## Reference implementation
 
@@ -154,18 +298,20 @@ cargo install --path landlock-exec
 landlock-exec --json examples/mini-write-tmp.json sh
 ```
 
-Policy inputs can be composed by specifying `--json` or `--toml` (and related
-file or directory paths) several times.
+Component compatibility policies can be composed by specifying `--json` or
+`--toml` (and related file or directory paths) several times. See
+[Policy composition and authority](#policy-composition-and-authority)
+before combining policies from different maintainers.
 
 ## TOML policy example
 
-Here is an example of a [TOML policy](examples/micro-var.toml) that uses
-variables, access right groups, and list of directory hierarchies for
-conciseness.
+Here is an abridged [TOML policy](examples/micro-var.toml) that uses variables,
+access right groups, and a list of directory hierarchies for conciseness.
 
 ```toml
-abi = 6
+abi = 5
 
+# The omitted ruleset defaults to all rights supported by ABI 5.
 [[variable]]
 name = "tmp"
 literal = ["/tmp", "/var/tmp"]
@@ -216,3 +362,35 @@ repository, they are replaced without compatibility aliases:
 - The Debian `liblandlockconfig0`, `liblandlockconfig-dev`, and `llconfig`
   packages are replaced by `liblandlock-policy0`, `liblandlock-policy-dev`,
   `landlock-policy`, and `landlock-exec`.
+
+## Policy format migration
+
+Policies accepted by earlier versions may require these updates:
+
+- Every policy must declare the Landlock ABI against which it was tested.
+  Choose the tested compatibility contract rather than blindly selecting the
+  newest ABI.
+- A concrete access or scope right must be supported by the effective policy ABI.
+  Remove an unsupported right or raise the ABI after reviewing and testing the
+  additional Landlock features.
+- Omitting `handled_access_fs`, `handled_access_net`, or `scoped` previously
+  left that category unhandled. Omission now selects all rights supported by
+  the effective policy ABI. Use an explicit empty array to keep a category unhandled.
+
+For example, this policy previously handled only filesystem execution:
+
+```toml
+[[ruleset]]
+handled_access_fs = ["execute"]
+```
+
+After testing it against ABI 6, preserve that behavior with:
+
+```toml
+abi = 6
+
+[[ruleset]]
+handled_access_fs = ["execute"]
+handled_access_net = []
+scoped = []
+```
